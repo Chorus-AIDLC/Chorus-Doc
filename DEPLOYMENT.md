@@ -4,28 +4,41 @@ The documentation site is an independent static Cloudflare Pages deployment. It
 does not replace the Chorus application repository, its README, or the landing
 site.
 
-## GitHub configuration
+Publication uses the **Cloudflare Pages Git integration**: Cloudflare watches the
+repository, runs the build, and publishes the generated `dist` output. There is
+no GitHub Actions workflow and no self-managed API token in this flow — the Git
+integration is authorized by Cloudflare itself.
 
-Create a protected GitHub environment named `docs-production`. Require reviewers
-for that environment, then configure:
+## Cloudflare Pages build settings
 
-| Name                       | Kind                 | Purpose                                                        |
-| -------------------------- | -------------------- | -------------------------------------------------------------- |
-| `DOCS_SITE_URL`            | environment variable | Public canonical URL, including `https://`                     |
-| `CLOUDFLARE_ACCOUNT_ID`    | environment variable | Cloudflare account containing the Pages project                |
-| `CLOUDFLARE_PROJECT_NAME`  | environment variable | Existing Pages project name                                    |
-| `CLOUDFLARE_API_TOKEN`     | environment secret   | Token scoped to deploy that Pages project                     |
-| `PUBLIC_GA_MEASUREMENT_ID` | environment variable | Optional. Google Analytics 4 measurement id (`G-…`) to enable analytics; leave unset to keep the site analytics-free |
+In the Cloudflare dashboard, under **Workers & Pages → the docs project →
+Settings → Build**:
 
-Pull-request CI has read-only repository permission and does not reference the
-environment or any Cloudflare secret.
+| Setting                | Value        |
+| ---------------------- | ------------ |
+| Build command          | `pnpm build` |
+| Deploy command         | `pnpm build` |
+| Root directory         | *(repository root)* |
 
-`PUBLIC_GA_MEASUREMENT_ID` is optional. When it is set, the build injects the GA4
-`gtag.js` snippet on every page; when it is unset or blank, the build emits no
-analytics code at all, so local development, previews, and internal/demo
-deployments stay analytics-free without any per-environment toggle. It is
-deliberately separate from the landing site's Google Analytics property — set a
-distinct measurement id here to keep documentation traffic in its own report.
+`pnpm build` runs `content:check`, `astro build`, and generates the `.md`
+mirrors, `llms.txt`, and sitemaps. It publishes to `dist`, which matches
+`pages_build_output_dir` in `wrangler.jsonc` — keep the two in sync.
+
+### Analytics (optional)
+
+Google Analytics 4 is env-gated on `PUBLIC_GA_MEASUREMENT_ID`. To enable
+analytics, add it as a build environment variable in the same Build settings;
+when it is unset or blank the build emits no analytics code at all, so previews
+and internal deployments stay analytics-free without any per-environment toggle.
+Set a distinct measurement id from the landing site's Google Analytics property
+to keep documentation traffic in its own report.
+
+### Quality-gate note
+
+The Cloudflare build runs only `pnpm build`, not the full `pnpm check` gate. The
+link and accessibility checks depend on a Playwright browser that is not present
+in Cloudflare's build image, so they do not run during deployment. Run
+`pnpm check` locally before merging to `main` — it is the real quality bar.
 
 ## Local validation
 
@@ -36,14 +49,9 @@ require credentials:
 pnpm install --frozen-lockfile
 pnpm exec playwright install chromium
 pnpm check
-pnpm deploy:check
 ```
 
-`deploy:check` validates the workflow/configuration contract and asks the
-installed Wrangler CLI to parse its current `pages deploy` help. It does not run
-the deploy command.
-
-Review the generated site locally before requesting publication:
+Review the generated site locally before merging:
 
 ```sh
 pnpm preview --host 127.0.0.1
@@ -55,40 +63,27 @@ and sitemap at the URL printed by Astro.
 
 ## Production deployment
 
-1. Create the Cloudflare Pages project named by `CLOUDFLARE_PROJECT_NAME`.
-2. Configure the `docs-production` GitHub environment and its approval policy.
-3. Run the **Deploy Docs** workflow manually and confirm the deployment branch.
-4. Approve the protected environment prompt.
-5. Confirm the workflow passes `pnpm check` before its publish step.
-6. Verify the deployment at `DOCS_SITE_URL`.
+1. Create the Cloudflare Pages project connected to this Git repository.
+2. Configure the Build settings above (build command `pnpm build`).
+3. Merge to the production branch; Cloudflare builds and publishes automatically.
+4. Verify the deployment at the project's public URL.
 
 V1 publishes only documentation for the current Chorus version.
-
-The upload command is:
-
-```sh
-wrangler pages deploy dist \
-  --project-name "$CLOUDFLARE_PROJECT_NAME" \
-  --branch main
-```
-
-It runs from the repository root, so only `dist` is uploaded.
 
 ## Rollback and disablement
 
 To roll back content, use Cloudflare Pages deployment history to promote the last
-known-good production deployment, or rerun **Deploy Docs** from a known-good
-commit. Verify the restored site at `DOCS_SITE_URL`.
+known-good production deployment, or revert the offending commit on the
+production branch and let Cloudflare rebuild.
 
-To stop publication, disable `.github/workflows/docs-deploy.yml` or remove
-approval access from the `docs-production` environment. Do not remove
-`.github/workflows/docs-pr.yml`; it remains an unprivileged quality gate.
+To stop publication, disconnect the Git integration or pause automatic
+deployments in the Cloudflare Pages project settings.
 
 Disabling or rolling back this deployment does not alter the Chorus application
 repository, the landing site, or the Chorus application deployment.
 
 Cloudflare references:
 
-- [Wrangler Pages commands](https://developers.cloudflare.com/workers/wrangler/commands/pages/)
-- [Pages Direct Upload](https://developers.cloudflare.com/pages/get-started/direct-upload/)
+- [Pages Git integration](https://developers.cloudflare.com/pages/configuration/git-integration/)
+- [Pages build configuration](https://developers.cloudflare.com/pages/configuration/build-configuration/)
 - [Pages Wrangler configuration](https://developers.cloudflare.com/pages/functions/wrangler-configuration/)

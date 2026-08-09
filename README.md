@@ -63,7 +63,6 @@ conventions, and screenshot requirements.
 | `pnpm check:links` | Internal + allowlisted-external link check |
 | `pnpm check:browser` | Responsive, keyboard, and accessibility baseline |
 | `pnpm preview` | Serve the production `dist` output |
-| `pnpm deploy:check` | Validate the deployment configuration contract (no publish) |
 
 Run `pnpm check` before opening a review — it is the same gate CI runs.
 
@@ -77,10 +76,9 @@ also emits `/llms.txt` and sitemaps.
 
 ## Deployment
 
-Publication uses the protected **Deploy Docs** GitHub Actions workflow
-(`.github/workflows/docs-deploy.yml`) targeting Cloudflare Pages. See
-[`DEPLOYMENT.md`](./DEPLOYMENT.md) for the required environment variables,
-secrets, and the manual approval flow.
+Publication uses the Cloudflare Pages Git integration: Cloudflare builds the
+site from the repository and auto-publishes the build output. See
+[`DEPLOYMENT.md`](./DEPLOYMENT.md) for the build settings.
 
 Google Analytics 4 is env-gated: the build injects `gtag.js` only when
 `PUBLIC_GA_MEASUREMENT_ID` is set, so local dev, previews, and internal domains

@@ -14,7 +14,6 @@
     "check:links": "node scripts/check-links.mjs",
     "check:browser": "node tests/browser-quality.mjs",
     "check:preview": "node tests/preview-integration.mjs",
-    "deploy:check": "node tests/deployment-contract.mjs && wrangler pages deploy --help",
     "test:quality-gate": "node tests/quality-gate-contract.mjs",
     "preview": "astro preview"
   },

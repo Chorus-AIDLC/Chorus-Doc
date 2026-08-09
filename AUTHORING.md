@@ -101,7 +101,7 @@ and is not a product screenshot. Do not use it as precedent for product document
 ## Release handoff
 
 Do not run a Cloudflare deployment as part of routine authoring. Complete the local
-`pnpm check` and production-preview review, then follow `DEPLOYMENT.md`. Publication
-uses the protected **Deploy Docs** workflow and requires the configured environment plus
-human approval. The release workflow reruns the same quality gate before uploading only
-`dist`.
+`pnpm check` and production-preview review before merging. Publication happens through
+the Cloudflare Pages Git integration, which builds from the repository and auto-publishes
+`dist` — see `DEPLOYMENT.md`. Cloudflare's build runs only `pnpm build`, so `pnpm check`
+locally is the real quality gate.

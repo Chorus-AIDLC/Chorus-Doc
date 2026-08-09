@@ -98,10 +98,10 @@ intrinsic width/height. See `AUTHORING.md` for the full review checklist.
 
 ## Deployment
 
-Cloudflare Pages via the protected **Deploy Docs** workflow
-(`.github/workflows/docs-deploy.yml`, `workflow_dispatch` + manual approval). PRs
-run the read-only gate in `docs-pr.yml`. Required config lives in the
-`docs-production` GitHub environment — see `DEPLOYMENT.md`.
+Cloudflare Pages **Git integration**: Cloudflare builds from the repo (build
+command `pnpm build`) and auto-publishes `dist`. No GitHub Actions workflow and
+no self-managed API token — see `DEPLOYMENT.md`. Run `pnpm check` locally before
+merging; Cloudflare's build only runs `pnpm build` (no Playwright in its image).
 
 GA4 is env-gated on `PUBLIC_GA_MEASUREMENT_ID`: unset ⇒ no analytics code emitted
 anywhere (keeps dev/preview/internal domains analytics-free). It is deliberately
