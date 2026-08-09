@@ -101,7 +101,7 @@ and is not a product screenshot. Do not use it as precedent for product document
 ## Release handoff
 
 Do not run a Cloudflare deployment as part of routine authoring. Complete the local
-`pnpm check` and production-preview review before merging. Publication happens through
-the Cloudflare Pages Git integration, which builds from the repository and auto-publishes
-`dist` — see `DEPLOYMENT.md`. Cloudflare's build runs only `pnpm build`, so `pnpm check`
-locally is the real quality gate.
+`pnpm check` and production-preview review before merging. Publication is a Cloudflare
+Workers static-asset deploy (`pnpm build`, then `npx wrangler deploy`) — see
+`DEPLOYMENT.md`. Cloudflare's build runs only `pnpm build`, so `pnpm check` locally is
+the real quality gate.

@@ -98,10 +98,14 @@ intrinsic width/height. See `AUTHORING.md` for the full review checklist.
 
 ## Deployment
 
-Cloudflare Pages **Git integration**: Cloudflare builds from the repo (build
-command `pnpm build`) and auto-publishes `dist`. No GitHub Actions workflow and
-no self-managed API token — see `DEPLOYMENT.md`. Run `pnpm check` locally before
-merging; Cloudflare's build only runs `pnpm build` (no Playwright in its image).
+Cloudflare **Workers static assets** (same model as `../ai-pm/packages/landing`):
+`wrangler.jsonc` uses `assets.directory: ./dist`, so the deploy command is
+`npx wrangler deploy` (NOT `wrangler pages deploy` — that's for the Pages
+`pages_build_output_dir` config we no longer use). Build with `pnpm build`. No
+GitHub Actions workflow; Cloudflare's Git build supplies deploy credentials, so
+do NOT set a `CLOUDFLARE_API_TOKEN` build variable (it overrides the built-in
+one → auth error). See `DEPLOYMENT.md`. Run `pnpm check` locally before merging;
+Cloudflare's build only runs `pnpm build` (no Playwright in its image).
 
 GA4 is env-gated on `PUBLIC_GA_MEASUREMENT_ID`: unset ⇒ no analytics code emitted
 anywhere (keeps dev/preview/internal domains analytics-free). It is deliberately

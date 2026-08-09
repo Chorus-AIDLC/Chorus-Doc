@@ -76,9 +76,10 @@ also emits `/llms.txt` and sitemaps.
 
 ## Deployment
 
-Publication uses the Cloudflare Pages Git integration: Cloudflare builds the
-site from the repository and auto-publishes the build output. See
-[`DEPLOYMENT.md`](./DEPLOYMENT.md) for the build settings.
+Publication is a Cloudflare Workers static-asset deploy (`wrangler.jsonc` sets
+`assets.directory: ./dist`), the same model as the landing site: build with
+`pnpm build`, then `npx wrangler deploy`. See [`DEPLOYMENT.md`](./DEPLOYMENT.md)
+for the build settings.
 
 Google Analytics 4 is env-gated: the build injects `gtag.js` only when
 `PUBLIC_GA_MEASUREMENT_ID` is set, so local dev, previews, and internal domains
