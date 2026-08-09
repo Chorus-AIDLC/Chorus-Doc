@@ -1,0 +1,67 @@
+---
+title: 手动创建与编辑实体
+description: 想法、任务、提案的手动入口（创建、编辑、移动、改挂父级、删除）作为”智能体提案、人类验证”自动流程的补充。
+docsLocale: zh
+route: /zh/guides/create-and-edit-entities/
+---
+
+import Screenshot from '../../../../components/Screenshot.astro';
+
+Chorus 通常运行在[反转对话](/zh/guides/ai-dlc-workflow/)之上：智能体提案，你来验证。但每一类实体也都有**手动入口**，你可以亲手写一个想法、一个任务，或一整份提案，也可以编辑、移动、改挂父级或删除已有的实体。本页讲述这些人工创作界面；至于实体之后走的生命周期，这里通过交叉链接到各阶段指南，而不重复讲解。
+
+## 手动创建想法
+
+想法位于项目**概览**（Overview）的想法看板中。选择 **New Idea** 打开对话框，有两种记录方式：
+
+- **Fill a form**：给想法填写标题和可选的描述。一个 **Make this a theme** 选项会把它变成用于归拢的主题（主题靠派生子想法来推进），而不是单一交付物。
+- **Describe to an agent**：在聊天输入框里把想法讲清楚，让在线智能体和你一起塑造它。此模式需要有智能体在线，没有时不可用。你也可以在描述时请智能体把一个大请求拆成若干子想法。
+
+<Screenshot
+  src="/images/workspace/new-idea-dialog.webp"
+  alt="项目概览上的 New Idea 对话框，展示 Fill a form 与 Describe to an agent 两个标签页以及 Make this a theme 选项"
+  width={1440}
+  height={900}
+  caption="New Idea 对话框既可填表单，也可把想法描述给智能体，还能勾选设为主题。"
+/>
+
+:::note[智能体在做什么]
+手动创建的想法进入与其他想法相同的流水线。一旦你把它分配给某个智能体，智能体就会运行需求细化，并起草一份提案供你审核。完整流程见[记录想法](/zh/guides/capture-an-idea/)。
+:::
+
+## 编辑、移动或改挂想法
+
+打开一个想法即可看到它的详情面板。在这里你可以 **Edit Idea**（修改标题和描述）、**Delete Idea**，或用 **Move to project…** 把它移动到另一个项目，移动对话框会在你确认前预览随想法一起移动的内容。
+
+面板还管理**血缘**，即想法之间的父子关系：
+
+- **Set parent** / **Change parent**：把当前想法挂到另一个想法之下，或改挂到别的父想法。
+- **Derive new idea**：从当前想法派生一个子想法（一个完整的想法，拥有自己的细化、提案和任务）。
+- **Detach (make top-level)**：解除父级链接，把想法退回顶层。
+
+**Make this a theme** 可在”单一交付物”与”用于归拢的主题”之间切换想法。主题只归拢它的子项，本身不能变成提案，参见[记录想法](/zh/guides/capture-an-idea/)中”主题与派生”一节。
+
+## 手动创建任务（Quick Task）
+
+大多数任务是在你批准提案时落地的，但当某项工作不需要完整的”想法→提案”循环时，你也可以直接新增一个，即 **Quick Task**。在 **Tasks** 看板上选择 **New Task**，填写标题和描述、**Priority**、工作量预估、**Acceptance Criteria**（审核者据以验证的清单），以及任何 **Dependencies**（用 **Add Dependency** 要求其他任务先完成）。手动创建的任务从未分配的开放状态开始，和落地而来的任务一样随时可被认领或指派。
+
+:::note[智能体在做什么]
+Quick Task 一经创建就是一个普通任务，把它分配给某个智能体，等它的依赖满足后，智能体会认领、执行，并提交给你验证。认领、指派与状态路径见[执行任务](/zh/guides/run-tasks/)。
+:::
+
+## 编辑任务及其依赖
+
+打开一个任务会进入同一个面板，此时标题为 **Edit Task**。修改任意字段后 **Save Changes**，或用 **Delete Task** 删除它。该面板还驱动状态路径：**Start Work**、**Submit for Review**、**Mark as Verified** 和 **Assign**。
+
+依赖有两个方向可读：**Depends on** 列出当前任务所等待的上游任务，**Blocked by this** 列出等待当前任务的下游任务。只有当一个任务依赖的一切都已完成，它才能开始。在看板上移动一张仍被阻塞的卡片时会弹出守卫；当你确认顺序无碍时，可以用 **Force Move** 强制移动。
+
+## 手动创建提案
+
+提案通常由 PM 智能体撰写，但你也可以自己写一份。选择 **Create Proposal**，填写标题，并选择这份提案要交付的想法，只有你已认领或被分配的想法可选，所以列表为空时先去认领一个。创建提案后会打开编辑，你在这里组装计划：为每份 PRD、设计或规格用 **Add Document**，为每个工作单元用 **Add Task**（连同它的验收标准和依赖）。计划完成后，**Submit for Review** 会把它送入与智能体所写提案相同的审批关口。
+
+:::note[智能体在做什么]
+无论提案由智能体还是你撰写，批准都是决策关口：审阅并批准其文档和任务草稿后，它们会落地成真正的 Document 和开放状态的 Task。批准会创建什么见[审核提案](/zh/guides/review-a-proposal/)。
+:::
+
+## 下一步
+
+以上是各类手动入口；它们创建出的实体走的是标准生命周期。继续阅读[记录想法](/zh/guides/capture-an-idea/)、[审核提案](/zh/guides/review-a-proposal/)或[执行任务](/zh/guides/run-tasks/)。完整的状态模型见[生命周期参考](/zh/reference/lifecycle/)。

@@ -1,0 +1,50 @@
+---
+title: Generic MCP clients
+description: 호환되는 MCP 클라이언트를 Chorus 도구에 연결합니다.
+docsLocale: ko
+route: /ko/reference/agents/generic-mcp/
+---
+
+# Generic MCP clients
+
+이 옵션은 클라이언트가 Streamable HTTP MCP를 지원하지만 전용 Chorus 통합은 없을 때 사용합니다.
+이 연결은 Chorus 도구만 노출하며, Chorus 워크플로를 설치하거나 클라이언트를 원격으로 사용할 수
+있게 만들지 않습니다.
+
+구성 전에 [에이전트 액세스 준비](/ko/guides/administrator-setup/)에 따라, 그 클라이언트에 필요한
+권한만 가진 에이전트 키를 만드세요.
+
+## MCP 서버 구성
+
+`chorus`라는 이름의 Streamable HTTP MCP 서버를 다음 값으로 추가합니다.
+
+```text
+URL: https://chorus.example.com/api/mcp
+Authorization: Bearer cho_REDACTED
+```
+
+가능하면 클라이언트의 보호된 자격 증명 저장소를 사용하세요. 구성 문법은 클라이언트마다 다르므로,
+URL과 사용자 지정 Authorization 헤더 추가는 클라이언트 문서를 따르세요.
+
+## 연결 확인
+
+사용 가능한 MCP 도구를 나열하고 `chorus_checkin`을 호출합니다. 응답이 예상한 에이전트 신원과
+권한을 보여 주는지 확인합니다.
+
+## 기능과 제한
+
+- 클라이언트는 그 에이전트 키가 허용하는 Chorus MCP 도구를 호출할 수 있습니다.
+- Chorus 스킬, 훅, 검토자, 워크플로 순서 제어는 설치되지 않습니다.
+- 범용 MCP 클라이언트는 Chorus 데몬 백엔드가 아닙니다.
+- Chorus는 클라이언트를 원격으로 시작, 제어, 중단, 재개할 수 없습니다.
+- 대화와 도구 실행 복구는 여전히 클라이언트의 책임입니다.
+
+## 자주 발생하는 문제
+
+- **`401 Unauthorized`:** 에이전트 키를 교체하고 클라이언트 자격 증명을 업데이트합니다.
+- **`404 Not Found`:** 정확한 `/api/mcp` 엔드포인트를 사용합니다.
+- **도구는 작동하지만 워크플로가 멈춤:** 클라이언트가 각 워크플로 단계와 검토 게이트를 스스로
+  실행해야 합니다.
+- **클라이언트가 HTTP 헤더를 설정할 수 없음:** 이 MCP 엔드포인트에 인증할 수 없습니다.
+
+일반적인 키와 연결 확인은 [문제 해결](/ko/guides/troubleshooting/)을 참고하세요.

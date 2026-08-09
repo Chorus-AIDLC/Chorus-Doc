@@ -1,0 +1,103 @@
+---
+title: Operate a self-hosted Chorus
+description: Bootstrap first access, configure authentication, run migrations, upgrade safely, and set cookie and reverse-proxy options.
+docsLocale: en
+route: /guides/deploy-operations/
+sidebar:
+  order: 23
+---
+
+This guide covers operating a self-hosted Chorus after it is deployed: getting the first
+person signed in, configuring authentication, upgrading safely, and the cookie and
+reverse-proxy settings that matter behind HTTPS. For how to stand a deployment up, see
+[Deploy in production](/guides/deploy-production/) or
+[Deploy with Docker](/guides/deploy-docker/).
+
+## Bootstrap first access
+
+A fresh deployment has no accounts yet. Set `DEFAULT_USER` and `DEFAULT_PASSWORD` to
+enable a built-in email/password login that bypasses single sign-on:
+
+```sh
+DEFAULT_USER='admin@example.com' \
+DEFAULT_PASSWORD='choose-a-strong-password'
+```
+
+When both variables are set, the login page shows an email/password form. On the first
+successful login, Chorus auto-provisions the user and its company from the email, so no
+manual setup is needed to get in.
+
+### Turn the built-in login off
+
+The built-in login is a bootstrap mechanism, not a permanent account system. Once real
+accounts exist — or once single sign-on is configured — turn it off by unsetting both
+`DEFAULT_USER` and `DEFAULT_PASSWORD` and restarting Chorus. With the pair removed, the
+built-in email/password form no longer appears and access goes through your configured
+identity provider instead.
+
+## Configure deployment-side authentication
+
+Two kinds of authentication are configured at the deployment level.
+
+### SuperAdmin bootstrap
+
+The `/admin` SuperAdmin panel is bootstrapped from environment variables, not from a
+database account:
+
+| Variable | Description |
+| --- | --- |
+| `SUPER_ADMIN_EMAIL` | Email for the SuperAdmin account that can reach the `/admin` panel. |
+| `SUPER_ADMIN_PASSWORD_HASH` | Bcrypt hash of the SuperAdmin password (never the plaintext). |
+
+Generate the hash and pass it as `SUPER_ADMIN_PASSWORD_HASH`:
+
+```sh
+node -e "console.log(require('bcryptjs').hashSync('your-password', 10))"
+```
+
+:::caution[Store the hash, not the password]
+Only the bcrypt hash belongs in your configuration. Keep the plaintext password out of
+environment files, shell history, and source control, and inject the hash through a secret
+store where possible.
+:::
+
+### Single sign-on (OIDC)
+
+Single sign-on is **not** configured through environment variables. The SuperAdmin
+configures OIDC per company from the `/admin` panel, and the settings are stored in the
+database. Each company has its own issuer, client ID, and enable toggle. Chorus uses PKCE
+and does **not** require a client secret. So the deployment-level bootstrap gets the
+SuperAdmin in, and the SuperAdmin then enables SSO for each company from the admin panel —
+no separate secret provisioning at the deployment layer.
+
+## Run migrations and upgrade safely
+
+Chorus applies pending database migrations automatically at startup (`prisma migrate
+deploy`). You do not run migrations by hand — starting a new version applies whatever is
+outstanding before the web application begins serving.
+
+To upgrade:
+
+1. **Back up your database first.** For an external PostgreSQL, take a backup; for an
+   embedded or volume-backed database, back up the data volume.
+2. Pull the new version — `npm update -g @chorus-aidlc/chorus` for the npm package, or pull
+   the new container image for a Docker deployment.
+3. Restart Chorus. Migrations apply automatically on boot, then the app starts.
+
+:::caution[Back up before upgrading]
+Always back up the database (or the data volume for embedded/volume-backed storage) before
+upgrading. Migrations run automatically and can change the schema; a backup is your only
+safe rollback point. Follow the standard
+[PostgreSQL backup documentation](https://www.postgresql.org/docs/current/backup.html) for
+your setup rather than improvising a per-engine procedure.
+:::
+
+## Cookies and reverse proxies
+
+Two settings matter when Chorus runs behind TLS termination or a reverse proxy:
+
+| Variable | Set to | When |
+| --- | --- | --- |
+| `COOKIE_SECURE` | `true` | The site is served over HTTPS (including behind a proxy that terminates TLS). Secure cookies are only sent over encrypted connections. |
+| `COOKIE_SECURE` | `false` | Only for trusted, internal HTTP-only networks. Cookies are then sent over unencrypted HTTP, so never use this on the public internet. |
+| `NEXTAUTH_URL` | The public base URL | Chorus runs behind a reverse proxy. Set it to the externally visible address (for example `https://chorus.example.com`) so redirects and links resolve correctly. |

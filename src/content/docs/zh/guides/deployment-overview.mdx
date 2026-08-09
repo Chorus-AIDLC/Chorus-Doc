@@ -1,0 +1,68 @@
+---
+title: 部署概览
+description: Chorus 支持的部署与自托管形态、各自的前置条件，以及如何选择。
+docsLocale: zh
+route: /zh/guides/deployment-overview/
+sidebar:
+  order: 20
+---
+
+本页介绍运行和自托管 Chorus 的几种支持形态，列出每种形态的前置条件，并帮助你做出选择。选定
+之后，[Docker](/zh/guides/deploy-docker/)、[生产部署](/zh/guides/deploy-production/)和
+[运维](/zh/guides/deploy-operations/)三篇指南会带你走完剩下的路。
+
+## 部署形态
+
+Chorus 以两种形态运行同一套应用，区别在于数据存放在哪里、由多少人使用。
+
+### 本地单机
+
+单台机器上的单个进程，供单个用户使用。Chorus 内置了嵌入式 PostgreSQL 数据库
+（[PGlite](https://pglite.dev)），因此无需另外安装任何外部组件：命令会自行创建数据库、执行
+迁移，并在 `8637` 端口提供 Web 应用。这是试用 Chorus 最快的方式，也是个人本地使用的正确
+选择。
+
+[快速开始指南](/zh/guides/getting-started/)完整演示了这条路径：安装全局包、设置管理员账号并
+登录。那篇指南是本地单机形态的权威安装步骤，因此本页不再重复其步骤。
+
+### 生产
+
+面向团队的共享部署，后端由你自行管理和备份的**外部 PostgreSQL 16** 数据库支撑，并由一个或
+多个应用实例对外提供服务。**Redis 7** 在单实例下是可选的，在运行多个实例时则是**必需**的：
+因为各实例之间要通过 Redis 相互传播实时更新（Server-Sent Events）。没有 Redis 时，Chorus 会
+回退到内存事件机制，而它只在单实例下有效。
+
+生产形态可以以容器方式运行（参见 [使用 Docker 部署](/zh/guides/deploy-docker/)）、以全局
+npm 包方式对接你自己的 PostgreSQL 与 Redis，或运行在内置的 AWS CDK 栈上（参见
+[生产部署](/zh/guides/deploy-production/)）。
+
+## 前置条件
+
+- **Node.js 22 或更高版本**：Chorus 面向 Node.js 22 运行时（Docker 镜像基于
+  `node:22-alpine` 构建）。
+- **`8637` 端口**：应用在此端口监听。请将该端口发布或反向代理出去，以访问 UI 和 MCP
+  端点。
+- **数据库**：本地形态无需准备任何数据库（内置 PGlite）。生产形态需要一个可通过连接字符串
+  访问的外部 **PostgreSQL 16** 数据库。
+- **缓存**：单实例无需缓存。多实例生产部署需要一个用于跨实例事件传播的 **Redis 7** 端点。
+
+## 如何选择
+
+<div class="table-scroll" role="region" aria-label="如何选择部署形态" tabindex="0">
+
+  | 如果你想…… | 选择 | 数据库 | 缓存 |
+  | --- | --- | --- | --- |
+  | 试用 Chorus，或在一台机器上独自使用 | 本地单机 | 内置 PGlite | 无 |
+  | 以最少的组件运行一个共享实例 | 独立容器 | 内置 PGlite（存于卷中） | 无 |
+  | 运行共享、可靠或多实例的部署 | 生产（Docker、npm 或 AWS CDK） | 外部 PostgreSQL 16 | Redis 7（2 个及以上实例时必需） |
+
+</div>
+
+## 继续阅读
+
+- **[使用 Docker 部署](/zh/guides/deploy-docker/)**：发布的 `chorusaidlc/chorus-app`
+  镜像：独立与生产两种 Compose 文件、`docker run` 示例、完整的环境变量参考，以及启动行为。
+- **[生产部署](/zh/guides/deploy-production/)**：对接你自己的 PostgreSQL 与 Redis、多实例
+  要求，以及完整的 AWS CDK 演练。
+- **[运维](/zh/guides/deploy-operations/)**：首次登录引导、部署侧的身份认证配置、自动迁移，
+  以及升级前的备份。

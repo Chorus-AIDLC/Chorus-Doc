@@ -1,0 +1,63 @@
+---
+title: The AI-DLC workflow
+description: How work moves through Chorus, from idea to done, and why AI proposes while you verify.
+docsLocale: en
+route: /guides/ai-dlc-workflow/
+sidebar:
+  order: 2
+---
+
+Chorus runs on the **AI-Driven Development Lifecycle (AI-DLC)**: a fixed pipeline that
+carries every piece of work from a rough idea to a verified result. You and your AI agents
+share the same pipeline, but you play different parts. This page explains those parts and
+the stages they move through, then links you into the step-by-step guide for each stage.
+
+## Reversed Conversation
+
+Most AI tools follow one direction: a human writes a prompt and the AI executes it. Chorus
+reverses that.
+
+**The AI proposes, and you verify.** An agent turns your idea into questions, then into a
+concrete proposal — design and specification documents plus a set of tasks. Nothing is
+built until you have read that proposal and approved it, and nothing is finished until you
+have checked the result against its acceptance criteria. You stay in the decision seat at
+every gate; the agent does the drafting and the execution in between.
+
+That is the "Reversed Conversation": not *human prompt → AI execute*, but *AI propose →
+human verify*. The stages below are the gates where you decide.
+
+## The pipeline
+
+Work flows along one path:
+
+**Idea → Proposal → Document + Task → Execute → Verify → Done.**
+
+You set up a workspace once, then every request travels this path. The table names each
+stage from your side of the conversation and links to its guide.
+
+| Stage | What you do | Guide |
+| --- | --- | --- |
+| Set up a project | Create a project, point it at a working directory, and open it. Everything below lives inside a project. | [Create a project](/guides/create-a-project/) |
+| Idea | Capture what you want as an idea. The agent runs elaboration rounds — short back-and-forth questions — until you both share the same understanding, then you confirm and resolve it. | [Capture an idea](/guides/capture-an-idea/) |
+| Proposal | The agent drafts a proposal and submits it. You read its documents and task drafts and either approve or reject. Approving materializes the **Documents** and **Tasks** from the drafts. | [Review a proposal](/guides/review-a-proposal/) |
+| Execute | Tasks are claimed or assigned and worked one by one. You follow their status and dependency graph as each task moves toward review. | [Run tasks](/guides/run-tasks/) |
+| Verify → Done | You check each task against its acceptance criteria and verify it. When the work is verified, the idea completes and you can read its report. | [Verify and complete](/guides/verify-and-complete/) |
+
+Follow the guides in that order and you go from an empty workspace to a verified, done
+idea without leaving the pipeline.
+
+:::note[What the agent does]
+The agent is your counterpart at every stage: it asks the elaboration questions, drafts the
+proposal, executes the approved tasks, and reports the evidence for your review. Chorus
+shows you the effect of each action — a new elaboration round, a submitted proposal, a task
+that reached `to_verify` — and waits for your decision. For how an agent connects and what
+it can do, see the [agent platform reference](/reference/agents/).
+:::
+
+{/* Screenshot surface: project overview showing an idea moving through the pipeline. */}
+
+## Where to go next
+
+Start at [Create a project](/guides/create-a-project/) and work through the five stage
+guides in order. For the stable, at-a-glance version of the stages and their handoffs, see
+the [workflow reference](/reference/workflow/).

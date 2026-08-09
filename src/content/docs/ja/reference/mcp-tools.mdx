@@ -1,0 +1,250 @@
+---
+title: MCP ツールカタログ
+description: エージェントが Chorus の MCP エンドポイントにどう接続し、ツールの可視性が権限でどう管理され、カテゴリー別にどんなツールがあるか。
+docsLocale: ja
+route: /ja/reference/mcp-tools/
+sidebar:
+  order: 7
+---
+
+エージェントは Chorus の MCP（Model Context Protocol）ツールを通じて Chorus を操作します。本ページは、
+このツール面のカテゴリー別ガイドです。クライアントがどう接続するか、プロジェクトの範囲づけがどう働くか、
+各ツールがどう可視になるか、そして各段階でエージェントが使う高頻度のツールを扱います。エンティティが
+経ていく状態と各段階の引き継ぎは[ライフサイクル参考](/ja/reference/lifecycle/)を、コメント・メンション・
+通知は[コラボレーション参考](/ja/reference/collaboration/)をご覧ください。
+
+## エンドポイントとトランスポート
+
+Chorus は **Streamable HTTP** で単一の MCP エンドポイントを公開します。
+
+```text
+POST https://chorus.example.com/api/mcp
+Authorization: Bearer cho_REDACTED
+```
+
+このエンドポイントは**ステートレス**です。各リクエストはエージェント key で認証され、リクエストごとの
+新しいサーバーインスタンスによって処理されます。サーバー側のセッションはなく、`initialize` → キープ
+アライブ → 期限切れの流れもなく、無操作タイムアウトもありません。クライアントは「session not found」
+状態を回復する必要が一切なく、ただ毎回のリクエストで key を送るだけです。ここから二つの帰結が生じます。
+
+- **権限はリクエストごとに再計算される。** UI でエージェントの権限をローテーションすると、次の呼び出しから
+  即座に効き、再接続は不要です。
+- **エージェント key だけがツール一覧を決める。** `tools/list` が返すツールの集合は、その key のリクエスト
+  ごとの有効権限から導かれます。
+
+クライアントの MCP 設定では、これを `http` 型のサーバーとして設定します。最小の `.mcp.json` ブロック：
+
+```json
+{
+  "mcpServers": {
+    "chorus": {
+      "type": "http",
+      "url": "https://chorus.example.com/api/mcp",
+      "headers": {
+        "Authorization": "Bearer cho_REDACTED"
+      }
+    }
+  }
+}
+```
+
+:::note
+MCP トランスポートのセッションは Chorus の **AgentSession** とは無関係です。AgentSession はスウォーム
+モードのサブエージェント向けの別個の可観測性の構造で、下記の session ツールで作成・追跡します。
+:::
+
+## プロジェクトによる範囲づけ
+
+多くのプロジェクトにまたがって働くエージェントは、MCP 接続に範囲づけヘッダーを送ることで、範囲を意識する
+すべての結果を部分集合へ絞れます。
+
+<div class="table-scroll" role="region" aria-label="プロジェクト範囲づけヘッダー" tabindex="0">
+
+  | ヘッダー | 値 | 効果 |
+  | --- | --- | --- |
+  | `X-Chorus-Project` | 単一のプロジェクト UUID、またはカンマ区切りで複数 | 結果をそのプロジェクトに限定する。 |
+  | `X-Chorus-Project-Group` | プロジェクトグループ UUID | 結果をそのグループ内のすべてのプロジェクトに限定する。 |
+
+</div>
+
+ヘッダーがない場合、結果はすべてのプロジェクトにわたります（既定）。**両方**のヘッダーがある場合は
+`X-Chorus-Project-Group` が優先します。範囲づけは `chorus_get_my_assignments` に影響し、範囲づけされた
+プロジェクトに絞ったプロジェクト別トラッカーを返します。`chorus_checkin` の `ideaTracker` は**ヘッダーで
+フィルターされません**。常にすべてのプロジェクトにわたる、エージェントの最も新しい着想（上限十件）を返します。
+それ以外のすべてのツールは明示的な `projectUuid` 引数を取り、ヘッダーでは範囲づけられません。
+
+```json
+{
+  "mcpServers": {
+    "chorus": {
+      "type": "http",
+      "url": "https://chorus.example.com/api/mcp",
+      "headers": {
+        "Authorization": "Bearer cho_REDACTED",
+        "X-Chorus-Project": "uuid-a,uuid-b"
+      }
+    }
+  }
+}
+```
+
+## 権限とツールの可視性
+
+ツールの可視性は、きめ細かな権限モデルで駆動されます。**5 つの資源**
+（`idea`、`proposal`、`document`、`task`、`project`）× **3 つの動作**
+（`read`、`write`、`admin`）= **15 の権限ビット**です。管理される各ツールは、必要な権限を**ちょうど一つ**
+宣言します。管理されるツールは、エージェントの有効権限セットがそのビットを含む**場合にのみ**、その
+`tools/list` に現れます。**公共ツールは管理されず、常に現れます。**
+
+エージェントの有効セットは、**ロールプリセット**と、その上に追加された任意の**カスタム権限**の和集合です。
+
+<div class="table-scroll" role="region" aria-label="ロールプリセットの権限セット" tabindex="0">
+
+  | プリセット | 有効な権限セット |
+  | --- | --- |
+  | `developer_agent` | `*:read` + `task:write`（6 ビット） |
+  | `pm_agent` | `*:read` + `idea:write`、`proposal:write`、`document:write`、`task:write`、`project:write`（10 ビット） |
+  | `admin_agent` | 全 15 ビット（`*:read` + `*:write` + `*:admin`） |
+
+</div>
+
+可視であることは、認可されていることと同じではありません。ツールは可視でも、ハンドラーの層で操作を拒む
+ことがあります。たとえば課題上の操作的な状態遷移は、誰がそのツールを見られるかにかかわらず、呼び出し元が
+その課題の担当者であることを要します。
+
+## ツールのカテゴリー
+
+<div class="table-scroll" role="region" aria-label="ツールのカテゴリー" tabindex="0">
+
+  | カテゴリー | 管理 | 何を扱うか |
+  | --- | --- | --- |
+  | **公共（Public）** | なし、常に可視 | 発見と読み取り（`chorus_get_*`、`chorus_list_*`、`chorus_search*`）、`chorus_checkin`、`chorus_get_my_assignments`、コメント、要件詳細化の回答、通知、そして `chorus_create_tasks` と `chorus_update_task`。 |
+  | **セッション（Session）** | なし、常に可視 | スウォームモードのワーカー向け AgentSession のライフサイクル：`chorus_create_session`、`chorus_session_checkin_task` / `chorus_session_checkout_task`、`chorus_session_heartbeat`、`chorus_close_session`、`chorus_reopen_session`、`chorus_list_sessions`、`chorus_get_session`。 |
+  | **開発者（Developer）** | `task:write` | 課題の担当、解除、報告、そして検証への提出。 |
+  | **PM** | `idea:write`、`proposal:write`、`document:write`、`project:write` | 着想、要件詳細化、提案、文書、参考資料の作成と推進。 |
+  | **管理者（Admin）** | `*:admin`（プロジェクト／グループの作成は `project:write`） | 提案の承認、課題の検証／再オープン／クローズ、受け入れ基準のマーク、エンティティの削除、プロジェクトとグループの管理。 |
+
+</div>
+
+:::caution
+`chorus_create_report` は公共ツールに見えます。`pm_` 接頭辞がなく、公共の名前空間のモジュールにあるからです。
+しかしそれは **`document:write` で管理されます**。そのビットを持つエージェント（`pm_agent` /
+`admin_agent` プリセット、または `document:write` をカスタム権限として加えた開発者エージェント）にのみ
+現れます。管理されない公共ツールとして扱わないでください。
+:::
+
+`chorus_create_tasks` と `chorus_update_task` は本当に公共です。フィールド、依存、受け入れ基準の編集は
+どのエージェントにも開かれています。ハンドラーの層の担当者ガードが、実際に誰が操作的な状態を変更できるかを
+強制するからです。課題の `in_progress` / `to_verify` の状態遷移は、依然として呼び出し元が担当者であることを要します。
+
+## 高頻度のツール
+
+代表的な部分集合を、入力、返り値の形、必要な権限とともに示します。すべてのツールについての完全な
+ツールごとの契約は、本ページ末尾で述べる真実の源にあります。
+
+### chorus_checkin — 公共
+
+一回の実行の開始時に推奨します。エージェントの識別情報と所有者、その有効権限セット、プロジェクト別に
+グループ化された着想トラッカー、そして通知の要約を返します。`ideaTracker` は最も新しく更新された十件の
+着想を上限とし、すべてのプロジェクトにわたります。上記の範囲づけヘッダーでは**絞られません**（範囲づけ
+され上限のないトラッカーには `chorus_get_my_assignments` を使ってください）。
+
+```text
+入力：  （なし）
+返り値：{ agent: { uuid, name, permissions, owner },
+          ideaTracker: { <projectUuid>: { name, ideas[] } },
+          notifications: { unread, recent[] } }
+```
+
+### chorus_get_my_assignments — 公共
+
+エージェントの完全な着想／課題トラッカーを、プロジェクト別にグループ化して返します。`chorus_checkin` の
+`ideaTracker` と同じ形で、近期着想の上限がなく、加えて open の課題からなる `taskTracker` を持ちます。
+範囲づけヘッダーに従います。
+
+```text
+入力：  （なし）
+返り値：{ ideaTracker: { <projectUuid>: { name, ideas[] } },
+          taskTracker: { <projectUuid>: { name, tasks[] } } }
+```
+
+### chorus_claim_task — `task:write`
+
+open の課題を担当し、`assigned` に移して呼び出し元を担当者に設定します。
+
+```text
+入力：  { taskUuid }
+返り値：更新された Task
+```
+
+### chorus_submit_for_verify — `task:write`（担当者のみ）
+
+課題を人間の検証へ提出し、`in_progress → to_verify` に移します。
+
+```text
+入力：  { taskUuid, summary? }
+返り値：更新された Task
+```
+
+### chorus_pm_create_proposal — `proposal:write`
+
+**空の**提案の容れ物を作り、そのあと `chorus_pm_add_document_draft` と `chorus_pm_add_task_draft` で
+中身を満たします。`inputType` が `idea` のとき、入力の各着想は成果物でなければなりません。テーマ（容れ物）の
+着想は拒否されます。子の着想を派生させ、それに対して提案してください。
+
+```text
+入力：  { projectUuid, title, description?, inputType: "idea" | "document",
+          inputUuids[], references?[] }
+返り値：作成された Proposal（status: draft）
+```
+
+### chorus_pm_add_task_draft — `proposal:write`
+
+草稿の提案に課題草稿を一つ追加します。受け入れ基準は必須です。空でない description を持つ項目が少なくとも
+一つ必要で、なければ呼び出しは拒否されます。
+
+```text
+入力：  { proposalUuid, title, description?, priority?, storyPoints?,
+          acceptanceCriteriaItems: [{ description, required? }],  // 必須、空不可
+          dependsOnDraftUuids?[] }
+返り値：更新された Proposal
+```
+
+### chorus_admin_verify_task — `task:admin`
+
+提出された課題を検証し、`to_verify → done` に移します。課題が構造化された受け入れ基準を持つ場合、すべての
+**必須**基準が（`chorus_mark_acceptance_criteria` を通じて）すでに `passed` とマークされていなければ、
+検証はブロックされます。
+
+```text
+入力：  { taskUuid }
+返り値：更新された Task（受け入れ基準のゲートがブロックするときはエラー）
+```
+
+## 管理されるツール → 必要な権限のマトリクス
+
+権限で管理されるすべてのツールと、その単一の必要なビットです。そのビットを持つこと、つまりプリセットまたは
+カスタム権限を通じて持つことが、ツールが現れる必要条件です。その上に、ハンドラーの層のガード（所有権、
+担当者、状態）がなお適用されることがあります。
+
+<div class="table-scroll" role="region" aria-label="管理されるツールと必要な権限" tabindex="0">
+
+  | 必要な権限 | ツール |
+  | --- | --- |
+  | `idea:write` | `chorus_claim_idea`、`chorus_release_idea`、`chorus_move_idea`、`chorus_pm_create_idea`、`chorus_edit_idea`、`chorus_pm_start_elaboration`、`chorus_pm_skip_elaboration` |
+  | `idea:admin` | `chorus_pm_validate_elaboration`、`chorus_admin_delete_idea` |
+  | `proposal:write` | `chorus_pm_create_proposal`、`chorus_pm_validate_proposal`、`chorus_pm_submit_proposal`、`chorus_pm_add_document_draft`、`chorus_pm_add_task_draft`、`chorus_pm_update_document_draft`、`chorus_pm_update_task_draft`、`chorus_pm_remove_document_draft`、`chorus_pm_remove_task_draft`、`chorus_pm_reject_proposal`、`chorus_pm_revoke_proposal`、`chorus_pm_assign_task` |
+  | `proposal:admin` | `chorus_admin_approve_proposal`、`chorus_admin_close_proposal` |
+  | `document:write` | `chorus_pm_create_document`、`chorus_pm_update_document`、`chorus_create_report`、`chorus_add_reference`、`chorus_update_reference`、`chorus_remove_reference` |
+  | `document:admin` | `chorus_admin_delete_document` |
+  | `task:write` | `chorus_claim_task`、`chorus_release_task`、`chorus_submit_for_verify`、`chorus_report_criteria_self_check`、`chorus_report_work` |
+  | `task:admin` | `chorus_admin_verify_task`、`chorus_admin_reopen_task`、`chorus_admin_close_task`、`chorus_mark_acceptance_criteria`、`chorus_admin_delete_task` |
+  | `project:write` | `chorus_admin_create_project`、`chorus_admin_create_project_group`、`chorus_admin_update_project_group`、`chorus_admin_delete_project_group`、`chorus_admin_move_project_to_group` |
+
+</div>
+
+:::note
+**権威ある完全な**ツール一覧は、動作中のサーバー自身の `tools/list` 応答、つまり各ツールのライブの自己
+記述、そしてリポジトリの `docs/MCP_TOOLS.md` です。本ページはこのツール面のカテゴリー別ガイドであって、
+各ツールを一バイト単位で転写したものではありません。ある自己記述と本ページが食い違うときは、サーバーが正しい。
+:::

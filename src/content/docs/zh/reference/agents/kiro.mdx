@@ -1,0 +1,67 @@
+---
+title: Kiro
+description: 安装并验证 Kiro CLI 的 Chorus 第一方集成。
+docsLocale: zh
+route: /zh/reference/agents/kiro/
+---
+
+# Kiro
+
+Kiro CLI 是 Chorus 第一方支持的运行后端。安装集成后，你可以使用 Chorus 工具、技能和审查智能体；安装 Chorus 后台服务后，还可以从 Chorus 远程启动和管理会话。
+
+## 安装集成
+
+准备好 Chorus 地址后运行官方安装脚本：
+
+```bash
+export CHORUS_URL="https://chorus.example.com"
+export CHORUS_API_KEY="cho_REDACTED"
+curl -fsSL "$CHORUS_URL/install-kiro.sh" | bash
+```
+
+如需只为当前项目安装，请在项目目录运行：
+
+```bash
+curl -fsSL "$CHORUS_URL/install-kiro.sh" | bash -s -- --workspace
+```
+
+安装脚本会合并现有 MCP 配置，不会覆盖其他 MCP 服务器。该集成需要 Kiro CLI v2。
+
+## 启用远程启动
+
+如果只在 Kiro 终端中使用 Chorus，可以跳过这一步。需要从 Chorus 远程发起
+工作时，请按照[连接智能体运行环境](/zh/guides/operator-onboarding/)选择
+`kiro` 运行后端。先在前台确认连接无误，再按照
+[管理后台服务](/zh/guides/daemon-operations/)让它保持在线。
+
+## 验证连接
+
+1. 运行 `kiro-cli --agent chorus`。
+2. 输入 `check in to chorus`，确认返回正确的智能体身份和权限。
+3. 运行 `/chorus-idea`，确认 Chorus 技能可用。
+4. 如果启用了远程启动，在 Chorus 的在线智能体列表中确认 Kiro 和工作目录均已显示。
+
+## 能力与限制
+
+- Chorus 官方维护 MCP 工具、工作流技能、主智能体、审查智能体和生命周期钩子。
+- 后台服务支持远程启动会话、追加指令、中断和恢复。
+- 工作区配置优先于全局配置；排查配置问题时需要检查当前项目的 `.kiro` 目录。
+- 远程任务继承运行后台服务的本地用户权限，因此只注册必要的工作目录。
+
+## 从终端恢复会话
+
+要在自己的终端里接管正在进行的会话，先在对话界面复制它的 session id（对话记录顶部的复制 session ID），然后在该会话原本的工作目录下运行：
+
+```bash
+kiro-cli chat --resume-id <sessionId>
+```
+
+复制到的 id 与 Chorus 恢复会话时传给 Kiro CLI 的 id 一致。完整流程见[中断与恢复会话](/zh/guides/session-recovery/#从终端接管会话)。
+
+## 常见问题
+
+- **找不到 Kiro CLI**：安装 Kiro CLI v2，并确认 `kiro-cli` 或 `kiro` 在 `PATH` 中。
+- **`chorus_checkin` 返回 `401`**：更新 API 密钥，并重新运行 `chorus login`。
+- **技能未加载**：检查全局 `~/.kiro/skills/` 或项目内 `.kiro/`，然后重新启动 Kiro。
+- **审查智能体无法使用 MCP**：确认审查智能体引用了安装脚本写入的 MCP 配置。
+- **在线智能体离线**：运行 `chorus daemon status` 和 `chorus daemon logs`。

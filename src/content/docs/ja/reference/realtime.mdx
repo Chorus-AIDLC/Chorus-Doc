@@ -1,0 +1,163 @@
+---
+title: リアルタイムイベントと通知
+description: ブラウザ UI が Server-Sent Events でどうライブ更新され、エージェントが通知 REST API を通じて同じ作業をどう受け取るか。
+docsLocale: ja
+route: /ja/reference/realtime/
+sidebar:
+  order: 8
+---
+
+Chorus は、開いているすべてのブラウザを、人とエージェントが行っていることと同期させ続けます。変更が
+落ちたとき、課題が動く、着想が担当される、提案が承認される、といったとき、その変更は Server-Sent
+Events（SSE）で配信され、影響を受けたページが自ら更新します。エージェントはそのストリームを消費しません。
+同じ作業を通知を通じて受け取ります。本ページは両方の経路を記録します。SSE エンドポイントとそのイベントの
+形、そしてエージェント（とブラウザクライアント）が呼ぶ通知 REST API です。
+
+## ライブ更新はどう流れるか
+
+サービス層の各変更は、データベースへの書き込みが完了したあと、プロセスレベルのイベントバスに変更
+イベントを発します。ある SSE エンドポイントがそのバスを購読し、接続された各ブラウザに一致するイベントを
+ストリームします。ブラウザはそれをデバウンスし、現在のページを再取得します。
+
+```text
+変更（MCP ツール / API ルート / server action）
+  → サービス層がイベントバスに RealtimeEvent を発する
+  → GET /api/events が購読し、company + project で絞る
+  → ブラウザの EventSource がイベントを受け取る
+  → 500ms デバウンス → router.refresh() → Server Components が再取得
+```
+
+この更新はあえて粗い粒度です。単一のイベントはページに「あなたが見ている何かが変わった」とだけ伝え、
+Next.js が Server Component を再実行して、新鮮なデータが新しい props としてクライアントコンポーネントへ
+戻ってきます。どのイベントも変更後のレコードそのものは運びません。
+
+## SSE エンドポイント
+
+二つのエンドポイントがブラウザにイベントをストリームします。どちらも `GET` で、どちらもリクエストの
+Cookie から認証し、どちらも `export const dynamic = "force-dynamic"` とマークされているため、Next.js が
+キャッシュされた応答を返すことは決してありません。
+
+<div class="table-scroll" role="region" aria-label="SSE エンドポイント" tabindex="0">
+
+  | エンドポイント | ストリームするもの |
+  | --- | --- |
+  | `GET /api/events?projectUuid=<uuid>` | エンティティの変更イベント。あなたの会社に絞られ、`projectUuid` が与えられたときはその一つのプロジェクトに絞られる。 |
+  | `GET /api/events/notifications` | 認証されたユーザー向けの通知イベント。これによりアプリ内の通知インジケーターがライブで更新される。 |
+
+</div>
+
+各応答は次のヘッダーと挙動で送られます。
+
+- **`Content-Type: text/event-stream`**、`Cache-Control: no-cache`、`Connection: keep-alive`。
+- 接続時、ストリームはまず `: connected` のコメントを書き、そのあと `data: <json>` のフレームとして
+  イベントをストリームします。
+- **ハートビート：** `: heartbeat` のコメントを 30 秒ごとに送り、アイドル期間や中間層のタイムアウトを
+  越えて接続を開いたままに保ちます。
+- **切断時のクリーンアップ：** クライアントがリクエストを中止したとき（タブを閉じる、遷移、ネットワークの
+  切断）、エンドポイントはイベントバスのリスナーを外し、ハートビートのタイマーをクリアします。
+- **マルチテナンシー：** 変更ストリームは、`companyUuid` が呼び出し元と一致しないイベントをすべて捨てる
+  ため、クライアントが別のワークスペースの活動を受け取ることは決してありません。
+
+### `RealtimeEvent` の形
+
+`GET /api/events` 上の変更イベントは、形が固定された JSON オブジェクトです。
+
+```typescript
+interface RealtimeEvent {
+  companyUuid: string;   // マルチテナント隔離 — ストリームは一致しないイベントを捨てる
+  projectUuid: string;   // 任意の projectUuid フィルターに使う
+  entityType: "task" | "idea" | "proposal" | "document";
+  entityUuid: string;    // 変更されたエンティティ
+  action: "created" | "updated" | "deleted";
+}
+```
+
+イベントは*どのエンティティがどう変わったか*を名指すだけで、そのエンティティのフィールドは決して運びません。
+クライアントはそれを更新の合図としてのみ使います。
+
+### クライアントの挙動
+
+ブラウザは `/api/events?projectUuid=<uuid>` に `EventSource` を開き、どんなメッセージでも、`router.refresh()`
+を呼ぶ前に 500ms 待ちます。このデバウンスは、一つの論理的な動作から来る一連のイベント、たとえば提案の
+承認は一つの提案更新に加えて作成された課題ごとに一つのイベントを発しますが、それを単一の更新にまとめます。
+タブの可視性が変わると、タブが隠れている間は接続が閉じられ、再び可視になったときに（更新とともに）開き直され、
+アンマウント時にはすべてが取り壊されます。
+
+## エージェントは SSE を使わない
+
+:::caution[SSE はブラウザ専用]
+SSE エンドポイントは **ブラウザ Cookie** で認証されます。`EventSource` はカスタムの `Authorization`
+ヘッダーを送れないため、エージェント API key を運べません。**エージェントは SSE を消費しません。** エージェントは
+その作業を、下記の [`chorus_get_notifications`](#通知-rest-api) MCP ツールと `/api/notifications` REST
+エンドポイントを通じて受け取ります。エージェントの変更はなお変更イベントを発するので、同じプロジェクトを
+見ているブラウザユーザーには、エージェントの作業がライブで現れます。この流れは一方向です。エージェントが
+動作し、人間が見る。
+:::
+
+## 通知 REST API
+
+通知は、エージェントとブラウザクライアントの双方が使う、永続的な「ポーリングして行動する」経路です。
+受け手は認証コンテキストから導かれます。ユーザーとして認証されたリクエストはそのユーザーの通知を読み、
+エージェント API key で認証されたリクエストはそのエージェントの通知を読みます。同じルートが両者を扱い、
+受け手のパラメーターはありません。
+
+<div class="table-scroll" role="region" aria-label="通知 REST エンドポイント" tabindex="0">
+
+  | メソッドとパス | 用途 | 主なパラメーター |
+  | --- | --- | --- |
+  | `GET /api/notifications` | 呼び出し元（ユーザーまたはエージェント）の通知を一覧する。`{ notifications, unreadCount }` を返す。 | クエリ：`limit`（1–100、既定 50）、`offset`（既定 0）、`unreadOnly`（`true` で未読のみ返す）、`projectUuid`（一つのプロジェクトに範囲づけ）。 |
+  | `GET /api/notifications/unread-count` | 呼び出し元の未読数を `{ count }` で返す。 | — |
+  | `POST /api/notifications/read-all` | 呼び出し元のすべての通知を既読にする。 | 任意の JSON body `{ projectUuid }` で掃引を一つのプロジェクトに限定。 |
+  | `PATCH /api/notifications/[uuid]/read` | 一つの通知を既読にする。 | パス：通知の `uuid`。 |
+  | `PATCH /api/notifications/[uuid]/archive` | 一つの通知をアーカイブする。 | パス：通知の `uuid`。 |
+  | `GET /api/notifications/preferences` | 呼び出し元の通知設定を読む。 | — |
+  | `PUT /api/notifications/preferences` | 呼び出し元の通知設定を更新する。 | 設定フィールドの JSON body。 |
+
+</div>
+
+`limit` はサーバー側で 1–100 の範囲に丸められ、`offset` は下限 0 に切り上げられます。呼び出し元が所有
+しない通知にマークやアーカイブをすると、その存在を明かすのではなく `404` を返します。
+
+## 応答の封筒
+
+すべての通知 REST ルートは、標準の Chorus JSON 封筒を返します。成功は載荷を `data` の下に運びます。
+
+```json
+{ "success": true, "data": { "notifications": [], "unreadCount": 0 } }
+```
+
+エラーは代わりに構造化された `error` オブジェクトを運びます。
+
+```json
+{ "success": false, "error": { "code": "NOT_FOUND", "message": "Notification not found" } }
+```
+
+ルートはこれらを `src/lib/api-response.ts` のヘルパーで組み立てます。成功には `success(data)`、よくある
+失敗には `errors.notFound(...)`、`errors.badRequest(...)`、`errors.unauthorized()`、`errors.forbidden(...)`
+です。それぞれ対応する HTTP ステータス（404、400、401、403）に対応づきます。有効なセッションもエージェント
+key もないリクエストは `errors.unauthorized()` で拒否されます。
+
+```json
+{ "success": false, "error": { "code": "UNAUTHORIZED", "message": "Authentication required" } }
+```
+
+HTTP は `401` です。（SSE エンドポイントはこの封筒より前から存在し、未認証のリクエストにはプレーンテキストの
+`Unauthorized` とステータス `401` で応えます。）
+
+## 単一インスタンスと複数インスタンスの配信
+
+イベントバスはメモリ内のシングルトンで、単一インスタンスのデプロイにはこれで十分です。変更を処理する
+プロセスが、すべての SSE 接続を保持するのと同じプロセスだからです。ローカルでイベントを発すれば、接続
+された各ブラウザに届きます。
+
+複数のインスタンスを動かすとこの前提が崩れます。インスタンス A 上の変更が、インスタンス B に接続された
+ブラウザにもなお届かなければなりません。複数インスタンスのデプロイでは、イベントバスを **Redis pub/sub**
+で裏打ちします。各インスタンスは共有チャンネルを購読し、変更はローカルだけで発するのではなく Redis へ
+発行し、各インスタンスの SSE エンドポイントが受け取った内容を自分の接続済みブラウザへ転送します。裏打ちを
+差し替えても、SSE エンドポイントとクライアントの hook は変わりません。違うのはイベントバスの実装だけです。
+
+## 通知の概念
+
+本ページは配信のしくみだけを扱います。何が通知を生成するか、つまりカテゴリー、@メンション、各種の活動で
+誰が通知されるか、そして各受け手が受け取りを選べる設定については、[コラボレーション参考](/ja/reference/collaboration/)を
+ご覧ください。

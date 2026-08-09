@@ -1,0 +1,169 @@
+---
+title: 명령과 스킬 라우팅
+description: 각 AI-DLC 단계에 대응하는 Chorus 플러그인 명령 — 트리거, 필요한 권한, 산출물, 그리고 Codex의 명명 차이.
+docsLocale: ko
+route: /ko/guides/plugin-commands/
+---
+
+Chorus 플러그인은 AI-DLC 파이프라인의 각 단계마다 명령 하나씩을 추가합니다. 이 페이지는 그 명령들의
+레퍼런스입니다. 각 명령을 언제 실행하는지, 그 API 키에 어떤 권한이 필요한지, 그리고 무엇을 산출하는지를
+다룹니다. 파이프라인 자체는 다시 설명하지 않습니다. 그에 대해서는
+[AI-DLC 워크플로](/ko/guides/ai-dlc-workflow/)와 아래에 링크한 각 단계 가이드를 읽으세요.
+
+## 런타임마다 호출 방식이 다르다
+
+Claude Code는 이 명령들을 `chorus` 네임스페이스 아래의 슬래시 명령으로 노출합니다. Codex는 같은 스킬을
+`$` 접두사로 노출합니다. 동작은 동일하며, 명령을 입력하는 방식만 다릅니다.
+
+```text
+# Claude Code — /chorus: 슬래시 명령
+/chorus
+/chorus:idea
+/chorus:proposal
+/chorus:develop
+/chorus:review
+/chorus:quick-dev
+/chorus:yolo
+
+# Codex — $ 접두사 스킬 이름
+$chorus
+$idea
+$proposal
+$develop
+$review
+$quick-dev
+$yolo
+```
+
+이 페이지의 명령은 모두 Claude Code 형식(`/chorus:develop`)으로 표기합니다. Codex에서는 `$` 형식
+(`$develop`)으로 바꿔 읽으세요. 나머지 런타임(OpenClaw, Kiro, Pi)도 같은 스킬을 탑재합니다. 런타임별
+호출 참고 사항은 [에이전트 설정](/ko/reference/agents/) 아래의 각 페이지를 참고하세요.
+
+## `/chorus` — 라우팅과 설정
+
+```text
+/chorus      # Claude Code
+$chorus      # Codex
+```
+
+- **트리거:** 세션을 시작할 때, 또는 어떤 단계 명령을 써야 할지 확신이 서지 않을 때 실행합니다. 개요이자
+  라우터 입구입니다.
+- **필요한 권한:** 연결된 플러그인과 API 키. 특정 권한은 필요 없습니다.
+- **산출물:** 워크플로 상태를 바꾸지 않습니다. 플랫폼 개요, 당신의 역할과 유효 권한을 알려 주고, 아래의
+  적절한 단계 명령으로 안내합니다.
+
+## 단계 명령
+
+한눈에 보기:
+
+| 명령 | 필요한 권한 | 산출물 |
+|---|---|---|
+| `/chorus:idea` | `idea:write`(요구사항 구체화 해결에는 `idea:admin`) | 요구사항 구체화가 해결되어 계획으로 넘어갈 수 있는, 가져간 아이디어 |
+| `/chorus:proposal` | `proposal:write` + `document:write` | 제출된 제안 — 문서 초안 + 작업 DAG(`draft` → `pending`) |
+| `/chorus:develop` | `task:write` | 작업 보고와 자체 점검한 수락 기준을 갖추고 `to_verify`까지 진행된 작업 |
+| `/chorus:review` | `proposal:admin` + `task:admin` | 승인된 제안(초안이 실체화)과 검증된 작업(→ `done`) |
+| `/chorus:quick-dev` | `task:write`(자체 검증에는 `task:admin`) | 독립 작업 또는 제안에 붙은 작업을 `to_verify` / `done`까지 구동 |
+| `/chorus:yolo` | 관리자 프리셋 키(모든 리소스의 write + `proposal:admin` + `task:admin`) | 프롬프트에서 아이디어 하나를 완료까지 구동하고 완료 보고서를 첨부 |
+
+### `/chorus:idea` — 구상
+
+```text
+/chorus:idea     # Claude Code
+$idea            # Codex
+```
+
+- **트리거:** 요구사항으로 다듬을 미처리 아이디어가 있을 때. 먼저 가져간 뒤 구조화된 요구사항 구체화
+  라운드를 실행합니다.
+- **필요한 권한:** 가져가기와 요구사항 구체화 실행에는 `idea:write`. 요구사항 구체화의 해결(커밋 게이트)에는
+  추가로 `idea:admin`이 필요하며, `pm_agent` 프리셋 키는 이 단계를 관리자 프리셋 키에 넘겨야 합니다.
+- **산출물:** 요구사항 구체화 라운드에 답변하고 해결한, 가져간 아이디어 — `/chorus:proposal`로 넘어갈 준비가
+  된 상태입니다. [아이디어 기록하기](/ko/guides/capture-an-idea/)를 참고하세요.
+
+### `/chorus:proposal` — 계획
+
+```text
+/chorus:proposal # Claude Code
+$proposal        # Codex
+```
+
+- **트리거:** 어떤 아이디어의 요구사항 구체화가 해결되어 작업을 계획할 준비가 되었을 때.
+- **필요한 권한:** 제안 컨테이너, 작업 초안, 의존성 에지에는 `proposal:write`. PRD, 기술 설계, 명세 초안에는
+  `document:write`.
+- **산출물:** 문서 초안과 작업 초안 의존성 그래프를 담고, 검증을 거쳐 검토에 제출된 제안(`draft` →
+  `pending`). 제출 시, 훅이 메인 에이전트에게 제안 검토자 생성을 촉구합니다.
+  [자동화 동작](/ko/guides/plugin-automation/)을 참고하세요.
+
+### `/chorus:develop` — 개발
+
+```text
+/chorus:develop  # Claude Code
+$develop         # Codex
+```
+
+- **트리거:** 승인된 작업이 있고, 그중 하나를 구현할 준비가 되었을 때. `start_development` 웨이크는 어떤
+  아이디어의 남은 작업 전부를 의존성 순서로 처리하라고 요청합니다.
+- **필요한 권한:** 가져가기, 작업 보고, 수락 기준 자체 점검, 제출에는 `task:write`.
+- **산출물:** `claim → in_progress → to_verify`를 거친 작업. 작업 보고와 자체 점검한 수락 기준을 갖춥니다.
+  제출 시, 훅이 작업 검토자 생성을 촉구합니다. [작업 실행하기](/ko/guides/run-tasks/)를 참고하세요.
+
+### `/chorus:review` — 검토와 거버넌스
+
+```text
+/chorus:review   # Claude Code
+$review          # Codex
+```
+
+- **트리거:** 제안이 `pending`이거나 작업이 `to_verify`에 있고, 당신이 관리자(인간 대리 역할)로서 그것들을
+  처리하고 있을 때.
+- **필요한 권한:** 제안 승인이나 종료에는 `proposal:admin`, 작업 검증·재오픈·종료와 수락 기준 표시에는
+  `task:admin`. 완전한 관리자 프리셋 키는 둘 다에 더해 아이디어와 문서를 종료하는 거버넌스 권한도 갖습니다.
+- **산출물:** 승인된 제안(그 문서 초안과 작업 초안이 실제 엔티티로 실체화)과 검증된 작업(`to_verify` →
+  `done`), 또는 피드백과 함께 거부·재오픈된 항목. [제안 검토하기](/ko/guides/review-a-proposal/)와
+  [검증하고 완료하기](/ko/guides/verify-and-complete/)를 참고하세요.
+
+### `/chorus:quick-dev` — 직접 작업
+
+```text
+/chorus:quick-dev # Claude Code
+$quick-dev        # Codex
+```
+
+- **트리거:** 작고 잘 이해된 작업(버그 수정, 핫픽스, 후속 패치)이라 완전한 아이디어 → 제안 과정이 과할 때.
+- **필요한 권한:** 작업 생성, 가져가기, 실행에는 `task:write`. 결과의 자체 검증에는 명시적인 `task:admin`이
+  필요하며, 그것이 없으면 에이전트는 증거를 게시하고 검증을 사람에게 넘깁니다.
+- **산출물:** 독립 작업(또는 `proposalUuid`로 기존 제안에 붙은 작업)을 `to_verify`까지, 키가 `task:admin`을
+  가진 경우 `done`까지 구동합니다.
+
+### `/chorus:yolo` — 완전 자동 파이프라인
+
+```text
+/chorus:yolo <prompt>                        # Claude Code
+$yolo <prompt>                               # Codex
+/chorus:yolo <prompt> --project <project-uuid>
+```
+
+- **트리거:** 자연어 프롬프트에서 시작해 무인으로 파이프라인 전체를 돌리고 싶을 때. `yolo_requested` 웨이크는
+  아이디어가 어느 단계에 있든 그곳에서 이어서 실행합니다.
+- **필요한 권한:** **관리자 프리셋** API 키 — 모든 리소스의 write에 더해 `proposal:admin`과 `task:admin`
+  (구체적으로 `idea:write`, `proposal:write` + `proposal:admin`, `task:write` + `task:admin`, 그리고
+  `project:write`). 비트가 하나라도 빠지면 스킬은 시작 단계에서 중단합니다.
+- **산출물:** 완전한 한 바퀴 — (지정되지 않았다면) 프로젝트, 아이디어, 자체 요구사항 구체화, 제안, 웨이브
+  기반 작업 실행, 검토 루프, 관리자 검증, 그리고 필수 완료 보고서. 사람의 명시적 승인 없이는 절대 PR을
+  병합하거나 푸시하지 않습니다.
+
+## 에이전트용
+
+- **트리거:** 라우팅과 역할 확인에는 `/chorus`(`$chorus`). 각 단계 명령은 해당 단계에 도달했을 때, 또는
+  사람의 웨이크로 발화합니다 — `start_development`는 아이디어의 남은 작업 전부에 대해 `/chorus:develop`을
+  이어서 실행하고, `yolo_requested`는 아이디어의 현재 단계에서 `/chorus:yolo`를 이어서 실행합니다.
+- **제약:**
+  - 도구의 *가시성*은 키의 권한 집합을 따르지만, 핸들러 가드는 여전히 적용됩니다 — 예를 들어 `task:write`를
+    가지고 있어도 작업의 담당자만 `chorus_submit_for_verify`를 호출할 수 있습니다.
+  - `/chorus:yolo`는 관리자 프리셋 키를 요구하며, 필요한 권한이 하나라도 빠지면 중단합니다.
+    `/chorus:quick-dev`는 명시적인 `task:admin`이 있을 때만 자체 검증하고, 그렇지 않으면 사람에게 넘깁니다.
+  - Codex에서는 같은 스킬을 `$` 접두사로 호출합니다. 검토와 자동화의 표면은 런타임마다 다릅니다.
+    [자동화 동작](/ko/guides/plugin-automation/)을 참고하세요.
+  - `/chorus:yolo` 아래에서도 포함해, 사람의 명시적 승인 없이는 절대 PR을 병합하거나 푸시하지 않습니다.
+- **출처:** `public/chorus-plugin/skills/chorus/SKILL.md`의 Skill Routing과 프리셋/권한 표.
+  각 단계 스킬 `public/chorus-plugin/skills/{idea,proposal,develop,review,yolo,quick-dev}/SKILL.md`.
+  그리고 `plugins/chorus/README.md`의 Codex `$` 명령 치트 시트.

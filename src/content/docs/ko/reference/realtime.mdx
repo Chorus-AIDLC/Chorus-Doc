@@ -1,0 +1,158 @@
+---
+title: 실시간 이벤트와 알림
+description: 브라우저 UI가 Server-Sent Events로 어떻게 실시간 업데이트되고, 에이전트가 알림 REST API를 통해 같은 작업을 어떻게 받는지.
+docsLocale: ko
+route: /ko/reference/realtime/
+sidebar:
+  order: 8
+---
+
+Chorus는 열려 있는 모든 브라우저를 사람과 에이전트가 하고 있는 일과 동기화된 상태로 유지합니다. 변경이
+반영되면, 작업이 움직이거나 아이디어를 가져가거나 제안이 승인되면, 그 변경은 Server-Sent Events(SSE)로
+방송되고 영향을 받은 페이지가 스스로 새로고침합니다. 에이전트는 그 스트림을 소비하지 않습니다. 같은 작업을
+알림을 통해 받습니다. 이 페이지는 두 경로를 모두 기록합니다. SSE 엔드포인트와 그 이벤트 형태, 그리고
+에이전트(와 브라우저 클라이언트)가 호출하는 알림 REST API입니다.
+
+## 실시간 업데이트는 어떻게 흐르는가
+
+각 서비스 계층 변경은 데이터베이스 쓰기가 끝난 뒤 프로세스 수준 이벤트 버스에 변경 이벤트를 냅니다. 한
+SSE 엔드포인트가 그 버스를 구독하고 연결된 각 브라우저에 일치하는 이벤트를 스트림하면, 브라우저가 그것을
+디바운스하고 현재 페이지를 다시 가져옵니다.
+
+```text
+변경(MCP 도구 / API 라우트 / server action)
+  → 서비스 계층이 이벤트 버스에 RealtimeEvent를 냄
+  → GET /api/events가 구독하고 company + project로 필터링
+  → 브라우저 EventSource가 이벤트를 받음
+  → 500ms 디바운스 → router.refresh() → Server Components가 다시 가져옴
+```
+
+이 새로고침은 일부러 굵은 입자로 되어 있습니다. 단일 이벤트는 페이지에 "네가 보고 있는 무언가가 바뀌었다"라고만
+알리고, Next.js가 Server Component를 다시 실행해 새로운 데이터가 새 props로 클라이언트 컴포넌트에 흘러
+들어옵니다. 어떤 이벤트도 변경된 레코드 자체를 나르지 않습니다.
+
+## SSE 엔드포인트
+
+두 엔드포인트가 브라우저에 이벤트를 스트림합니다. 둘 다 `GET`이고, 둘 다 요청의 Cookie에서 인증하며, 둘 다
+`export const dynamic = "force-dynamic"`으로 표시되어 있어 Next.js가 캐시된 응답을 내는 일이 결코 없습니다.
+
+<div class="table-scroll" role="region" aria-label="SSE 엔드포인트" tabindex="0">
+
+  | 엔드포인트 | 스트림하는 것 |
+  | --- | --- |
+  | `GET /api/events?projectUuid=<uuid>` | 엔티티 변경 이벤트. 당신의 회사로 필터되며, `projectUuid`가 주어지면 그 하나의 프로젝트로 필터된다. |
+  | `GET /api/events/notifications` | 인증된 사용자를 위한 알림 이벤트. 이를 통해 앱 내 알림 표시기가 실시간으로 업데이트된다. |
+
+</div>
+
+각 응답은 다음 헤더와 동작으로 전송됩니다.
+
+- **`Content-Type: text/event-stream`**, `Cache-Control: no-cache`, `Connection: keep-alive`.
+- 연결 시, 스트림은 먼저 `: connected` 주석을 쓰고, 그다음 `data: <json>` 프레임으로 이벤트를 스트림합니다.
+- **하트비트:** `: heartbeat` 주석을 30초마다 보내, 유휴 기간과 중간 계층 타임아웃을 넘어 연결을 열어 둡니다.
+- **연결 해제 시 정리:** 클라이언트가 요청을 중단하면(탭 닫기, 이동, 네트워크 끊김), 엔드포인트는 이벤트
+  버스의 리스너를 제거하고 하트비트 타이머를 지웁니다.
+- **멀티테넌시:** 변경 스트림은 `companyUuid`가 호출자와 일치하지 않는 이벤트를 모두 버리므로, 클라이언트가
+  다른 워크스페이스의 활동을 받는 일은 결코 없습니다.
+
+### `RealtimeEvent` 형태
+
+`GET /api/events`의 변경 이벤트는 형태가 고정된 JSON 객체입니다.
+
+```typescript
+interface RealtimeEvent {
+  companyUuid: string;   // 멀티테넌트 격리 — 스트림은 일치하지 않는 이벤트를 버린다
+  projectUuid: string;   // 선택적 projectUuid 필터에 사용
+  entityType: "task" | "idea" | "proposal" | "document";
+  entityUuid: string;    // 변경된 엔티티
+  action: "created" | "updated" | "deleted";
+}
+```
+
+이벤트는 *어떤 엔티티가 어떻게 바뀌었는지* 를 가리킬 뿐, 그 엔티티의 필드는 결코 나르지 않습니다. 클라이언트는
+그것을 새로고침 신호로만 사용합니다.
+
+### 클라이언트 동작
+
+브라우저는 `/api/events?projectUuid=<uuid>`에 `EventSource`를 열고, 어떤 메시지에도 `router.refresh()`를
+호출하기 전에 500ms 기다립니다. 이 디바운스는 하나의 논리적 동작에서 나오는 일련의 이벤트, 예를 들어 제안을
+승인하면 제안 업데이트 하나에 더해 생성된 작업마다 이벤트 하나씩을 내는데, 그것을 단일 새로고침으로 합칩니다.
+탭 가시성이 바뀌면, 탭이 숨겨진 동안 연결이 닫히고 다시 보이게 되면 (새로고침과 함께) 다시 열리며, 언마운트
+시에는 모든 것이 해체됩니다.
+
+## 에이전트는 SSE를 쓰지 않는다
+
+:::caution[SSE는 브라우저 전용]
+SSE 엔드포인트는 **브라우저 Cookie** 로 인증됩니다. `EventSource`는 사용자 지정 `Authorization` 헤더를
+보낼 수 없으므로 에이전트 API key를 나를 수 없습니다. **에이전트는 SSE를 소비하지 않습니다.** 에이전트는
+그 작업을 아래의 [`chorus_get_notifications`](#알림-rest-api) MCP 도구와 `/api/notifications` REST
+엔드포인트를 통해 받습니다. 에이전트의 변경은 여전히 변경 이벤트를 내므로, 같은 프로젝트를 보고 있는 브라우저
+사용자에게는 에이전트의 작업이 실시간으로 나타납니다. 이 흐름은 한 방향입니다. 에이전트가 동작하고, 사람이
+지켜봅니다.
+:::
+
+## 알림 REST API
+
+알림은 에이전트와 브라우저 클라이언트가 모두 쓰는, 지속되는 "폴링하고 행동하는" 경로입니다. 수신자는 인증
+컨텍스트에서 도출됩니다. 사용자로 인증된 요청은 그 사용자의 알림을 읽고, 에이전트 API key로 인증된 요청은 그
+에이전트의 알림을 읽습니다. 같은 라우트가 둘을 모두 처리하며, 수신자 매개변수는 없습니다.
+
+<div class="table-scroll" role="region" aria-label="알림 REST 엔드포인트" tabindex="0">
+
+  | 메서드와 경로 | 용도 | 주요 매개변수 |
+  | --- | --- | --- |
+  | `GET /api/notifications` | 호출자(사용자 또는 에이전트)의 알림을 나열한다. `{ notifications, unreadCount }`를 반환한다. | 쿼리: `limit`(1–100, 기본 50), `offset`(기본 0), `unreadOnly`(`true`면 읽지 않은 것만 반환), `projectUuid`(하나의 프로젝트로 범위 지정). |
+  | `GET /api/notifications/unread-count` | 호출자의 읽지 않은 수를 `{ count }`로 반환한다. | — |
+  | `POST /api/notifications/read-all` | 호출자의 모든 알림을 읽음으로 표시한다. | 선택적 JSON body `{ projectUuid }`로 훑는 범위를 하나의 프로젝트로 제한. |
+  | `PATCH /api/notifications/[uuid]/read` | 알림 하나를 읽음으로 표시한다. | 경로: 알림 `uuid`. |
+  | `PATCH /api/notifications/[uuid]/archive` | 알림 하나를 보관한다. | 경로: 알림 `uuid`. |
+  | `GET /api/notifications/preferences` | 호출자의 알림 설정을 읽는다. | — |
+  | `PUT /api/notifications/preferences` | 호출자의 알림 설정을 업데이트한다. | 설정 필드의 JSON body. |
+
+</div>
+
+`limit`은 서버 측에서 1–100 범위로 조정되고, `offset`은 하한 0으로 내려 고정됩니다. 호출자가 소유하지 않은
+알림에 표시나 보관을 하면, 그 존재를 드러내는 대신 `404`를 반환합니다.
+
+## 응답 봉투
+
+모든 알림 REST 라우트는 표준 Chorus JSON 봉투를 반환합니다. 성공은 페이로드를 `data` 아래에 나릅니다.
+
+```json
+{ "success": true, "data": { "notifications": [], "unreadCount": 0 } }
+```
+
+오류는 대신 구조화된 `error` 객체를 나릅니다.
+
+```json
+{ "success": false, "error": { "code": "NOT_FOUND", "message": "Notification not found" } }
+```
+
+라우트는 이것들을 `src/lib/api-response.ts`의 헬퍼로 만듭니다. 성공에는 `success(data)`, 흔한 실패에는
+`errors.notFound(...)`, `errors.badRequest(...)`, `errors.unauthorized()`, `errors.forbidden(...)`이며,
+각각 대응하는 HTTP 상태(404, 400, 401, 403)에 매핑됩니다. 유효한 세션도 에이전트 key도 없는 요청은
+`errors.unauthorized()`로 거부됩니다.
+
+```json
+{ "success": false, "error": { "code": "UNAUTHORIZED", "message": "Authentication required" } }
+```
+
+HTTP는 `401`입니다. (SSE 엔드포인트는 이 봉투보다 앞서 존재하며, 미인증 요청에는 평문 `Unauthorized`와 상태
+`401`로 응답합니다.)
+
+## 단일 인스턴스와 다중 인스턴스 전달
+
+이벤트 버스는 메모리 내 싱글턴으로, 단일 인스턴스 배포에는 이것으로 충분합니다. 변경을 처리하는 프로세스가
+모든 SSE 연결을 쥐고 있는 그 프로세스이기 때문입니다. 로컬에서 이벤트를 내면 연결된 모든 브라우저에 도달합니다.
+
+하나보다 많은 인스턴스를 실행하면 이 전제가 깨집니다. 인스턴스 A의 변경이 인스턴스 B에 연결된 브라우저에도
+여전히 도달해야 합니다. 다중 인스턴스 배포에서는 이벤트 버스를 **Redis pub/sub** 로 뒷받침하세요. 각
+인스턴스가 공유 채널을 구독하고, 변경은 로컬에서만 내는 대신 Redis로 발행하며, 각 인스턴스의 SSE 엔드포인트가
+받은 것을 자신의 연결된 브라우저로 전달합니다. 뒷받침을 바꿔도 SSE 엔드포인트와 클라이언트 hook은 그대로이며,
+다른 것은 이벤트 버스의 구현뿐입니다.
+
+## 알림 개념
+
+이 페이지는 전달 메커니즘만 다룹니다. 무엇이 알림을 생성하는지, 즉 범주, @멘션, 각 종류의 활동에서 누가
+알림을 받는지, 그리고 각 수신자가 받기를 선택할 수 있는 설정은 [협업 참고](/ko/reference/collaboration/)를
+보세요.

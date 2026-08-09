@@ -1,0 +1,24 @@
+---
+title: 工作流参考
+description: Chorus 交付工作流中的稳定阶段与交接规则。
+docsLocale: zh
+route: /zh/reference/workflow/
+sidebar:
+  order: 1
+---
+
+<div class="table-scroll" role="region" aria-label="Chorus 工作流阶段" tabindex="0">
+
+  | 阶段 | 产出 | 退出条件 |
+  | --- | --- | --- |
+  | Idea | 已确认的需求梳理 | 请求人确认双方理解一致 |
+  | Proposal | 已批准的文档与 Task 依赖图 | 独立审查通过 |
+  | Develop | 实施证据 | 所有必需验收标准均完成自检 |
+  | Verify | 已审查的 Task | 管理员接受实施证据 |
+
+</div>
+
+## Task 状态
+
+Task 依次经过 `open`、`assigned`、`in_progress`、`to_verify` 和 `done`。
+只有上游 Task 到达 `done` 后，依赖它的下游 Task 才会解除阻塞。

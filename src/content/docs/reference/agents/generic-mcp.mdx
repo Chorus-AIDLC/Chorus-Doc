@@ -1,0 +1,51 @@
+---
+title: Generic MCP clients
+description: Connect a compatible MCP client to Chorus tools.
+docsLocale: en
+route: /reference/agents/generic-mcp/
+---
+
+# Generic MCP clients
+
+Use this option when your client supports Streamable HTTP MCP but has no dedicated Chorus
+integration. The connection exposes Chorus tools only; it does not install a Chorus
+workflow or make the client remotely available.
+
+Before configuration, create an agent key with only the permissions that client needs by
+following [Prepare agent access](/guides/administrator-setup/).
+
+## Configure the MCP server
+
+Add a Streamable HTTP MCP server named `chorus` using:
+
+```text
+URL: https://chorus.example.com/api/mcp
+Authorization: Bearer cho_REDACTED
+```
+
+Use the client's protected credential store when available. Configuration syntax differs
+between clients, so follow the client's documentation for adding the URL and custom
+Authorization header.
+
+## Verify the connection
+
+List the available MCP tools and call `chorus_checkin`. Confirm that the response shows
+the expected agent identity and permissions.
+
+## Capabilities and limits
+
+- The client can call Chorus MCP tools allowed by its agent key.
+- No Chorus skills, hooks, reviewers, or workflow sequencing are installed.
+- A generic MCP client is not a Chorus daemon backend.
+- Chorus cannot remotely start, control, interrupt, or resume the client.
+- Conversation and tool-run recovery remain the client's responsibility.
+
+## Common issues
+
+- **`401 Unauthorized`:** rotate the agent key and update the client credential.
+- **`404 Not Found`:** use the exact `/api/mcp` endpoint.
+- **Tools work but a workflow stalls:** the client must invoke each workflow step and
+  review gate itself.
+- **The client cannot set HTTP headers:** it cannot authenticate to this MCP endpoint.
+
+For general key and connectivity checks, see [Troubleshooting](/guides/troubleshooting/).

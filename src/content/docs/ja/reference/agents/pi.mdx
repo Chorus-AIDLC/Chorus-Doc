@@ -1,0 +1,64 @@
+---
+title: Pi
+description: 高度な、ソースのみの Chorus 統合を Pi で評価します。
+docsLocale: ja
+route: /ja/reference/agents/pi/
+---
+
+# Pi
+
+Pi 統合は第一者ですが、現在は高度な評価向けを想定しています。スタンドアロンのパッケージとして
+配布されておらず、インストールには Chorus リポジトリのローカルチェックアウトが必要です。ほとんどの
+エンドユーザーは、別の[サポート対象プラットフォーム](/ja/reference/agents/)を選ぶべきです。
+
+インストール前に、[エージェントのアクセスを準備する](/ja/guides/administrator-setup/)に従って
+エージェントキーを作成します。
+
+## ソースチェックアウトからインストールする
+
+Chorus チェックアウトのルートで実行します。
+
+```bash
+pi install npm:pi-mcp-adapter
+pi install npm:@narumitw/pi-subagents
+pi install ./packages/chorus-pi
+mkdir -p ~/.pi/agent/agents
+cp packages/chorus-pi/agents/*.md ~/.pi/agent/agents/
+```
+
+Pi はモノレポの Git URL からパッケージのサブディレクトリを選べないため、Chorus リポジトリの URL を
+直接インストールしても、この統合はインストールされません。
+
+プロジェクトの `.mcp.json` を次のように設定します。
+
+```text
+URL: https://chorus.example.com/api/mcp
+Authorization: Bearer cho_REDACTED
+```
+
+`.mcp.json` にはエージェントキーが含まれるため、バージョン管理には含めないでください。
+
+## 接続を確認する
+
+Pi を再起動し、`/mcp` を確認して、Pi に `chorus_checkin` の呼び出しを依頼します。応答が想定した
+エージェントの身元と権限を示すことを確認します。最初のターンでも、Chorus プラグインが有効である
+ことが報告されるはずです。
+
+## 機能と制限
+
+- パッケージは Chorus MCP ツール、ワークフロースキル、レビューエージェント、そして Pi フックを
+  提供します。
+- Pi は Chorus デーモンのバックエンドではありません。
+- Chorus は Pi セッションをリモートで起動、中断、再開することはできません。
+- ローカルの会話の復旧は、Pi 自身のセッション機能を使います。
+
+## よくある問題
+
+- **MCP サーバーが見当たらない：** `.mcp.json` をプロジェクトのルートに置くか、`/mcp setup` を
+  実行します。
+- **スキルが見当たらない：** インストール後に `/reload` を実行します。
+- **レビューエージェントが見当たらない：** `pi-subagents` がインストールされ、同梱のエージェント
+  ファイルがコピーされていることを確認します。
+- **接続が認可されない：** `.mcp.json` のエージェントキーを差し替え、Pi を再起動します。
+
+一般的な接続の問題については、[トラブルシューティング](/ja/guides/troubleshooting/)を参照してください。

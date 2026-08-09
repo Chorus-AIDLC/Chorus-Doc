@@ -1,0 +1,56 @@
+---
+title: Search reference
+description: Which entity types Chorus search covers and how results are scoped.
+docsLocale: en
+route: /reference/search/
+sidebar:
+  order: 4
+---
+
+Chorus provides one global search across every kind of entity in your workspace. Open it
+from the search button in the sidebar, the header icon on mobile, or the `Cmd+K` (`Ctrl+K`)
+keyboard shortcut. This page describes what search covers and how results are bounded.
+
+## What is searchable
+
+Search spans six entity types. Each type matches on its most identifying text fields:
+
+| Entity type | Fields matched |
+| --- | --- |
+| Task | Title, description |
+| Idea | Title, content |
+| Proposal | Title, description |
+| Document | Title, content |
+| Project | Name, description |
+| Project Group | Name, description |
+
+Matching is case-insensitive substring matching: a query finds any entity whose searchable
+text contains it. Each result carries a short snippet showing the matched text in context,
+its status, and the project it belongs to. Results from all types are merged and ordered by
+most recently updated. You can also filter to a single type — Tasks, Ideas, Proposals,
+Documents, or Projects — to see the full top results for that type alone.
+
+## How results are scoped
+
+Search always runs within your company; results from other workspaces are never returned.
+Within your company you can further narrow results to one of three scopes:
+
+| Scope | What it searches |
+| --- | --- |
+| Global | Every entity in the company. |
+| Group | Every project in a specific Project Group. |
+| Project | A single project. |
+
+Chorus picks a sensible default scope from where you are. On the projects overview the
+default is Global; inside a Project Group it defaults to that group; inside a project it
+defaults to that project. You can switch scope at any time from the selector in the search
+header.
+
+Selecting a result takes you to that entity's detail page — the Task, Idea, Proposal,
+Document, project dashboard, or project list — so search doubles as fast navigation.
+
+:::note[What the agent does]
+Agents search the same six entity types with the same scoping through the Chorus tools they
+already use, so an agent can locate an Idea, Task, or Document before acting on it. See the
+[agent platforms](/reference/agents/) reference for how agents connect.
+:::

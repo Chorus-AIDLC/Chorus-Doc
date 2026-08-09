@@ -1,0 +1,165 @@
+---
+title: 命令与技能路由
+description: 各 AI-DLC 阶段对应的 Chorus 插件命令：触发时机、所需权限与产出，以及 Codex 的命名差异。
+docsLocale: zh
+route: /zh/guides/plugin-commands/
+---
+
+Chorus 插件为 AI-DLC 流水线的每个阶段提供一个命令。本页是这些命令的速查参考:各命令
+何时运行、其 API 密钥需要哪些权限,以及会产出什么。本页不重复讲解流水线本身，相关内容
+请阅读[AI-DLC 工作流](/zh/guides/ai-dlc-workflow/)以及下文链接的各阶段指南。
+
+## 不同运行时的调用方式不同
+
+Claude Code 将这些命令以 `chorus` 命名空间下的斜杠命令暴露;Codex 则以 `$` 前缀暴露同一批
+技能。两者行为完全一致,只是输入命令的写法不同。
+
+```text
+# Claude Code —— /chorus: 斜杠命令
+/chorus
+/chorus:idea
+/chorus:proposal
+/chorus:develop
+/chorus:review
+/chorus:quick-dev
+/chorus:yolo
+
+# Codex —— $ 前缀技能名
+$chorus
+$idea
+$proposal
+$develop
+$review
+$quick-dev
+$yolo
+```
+
+本页命令统一采用 Claude Code 写法(`/chorus:develop`)。在 Codex 上请替换为 `$` 写法
+(`$develop`)。其余运行时（OpenClaw、Kiro、Pi）搭载同一批技能;运行时特有的调用说明见
+[配置 Agent](/zh/reference/agents/)下各运行时页面。
+
+## `/chorus`：路由与配置
+
+```text
+/chorus      # Claude Code
+$chorus      # Codex
+```
+
+- **触发时机:** 在会话开始时运行,或当你不确定该用哪个阶段命令时运行。它是总览与路由入口。
+- **所需权限:** 已连接的插件与 API 密钥;无特定权限要求。
+- **产出:** 不改变工作流状态。它给出平台总览、你的角色与生效权限,并把你指引到下文相应的
+  阶段命令。
+
+## 各阶段命令
+
+速查表:
+
+| 命令 | 所需权限 | 产出 |
+|---|---|---|
+| `/chorus:idea` | `idea:write`(完成澄清需 `idea:admin`) | 已认领并完成澄清的想法,可进入规划 |
+| `/chorus:proposal` | `proposal:write` + `document:write` | 已提交的方案：文档草稿 + 任务 DAG(`draft` → `pending`) |
+| `/chorus:develop` | `task:write` | 已推进到 `to_verify` 的任务,附工作报告与已自检的验收标准 |
+| `/chorus:review` | `proposal:admin` + `task:admin` | 已批准的方案(草稿落地)与已验证的任务(→ `done`) |
+| `/chorus:quick-dev` | `task:write`(自验证需 `task:admin`) | 独立或挂靠方案的任务,推进到 `to_verify` / `done` |
+| `/chorus:yolo` | 管理员预设密钥(所有资源的 write + `proposal:admin` + `task:admin`) | 从提示词一路驱动某个想法到完成,并附结项报告 |
+
+### `/chorus:idea`：构思
+
+```text
+/chorus:idea     # Claude Code
+$idea            # Codex
+```
+
+- **触发时机:** 你有一个待细化为需求的开放想法，先认领,再运行结构化澄清轮次。
+- **所需权限:** 认领与运行澄清需 `idea:write`。完成澄清(提交闸门)还需 `idea:admin`;
+  `pm_agent` 预设的密钥必须将该步交给管理员预设的密钥执行。
+- **产出:** 一个已认领、澄清轮次已作答并已完成的想法，可进入 `/chorus:proposal`。参见
+  [记录想法](/zh/guides/capture-an-idea/)。
+
+### `/chorus:proposal`：规划
+
+```text
+/chorus:proposal # Claude Code
+$proposal        # Codex
+```
+
+- **触发时机:** 某个想法的澄清已完成,可以开始规划工作了。
+- **所需权限:** 方案容器、任务草稿与依赖关系需 `proposal:write`;PRD、技术设计与规格草稿需
+  `document:write`。
+- **产出:** 一个包含文档草稿与任务草稿依赖图的方案,经校验后提交评审(`draft` → `pending`)。
+  提交时,钩子会提示主 Agent 生成方案评审子 Agent，参见
+  [自动化行为](/zh/guides/plugin-automation/)。
+
+### `/chorus:develop`：开发
+
+```text
+/chorus:develop  # Claude Code
+$develop         # Codex
+```
+
+- **触发时机:** 已批准的任务就绪,你准备实现其中之一。`start_development` 唤醒要求你按依赖
+  顺序清空某个想法的全部剩余任务。
+- **所需权限:** 认领、汇报工作、自检验收标准与提交需 `task:write`。
+- **产出:** 一个经历 `claim → in_progress → to_verify` 的任务,附工作报告与已自检的验收标准。
+  提交时,钩子会提示生成任务评审子 Agent。参见[执行任务](/zh/guides/run-tasks/)。
+
+### `/chorus:review`：评审与治理
+
+```text
+/chorus:review   # Claude Code
+$review          # Codex
+```
+
+- **触发时机:** 有方案处于 `pending`,或有任务处于 `to_verify`,而你正以管理员身份(人类代理
+  角色)处理它们。
+- **所需权限:** 批准或关闭方案需 `proposal:admin`;验证、重开或关闭任务及标记验收标准需
+  `task:admin`。完整的管理员预设密钥同时具备两者,外加关闭想法与文档的治理权限。
+- **产出:** 已批准的方案(其文档与任务草稿落地为真实实体)与已验证的任务(`to_verify` →
+  `done`),或附带反馈的驳回与重开项。参见[评审方案](/zh/guides/review-a-proposal/)与
+  [验证与完成](/zh/guides/verify-and-complete/)。
+
+### `/chorus:quick-dev`：直接建任务
+
+```text
+/chorus:quick-dev # Claude Code
+$quick-dev        # Codex
+```
+
+- **触发时机:** 小而明确的工作（缺陷修复、热修复或后续补丁），完整的想法→方案流程显得多余时。
+- **所需权限:** 创建、认领与执行任务需 `task:write`。自验证结果需显式的 `task:admin`;没有该
+  权限时,Agent 会附上证据并移交人类进行验证。
+- **产出:** 独立任务(或通过 `proposalUuid` 挂靠到既有方案的任务),推进到 `to_verify`;当密钥
+  具备 `task:admin` 时推进到 `done`。
+
+### `/chorus:yolo`：全自动流水线
+
+```text
+/chorus:yolo <prompt>                        # Claude Code
+$yolo <prompt>                               # Codex
+/chorus:yolo <prompt> --project <project-uuid>
+```
+
+- **触发时机:** 你希望从一段自然语言提示词开始,无人值守地跑完整条流水线。`yolo_requested`
+  唤醒会从想法所处的任意阶段恢复执行。
+- **所需权限:** 一把**管理员预设**的 API 密钥，所有资源的 write 加上 `proposal:admin` 与
+  `task:admin`(具体为 `idea:write`、`proposal:write` + `proposal:admin`、`task:write` +
+  `task:admin` 以及 `project:write`)。缺任一权限时,技能会在启动阶段直接中止。
+- **产出:** 一次完整运行（未指定时创建项目、想法、自澄清、方案、按波次的任务执行、评审
+  循环、管理员验证，以及一份必备的结项报告）。未经人类明确批准,它绝不合并或推送 PR。
+
+## 面向 Agent
+
+- **触发时机:** `/chorus`(`$chorus`)用于路由与角色发现;各阶段命令在进入相应阶段时触发,或
+  由人类唤醒触发，`start_development` 恢复 `/chorus:develop` 以处理某个想法的全部剩余任务,
+  `yolo_requested` 从想法当前阶段恢复 `/chorus:yolo`。
+- **约束:**
+  - 工具的*可见性*取决于密钥的权限集,但处理器层的守卫仍会生效，例如即便持有 `task:write`,
+    也只有任务的受理人才能调用 `chorus_submit_for_verify`。
+  - `/chorus:yolo` 需要管理员预设密钥,缺任一所需权限即中止;`/chorus:quick-dev` 仅在显式持有
+    `task:admin` 时自验证,否则移交人类。
+  - 在 Codex 上以 `$` 前缀调用同一批技能;评审与自动化的呈现因运行时而异，参见
+    [自动化行为](/zh/guides/plugin-automation/)。
+  - 未经人类明确批准,绝不合并或推送 PR,`/chorus:yolo` 下同样如此。
+- **引用出处:** `public/chorus-plugin/skills/chorus/SKILL.md` 中的 Skill Routing 与预设/权限表;
+  各阶段技能 `public/chorus-plugin/skills/{idea,proposal,develop,review,yolo,quick-dev}/SKILL.md`;
+  以及 `plugins/chorus/README.md` 中的 Codex `$` 命令速查表。

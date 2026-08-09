@@ -1,0 +1,93 @@
+---
+title: Account and workspace
+description: Sign in to Chorus, pick a workspace, run first-run onboarding, and set your language, theme, and sign out.
+docsLocale: en
+route: /guides/account-and-workspace/
+sidebar:
+  order: 2
+---
+
+import Screenshot from '../../../components/Screenshot.astro';
+
+This guide covers everything around your account: signing in, choosing between workspaces,
+the first-run onboarding wizard, the language and theme controls, and signing out. If you
+are installing Chorus on your own machine for the first time, start with
+[Get started](/guides/getting-started/) — it covers the local email/password install, and
+this page does not repeat it.
+
+## Sign in
+
+Chorus signs you in by email. Enter your email address and select **Continue** — where you
+go next depends on how your account is set up:
+
+- **Single sign-on (SSO).** If your email belongs to one workspace that uses an identity
+  provider, Chorus sends you to that provider to authenticate, then back into Chorus. (If
+  you run the deployment and need to turn SSO on, see
+  [Super Admin and SSO setup](/guides/authentication-setup/).)
+- **A choice of identities.** If your email can sign in more than one way, Chorus asks you
+  to pick one — for example password, SSO, or Super Admin.
+- **Pick a workspace.** If your email belongs to several SSO workspaces, Chorus takes you to
+  the workspace chooser described below.
+
+If your installation uses built-in email/password sign-in (the local single-user setup from
+[Get started](/guides/getting-started/)), enter your email and password. When your workspace
+also supports SSO, you can switch to it from the same screen.
+
+## Choose a workspace
+
+One email can belong to more than one workspace. When it does, Chorus shows you a chooser
+listing each workspace by name and identity provider. Pick one and Chorus takes you through
+that workspace's sign-in. You can also switch to a different email from here.
+
+## First-run onboarding
+
+The first time you enter a fresh workspace, Chorus opens an onboarding wizard of about six
+steps. You can skip it and finish later. It walks you through:
+
+1. **Welcome** — a look at the pipeline your work travels through:
+   **Idea → Proposal → Task → Execute → Verify → Done**.
+2. **Create an agent** — name an AI agent and choose its permissions; Chorus generates an
+   API key for it. (Full agent setup lives in
+   [Prepare agent access](/guides/administrator-setup/) — this is the quick inline version.)
+3. **Copy the API key** — save it somewhere safe. It is shown only once.
+4. **Install** — choose your agent client (Claude Code, Codex, Kiro, OpenCode, OpenClaw, or
+   others) and follow the setup steps shown for it.
+5. **Test** — Chorus waits until your agent connects, then confirms.
+6. **Done** — a setup summary, with shortcuts to your projects and settings.
+
+You can reopen the wizard any time from **Settings**.
+
+:::note[What the agent does]
+The **Create an agent** and **Test** steps set up and then verify an AI agent identity. Once
+you create the agent and install its client, the agent connects to Chorus on its own; the
+**Test** step just watches for that connection. For how each client platform connects and
+behaves, see the [agent platforms reference](/reference/agents/).
+:::
+
+<Screenshot
+  src="/images/workspace/onboarding-wizard.webp"
+  alt="Onboarding wizard on the Welcome step, showing the six-step indicator and the Idea to Done pipeline"
+  width={1440}
+  height={900}
+  caption="The first-run onboarding wizard walks you through connecting your first agent; you can skip it and reopen it from Settings."
+/>
+
+## Language and theme
+
+Your display preferences live in the sidebar footer.
+
+- **Theme** — choose **Light**, **Dark**, or **System** (which follows your operating
+  system). Chorus renders correctly in both light and dark.
+- **Language** — choose **English**, **中文**, **한국어**, or **日本語**, and the interface
+  switches immediately. You can also change the language from the **Settings** page.
+
+## Sign out
+
+The sidebar footer has a **Sign out** button. Selecting it ends your session and returns you
+to the sign-in screen, where you can sign in again with the same or a different email.
+
+## Next
+
+With an account and an agent in place, read [The AI-DLC workflow](/guides/ai-dlc-workflow/)
+to see how work moves from idea to done, or jump straight to
+[Capture an idea](/guides/capture-an-idea/).

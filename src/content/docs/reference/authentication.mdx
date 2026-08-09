@@ -1,0 +1,237 @@
+---
+title: Authentication & permissions
+description: How clients authenticate to Chorus and how the agent permission model gates every tool and route.
+docsLocale: en
+route: /reference/authentication/
+sidebar:
+  order: 6
+---
+
+Chorus authenticates every request into one unified `AuthContext`, then gates what an agent
+can do against a fine-grained permission set. This page documents the authentication
+methods, the agent API key contract, and the permission model that drives both MCP tool
+visibility and REST access.
+
+Stable anchors you can cite: [`#unified-authcontext`](#unified-authcontext),
+[`#resolution-cascade`](#resolution-cascade), [`#agent-api-key`](#agent-api-key),
+[`#permission-model`](#permission-model), [`#role-presets`](#role-presets),
+[`#custom-permissions-and-the-effective-set`](#custom-permissions-and-the-effective-set).
+
+## Unified AuthContext
+
+Every authenticated request resolves to one of three context types. Multi-tenancy is
+enforced through `companyUuid`: all data access is scoped to it, and only Super Admin
+operates across companies.
+
+| Context type | `type` | Key fields | Produced by |
+| --- | --- | --- | --- |
+| User | `user` | `companyUuid`, `actorUuid`, `email`, `name` | OIDC, Default Auth |
+| Agent | `agent` | `companyUuid`, `actorUuid`, `roles[]` (preset selector), `permissions[]` (effective set), `agentName`, `ownerUuid` | API key |
+| Super Admin | `super_admin` | `email` (no `companyUuid`) | Super Admin session |
+
+An agent's authorization comes entirely from its `permissions[]` — the flat effective set.
+The `roles[]` field is only a preset selector, not the authorization source.
+
+## Resolution cascade
+
+A single entry point tries each method in priority order and returns on the first success:
+
+```text
+1. Authorization: Bearer <token>
+   ├─ cho_… prefix  → API key validation      → Agent context
+   ├─ RS*/ES* JWT   → OIDC token verification  → User context
+   └─ HS256 JWT     → Chorus JWT verification   → User context
+2. Session cookies
+   └─ user_session | admin_session            → User | Super Admin context
+3. OIDC cookie (for SSE / EventSource, no Authorization header)
+   └─ oidc_access_token cookie                → User context
+4. No match → unauthenticated
+```
+
+The token in step 1 is classified by shape: a `cho_` prefix is an API key; otherwise a
+three-part JWT is OIDC when its header algorithm is asymmetric (`RS*`/`ES*`) and a Chorus
+self-signed session token when it is `HS256`.
+
+## Agent API key
+
+Agents authenticate with a bearer API key on every MCP and REST request:
+
+```http
+Authorization: Bearer cho_<random>
+```
+
+The contract:
+
+- **`cho_` prefix.** Every key begins with `cho_` followed by base64url-encoded random
+  bytes. The prefix is how the resolution cascade recognizes a key versus a JWT.
+- **Shown once.** The raw key is returned only at creation time. Copy it then; it cannot be
+  retrieved again.
+- **SHA-256 hash at rest.** Only the SHA-256 hash of the key is stored. The database never
+  holds the raw value, so a database dump does not expose usable credentials.
+- **Timing-safe comparison.** Validation hashes the presented token and compares hashes with
+  a constant-time comparison, so a mismatch takes the same time regardless of how many
+  leading characters match.
+- **Rotation, revocation, expiry.** A key can be revoked or given an optional expiry; a
+  revoked or expired key fails validation. Rotate by creating a replacement and revoking the
+  old one. Permissions live on the agent, not the key, so rotating a key preserves the
+  agent's permissions — editing the agent changes them.
+
+:::caution[The key is shown once]
+There is no way to recover a raw key after creation. Store it in a secret manager and treat
+it like a password. If it leaks, revoke it and issue a replacement.
+:::
+
+Creating, editing, rotating, and revoking keys is a Settings task, not an API call. See
+[Prepare agent access](/guides/administrator-setup/) for the credential-creation steps,
+[Manage agents and API keys](/guides/manage-agents/) for editing and revoking, and
+[Connect an agent runtime](/guides/operator-onboarding/) for wiring a key into an agent.
+
+## Other authentication methods
+
+These serve human users and platform administrators. They are summarized here; the operator
+guides cover setup.
+
+### OIDC (users)
+
+Enterprise SSO for human users, configured per company (issuer, client ID, enabled toggle)
+by a Super Admin. Login uses the Authorization Code flow with **PKCE** and no client secret.
+After the provider redirects back, Chorus finds-or-creates the user by
+`(companyUuid, oidcSub)` and sets HTTP-only cookies:
+
+| Cookie | Purpose |
+| --- | --- |
+| `oidc_access_token` | Access token for API calls (~1 hour) |
+| `oidc_refresh_token` | Refresh token for silent renewal (~30 days) |
+| `oidc_client_id` | Client ID used during token refresh |
+| `oidc_issuer` | Issuer used for JWKS discovery |
+
+Access tokens are verified against the provider's JWKS (cached), and edge middleware renews
+an expiring access token transparently before requests reach the app.
+
+### Default Auth (development)
+
+A single email/password login for development and demo deployments without OIDC. Enabled
+only when `DEFAULT_USER` and `DEFAULT_PASSWORD` are both set:
+
+```bash
+DEFAULT_USER="dev@example.local"
+DEFAULT_PASSWORD="change-me"
+```
+
+On login Chorus auto-provisions the company and user and issues one long-lived self-signed
+JWT in a `user_session` cookie. There is no refresh flow — when it expires, the user logs
+in again. Do not enable Default Auth in production.
+
+### Super Admin
+
+Platform-level administration across all companies (company management, per-company OIDC
+configuration). Configured with an email and a **bcrypt** password hash in the environment:
+
+```bash
+SUPER_ADMIN_EMAIL="admin@example.com"
+SUPER_ADMIN_PASSWORD_HASH="$2b$10$…"   # bcrypt hash
+```
+
+A successful login sets an `admin_session` cookie. A Super Admin context has **no
+`companyUuid`** and is therefore not subject to company scoping — it is the only context
+that reads across tenants.
+
+## Permission model
+
+Agent authorization is a set of permission bits. The effective set an agent carries decides,
+at every layer, what it may do.
+
+### The 5 × 3 matrix
+
+A permission is written `{resource}:{action}`. Five resources times three actions gives 15
+possible bits:
+
+| | `read` | `write` | `admin` |
+| --- | --- | --- | --- |
+| **`idea`** | view ideas | create / claim / release / update ideas; run elaboration | close / delete ideas |
+| **`proposal`** | view proposals and drafts | create / submit / reject / revoke; manage drafts; batch-create tasks; manage the task DAG; assign tasks | approve / close proposals |
+| **`document`** | view documents | create / update documents | delete documents |
+| **`task`** | view tasks | claim / release / submit / report; self-check acceptance criteria | verify / reopen / close / delete tasks; mark acceptance criteria |
+| **`project`** | view projects and groups | create / update / delete projects and groups; move projects | reserved (granted by `admin_agent`, not yet gated) |
+
+Actions are cumulative by convention but **not** automatically inherited: granting
+`task:admin` does not imply `task:read` or `task:write` — each bit is granted explicitly.
+
+:::caution[`*:admin` bits are human-level]
+The `admin` column covers actions that normally require a human reviewer — approving
+proposals, verifying tasks, and deleting entities. Granting an `*:admin` bit lets an agent
+substitute for that human judgment (and is not author-scoped: `task:admin` can verify any
+task in the company, not only ones the agent worked on). Grant admin bits only to agents
+that intentionally automate an approval workflow.
+:::
+
+### Role presets
+
+Three named presets expand to fixed subsets of the 15 bits. A preset is a shortcut, not a
+separate authorization mechanism.
+
+| Preset | Count | Expanded permissions |
+| --- | :---: | --- |
+| `developer_agent` | **6** | `*:read` + `task:write` |
+| `pm_agent` | **10** | `*:read` + `idea:write` + `proposal:write` + `document:write` + `task:write` + `project:write` |
+| `admin_agent` | **15** | every bit (`*:read` + `*:write` + `*:admin`) |
+
+Expanded, the presets are:
+
+```text
+developer_agent (6):
+  idea:read  proposal:read  document:read  project:read  task:read
+  task:write
+
+pm_agent (10):
+  idea:read      idea:write
+  proposal:read  proposal:write
+  document:read  document:write
+  task:read      task:write
+  project:read   project:write
+
+admin_agent (15):
+  idea:read      idea:write      idea:admin
+  proposal:read  proposal:write  proposal:admin
+  document:read  document:write  document:admin
+  task:read      task:write      task:admin
+  project:read   project:write   project:admin
+```
+
+### Custom permissions and the effective set
+
+Beyond a preset, an agent can carry custom permission bits. The **effective set** is the
+union of the expanded preset(s) and the custom bits:
+
+```text
+effective = expand(preset) ∪ custom
+```
+
+Order does not matter — it is a pure set union. Common shapes:
+
+- **Read-only auditor** — no preset, custom `*:read` only: can inspect everything, mutate
+  nothing.
+- **Self-verifying developer** — `developer_agent` + `task:admin`: can verify tasks without
+  waiting for an admin.
+- **PM with approval** — `pm_agent` + `proposal:admin`: can approve proposals directly.
+
+### How the effective set gates access
+
+The same effective set drives both integration surfaces:
+
+- **MCP tool visibility.** Each permission-gated MCP tool declares exactly one required
+  permission. At connection time, a tool is registered on the agent's server only if its
+  required permission is in the effective set — otherwise the tool is simply absent from the
+  agent's tool list. Public tools (discover / read / list / search / comment / session, and
+  `chorus_create_tasks` / `chorus_update_task`) carry no gate and appear for every agent.
+- **REST gating.** Gated REST routes wrap their handler with
+  `requireAgentPermission("{resource}:{action}", …)`. An agent missing the bit gets
+  `403 Missing permission`. A human user is not subject to `requireAgentPermission` (human
+  routes use session-based checks), and a Super Admin bypasses all permission checks.
+
+:::note[What the agent sees]
+An agent's tool list is exactly the union of the public tools and the gated tools its
+effective permissions unlock. If a tool you expect is missing, the agent lacks its required
+permission — edit the agent's permissions rather than the key. For the full tool →
+permission mapping, see the [MCP tools catalog](/reference/mcp-tools/).
+:::

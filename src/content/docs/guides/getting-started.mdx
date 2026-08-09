@@ -1,0 +1,86 @@
+---
+title: Get started
+description: Install Chorus, sign in, and connect your first AI agent.
+docsLocale: en
+route: /guides/getting-started/
+sidebar:
+  order: 1
+---
+
+This guide takes you from a new machine to a working local Chorus installation. You need
+[Node.js 22 or later](https://nodejs.org/) and npm.
+
+## Install and start Chorus
+
+Install the Chorus command globally:
+
+```sh
+npm install --global \
+  @chorus-aidlc/chorus
+```
+
+Set your administrator account and start Chorus:
+
+```sh
+DEFAULT_USER=you@example.com \
+DEFAULT_PASSWORD='choose-a-strong-password' \
+chorus
+```
+
+Chorus creates its local database, applies any required migrations, and starts the web
+application. Keep this terminal open while you use Chorus.
+
+## Sign in
+
+Open `http://localhost:8637` and sign in with the email and password you set above. Keep
+those values out of shell history on shared machines. The built-in database is intended
+for local, single-user use. For a shared installation, use an external PostgreSQL
+database or the supported Docker deployment and manage credentials through the
+deployment environment.
+
+## Connect an agent
+
+1. Open **Settings**.
+2. Find **Setup Guide** and select **Open Setup Guide**.
+3. Choose your agent platform.
+4. Follow the displayed installation and connection steps.
+5. Complete the guide's connection check.
+
+The setup guide creates the required agent credential and gives you commands for the
+platform you selected. Do not reuse commands from another platform.
+
+For the full picture of agent configuration — how to compare platforms, what the Chorus
+plugin packages, and how to upgrade or uninstall it — see
+[Agent platforms](/reference/agents/), and the rest of the
+[Set up agents](/guides/administrator-setup/) guides for access keys, remote start, and
+keeping a runtime online.
+
+Choose what you want to do next:
+
+- **Use Chorus from the agent's terminal:** complete the platform page's check-in step.
+  OpenCode, Pi, and generic MCP clients stop here; they do not appear as remotely
+  available runtimes.
+- **Start work remotely from Chorus:** use Claude Code, Codex, Kiro, or OpenClaw. For
+  Claude Code, Codex, and Kiro, [connect the runtime](/guides/operator-onboarding/),
+  [keep it online](/guides/daemon-operations/), and then
+  [start your first session](/guides/remote-control/). OpenClaw stays online through its
+  own gateway.
+
+When another person manages the machine or credential, begin with
+[Prepare agent access](/guides/administrator-setup/).
+
+## Run your first idea
+
+With Chorus running and an agent connected, put it to work. The fastest way to see the whole
+loop is to run one small idea end to end:
+
+1. [Create a project](/guides/create-a-project/) to hold the work.
+2. [Capture an idea](/guides/capture-an-idea/) — something small and real, like *"add a
+   README to this repo"* — and answer the agent's elaboration questions.
+3. [Review the proposal](/guides/review-a-proposal/) the agent drafts, and approve it.
+4. Let the agent [run the tasks](/guides/run-tasks/), then
+   [verify and complete](/guides/verify-and-complete/) the result.
+
+For the full picture of how a request travels from idea to done and where you make the
+decisions, read [The AI-DLC workflow](/guides/ai-dlc-workflow/) — it links you into the
+step-by-step guide for each stage.

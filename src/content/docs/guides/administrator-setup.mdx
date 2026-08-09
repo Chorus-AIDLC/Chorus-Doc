@@ -1,0 +1,67 @@
+---
+title: Prepare agent access
+description: Create a least-privilege agent credential and give an operator the details needed to connect.
+docsLocale: en
+route: /guides/administrator-setup/
+sidebar:
+  order: 8
+---
+
+import Screenshot from '../../../components/Screenshot.astro';
+
+Use this guide when you manage Chorus but another person operates the machine that runs
+the agent. If you are connecting your own machine, the in-app **Setup Guide** is usually
+faster.
+
+## Create a credential
+
+1. Open **Settings** and go to **Agents**.
+2. Select **Create API Key**.
+3. Enter a name that identifies the agent and its owner or machine.
+4. Choose the preset closest to the work the agent will perform.
+5. Review the individual permissions and remove anything the agent does not need.
+6. Create the key and store it immediately.
+
+For implementation work, start with the **Developer** preset. Add proposal, document,
+project, or administrative access only when the agent's assigned workflow requires it.
+
+<Screenshot
+  src="/images/agent-operations/credential-permissions.webp"
+  alt="Create API Key dialog showing the Developer preset and its resource permissions"
+  width={1440}
+  height={900}
+  caption="The Developer preset grants task write access and read access to the supporting work resources."
+/>
+
+:::caution[The API key is shown once]
+Treat the `cho_` value as a password. Store it in a secret manager or another approved
+credential store. If it is exposed, revoke the key in **Settings → Agents** and create a
+replacement.
+:::
+
+## Give the operator what they need
+
+Send the following through an approved secure channel:
+
+- the Chorus URL;
+- the agent name and API key;
+- the selected platform, such as Claude Code, Codex, or Kiro;
+- the directories the agent is allowed to work in;
+- the permissions you granted.
+
+Do not place a real API key in a ticket, chat room, screenshot, shell command, or source
+repository.
+
+## Confirm access
+
+Ask the operator to follow [Connect an agent runtime](/guides/operator-onboarding/). When
+they finish:
+
+1. Open **Settings → Agents**.
+2. Find the agent and open its connection details.
+3. Confirm its status is **Online**.
+4. Confirm the backend, host, and working directory match the intended machine.
+
+If the connection is not online, use [Troubleshoot agent connections](/guides/troubleshooting/).
+Revoke credentials that are no longer in use, especially after a machine or operator
+changes.

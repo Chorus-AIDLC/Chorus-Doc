@@ -1,0 +1,82 @@
+---
+title: Super Admin と SSO のセットアップ
+description: プラットフォームの Super Admin としてサインインし、ワークスペースを作成し、OIDC シングルサインオンを設定してチームがサインインできるようにします。
+docsLocale: ja
+route: /ja/guides/authentication-setup/
+sidebar:
+  order: 5
+---
+
+import Screenshot from '../../../../components/Screenshot.astro';
+
+Chorus のほとんどはワークスペース単位ですが、ワークスペースの上に立つ役割が一つあります。**Super Admin** です。これはワークスペースを作成し、チームのためにシングルサインオン（SSO）を有効にするための入り口です。このガイドは Chorus のデプロイを運用する人向けです。サインインしたいだけのエンドユーザーは[アカウントとワークスペース](/ja/guides/account-and-workspace/)をお読みください。
+
+## Super Admin を有効にする
+
+Super Admin は、どのワークスペースからも独立した、プラットフォームレベルのログインです。サーバー上で二つの環境変数、つまり管理者のメールアドレスと、管理者パスワードの bcrypt ハッシュで有効にします。
+
+```sh
+SUPER_ADMIN_EMAIL="admin@example.com"
+SUPER_ADMIN_PASSWORD_HASH="$2b$10$..."   # パスワードの bcrypt ハッシュ
+```
+
+ハッシュは、次のような一度きりのコマンドで生成します。
+
+```sh
+node -e "console.log(require('bcryptjs').hashSync('your-password', 10))"
+```
+
+ハッシュはデプロイのシークレットストアに保管し、平文のパスワードは決して保管しないでください。管理者セッションの署名には `NEXTAUTH_SECRET` の設定も必要です（これはアプリ全体で必須です）。
+
+## Super Admin としてサインインする
+
+アプリ内に管理パネルへのリンクはありません。通常のサインイン画面から到達します。Super Admin のメールアドレスを入力すると、Chorus はそれを認識し、専用のステップで管理者パスワードを求め、その後 **Super Admin** パネルを開きます。管理者セッションはどのワークスペースからも独立しており、通常のセッションより短命なので、定期的にサインインし直します。
+
+:::caution[Super Admin にはワークスペースの境界がありません]
+ワークスペースの admin エージェントとは違い、Super Admin は一つのワークスペースに限定されず、デプロイ全体を管理します。その認証情報はそれに見合った扱いをしてください。ワークスペースの **admin エージェント**（[エージェントを管理する](/ja/guides/manage-agents/)を参照）が統治するのは*一つのワークスペースの内部*の仕事です。Super Admin が統治するのは*ワークスペースそのもの*です。
+:::
+
+<Screenshot
+  src="/images/workspace/super-admin.webp"
+  alt="Dashboard と Companies のナビゲーション、およびワークスペース・ユーザー・エージェントの件数を表示する Super Admin パネルのダッシュボード"
+  width={1440}
+  height={900}
+  caption="Super Admin パネルは、専用の Dashboard と Companies のビューからデプロイのワークスペースを管理します。"
+/>
+
+## ワークスペースを作成する
+
+Super Admin パネルの **Companies** は、すべてのワークスペースを、そのメールドメイン、OIDC の状態、ユーザー数とエージェント数とともに一覧します。ここからワークスペースを作成・編集・削除します。
+
+作成時には、**名前**、一つ以上の**メールドメイン**、そしてその SSO 設定（下記）を与えます。メールドメインは、サインイン時に人のメールアドレスからこのワークスペースを見つけ出す手がかりになります。
+
+:::caution[ワークスペースの削除は取り消せません]
+ワークスペースを削除すると、それ自身とすべてのデータ、つまりプロジェクト・着想・提案・課題・文書・エージェント・ユーザーがまとめて消えます。取り消しはできません。
+:::
+
+## SSO（OIDC）を設定する
+
+Chorus は、PKCE 付きの OpenID Connect を使ってあなたの ID プロバイダー経由でユーザーをサインインさせます。管理すべき **client secret** はありません。設定はワークスペースごとに、Super Admin パネル内のそのワークスペースの設定で、**OIDC Configuration** の下で行います。必須の値は二つです。
+
+- **OIDC Issuer URL** — あなたのプロバイダーの OpenID Connect ディスカバリー URL。
+- **Client ID** — プロバイダー側のアプリケーションの client ID。
+
+両方を設定すると SSO は自動的に有効になり、どちらかを消すと無効になります。Chorus は標準の `openid profile email` スコープを要求します。
+
+<Screenshot
+  src="/images/workspace/super-admin-oidc.webp"
+  alt="Super Admin パネルのワークスペース編集ページ。Issuer URL と Client ID のフィールドを持つ OIDC Configuration カードを表示している"
+  width={1440}
+  height={900}
+  caption="各ワークスペースの OIDC 設定はその編集ページにあります。Issuer URL と Client ID の両方を設定すると SSO が有効になります。"
+/>
+
+あなたの ID プロバイダー側で、Chorus をアプリケーションとして登録し、その**リダイレクト（コールバック）URL** をホワイトリストに追加します。これは、あなたの Chorus サイトのアドレスの後に `/login/callback` を付けたものです。Companies の一覧に、そのままコピーできる正確な URL が表示されます。これはあなたが実際に Chorus にアクセスするアドレスから組み立てられるので、本番の URL から Companies ページを開き、そこに表示された値をコピーしてください。
+
+### これがユーザーにどう届くか
+
+あるワークスペースに SSO が設定されると、そのドメインのメールでサインインする人は、あなたの ID プロバイダーへ送られてから戻ってきます。これは[アカウントとワークスペース](/ja/guides/account-and-workspace/)で説明する流れです。メールが複数の SSO ワークスペースに一致する人は、一つを選ぶよう求められます。すでにあるワークスペースに追加された人は、メールドメインが違ってもそのワークスペースに解決されます。
+
+## 次に
+
+ワークスペースと SSO が整ったら、日々のセットアップは各ワークスペースの運用担当者に引き継ぎます。[エージェントのアクセスを準備する](/ja/guides/administrator-setup/)ではエージェント認証情報の作成を扱い、[アカウントとワークスペース](/ja/guides/account-and-workspace/)ではユーザーがサインイン時に目にするものを扱います。

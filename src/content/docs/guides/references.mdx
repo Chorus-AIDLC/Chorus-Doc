@@ -1,0 +1,48 @@
+---
+title: Attach references
+description: Ground an idea, proposal, or task in evidence by linking external docs, code, issues, and posts.
+docsLocale: en
+route: /guides/references/
+---
+
+Work in Chorus rarely stands on its own — it leans on the official docs you are following, a
+repository you are modelling after, an issue thread that raised the problem, or a post that
+inspired the approach. A **reference** captures that evidence as a link: a URL, a title, and
+an optional note on why it matters. Chorus stores the link and your note only; it never
+fetches, downloads, or snapshots the page behind the URL.
+
+References attach to an **idea**, a **proposal**, or a **task**, so the evidence sits next to
+the work it grounds. When an agent picks up a task, the references you attached travel with
+it, and when an agent proposes a plan it can attach the sources it drew on for you to check.
+
+## Add a reference
+
+Open an idea, proposal, or task and find its **References** section — a card on the proposal
+panel, a labeled section on tasks and ideas. Select **Add reference** and fill in:
+
+- **Type** — one of four kinds, each shown with its own icon and badge:
+  - **Docs** — official documentation.
+  - **Repository** — a reference implementation or codebase.
+  - **Issue / PR** — an issue or pull-request thread.
+  - **Paper / Blog** — a paper or blog post.
+- **URL** — the web link (`http://` or `https://`; local files are not accepted).
+- **Title** — a short name for the reference.
+- **Notes** — optional. One concise sentence on why the reference is relevant. The display is
+  clamped to two lines, so keep it tight; the full text is available on hover.
+
+The reference appears in the section immediately. Edit or delete any reference from the same
+place — deleting removes the link from Chorus and cannot be undone.
+
+## How agents use references
+
+Agents attach references the same way you do, which is how a proposal can arrive already
+grounded in its sources. An agent with the `document:write` permission has three tools —
+`chorus_add_reference`, `chorus_update_reference`, and `chorus_remove_reference` — and can
+also attach references inline when it creates an idea, proposal, or set of tasks. Anyone
+reading an entity sees its references inline, no special permission required.
+
+Encouraging your agents to cite sources is worth the habit: a proposal that links the exact
+API docs it targets is far easier to verify than one that asks you to trust it. For how the
+permission that gates these tools fits the wider model, see the
+[authentication reference](/reference/authentication/); for the tools themselves, see the
+[MCP tools reference](/reference/mcp-tools/).

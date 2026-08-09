@@ -1,0 +1,80 @@
+---
+title: Claude Code
+description: Claude Code를 Chorus에 연결하고 필요하면 원격 작업에 사용할 수 있게 합니다.
+docsLocale: ko
+route: /ko/reference/agents/claude-code/
+---
+
+# Claude Code
+
+Claude Code에는 제1자 Chorus 플러그인이 있습니다. 대화식 Claude Code 세션에서 Chorus 도구와
+워크플로 스킬을 지원하며, 지원되는 Chorus 데몬 백엔드로도 실행할 수 있습니다.
+
+설치 전에 [에이전트 액세스 준비](/ko/guides/administrator-setup/)에 따라 에이전트 키를
+만드세요.
+
+## 플러그인 설치
+
+Claude Code를 시작하는 셸에서 Chorus URL과 전용 에이전트 키를 설정합니다.
+
+```bash
+export CHORUS_URL="https://chorus.example.com"
+export CHORUS_API_KEY="cho_REDACTED"
+```
+
+그런 다음 Claude Code 안에서 다음 명령을 실행합니다.
+
+```text
+/plugin marketplace add Chorus-AIDLC/chorus
+/plugin install chorus@chorus-plugins
+```
+
+설치 후 Claude Code를 재시작합니다.
+
+## 원격 시작 활성화
+
+대화식 Claude Code 세션에서만 Chorus를 사용한다면 이 섹션을 건너뛰세요. 그렇지 않다면
+[런타임 연결](/ko/guides/operator-onboarding/)에 따라 백엔드로 `claude-code`를 선택합니다.
+[데몬 운영](/ko/guides/daemon-operations/)으로 온라인 상태를 유지하기 전에, 포그라운드에서
+연결을 확인하세요.
+
+## 연결 확인
+
+Claude Code에서 `/plugin list`를 실행해 `chorus@chorus-plugins`가 활성화되어 있는지 확인합니다.
+그런 다음 Claude Code에 `check in to chorus`를 요청합니다. 성공하면 응답이 연결된 에이전트와
+그 권한을 보여 줍니다.
+
+데몬 모드에서는 Chorus의 **설정 → 에이전트**를 열고 예상한 호스트와 작업 디렉터리가 온라인인지
+확인합니다.
+
+## 기능과 제한
+
+- 플러그인은 Chorus MCP 도구, 워크플로 스킬, 그리고 수명 주기 통합을 제공합니다.
+- 데몬 모드는 원격 시작, 후속 지시, 중단, 재개를 지원합니다.
+- 원격 작업은 등록된 작업 디렉터리 안에서 로컬 운영체제 사용자가 사용할 수 있는 모든 것에 접근할
+  수 있습니다. 신뢰하는 디렉터리만 등록하세요.
+
+공통 운영 절차는 [원격 제어](/ko/guides/remote-control/)와
+[세션 복구](/ko/guides/session-recovery/)를 사용하세요.
+
+## 터미널에서 재개하기
+
+자신의 터미널에서 진행 중인 대화를 넘겨받으려면, 채팅 UI에서 해당 세션 ID를 복사한 뒤
+(대화 기록 헤더의 **Copy session ID**), 그 대화의 작업 디렉터리에서 실행합니다.
+
+```bash
+claude --resume <sessionId>
+```
+
+복사한 ID는 Chorus가 세션을 재개할 때 Claude Code에 전달하는 것과 같은 ID입니다. Claude Code
+백엔드의 경우, 그것은 직접 아이디어의 UUID입니다. 전체 흐름은
+[세션 중단과 재개](/ko/guides/session-recovery/#터미널에서-이어받기)를 참고하세요.
+
+## 자주 발생하는 문제
+
+- **플러그인이 나타나지 않음:** Claude Code를 재시작한 뒤 `/plugin list`를 확인합니다.
+- **체크인이 승인되지 않음:** 에이전트 키를 만들거나 교체하고 `CHORUS_API_KEY`를 업데이트한
+  다음 Claude Code를 재시작합니다.
+- **데몬이 오프라인:** `chorus daemon status`를 실행한 뒤
+  [문제 해결](/ko/guides/troubleshooting/)을 참고합니다.
+- **잘못된 프로젝트가 표시됨:** 의도한 절대 경로의 `--cwd` 값으로 데몬을 다시 설치합니다.

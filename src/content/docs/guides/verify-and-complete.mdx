@@ -1,0 +1,105 @@
+---
+title: Verify and complete
+description: Mark acceptance criteria, verify a task, complete the idea, and read its completion report.
+docsLocale: en
+route: /guides/verify-and-complete/
+sidebar:
+  order: 7
+---
+
+import Screenshot from '../../../components/Screenshot.astro';
+
+Verification is the final gate in the [Reversed Conversation](/guides/ai-dlc-workflow/):
+you check the delivered work against its acceptance criteria and accept it. When the last
+task of an idea is verified, the idea is complete and you can read its report. This guide
+covers marking acceptance criteria, verifying a task, and reading the completion report.
+
+## Open a task awaiting verification
+
+When a task reaches **To Verify**, open it from the Tasks board to see its detail panel.
+Read the assignee's work summary and the reports in the activity, then scroll to the
+**Acceptance Criteria** section — this is what you verify against, not just the summary.
+
+## Mark the acceptance criteria
+
+Each acceptance criterion shows its description, a **Required** or **Optional** badge, and
+two tracks:
+
+- **Dev Self-Check** — how the agent rated the criterion, with its evidence.
+- **Verification** — your decision.
+
+For each criterion, review the evidence and select **Pass** or **Fail**. Use **Fail** with a
+note when a required criterion is not actually met. If you change your mind, select **Undo**
+to reset a criterion. A banner tells you whether all required criteria have passed or how
+many are still outstanding.
+
+<Screenshot
+  src="/images/workflow/task-acceptance-criteria.webp"
+  alt="Task Acceptance Criteria section with Dev Self-Check, Pass and Fail controls, and the readiness banner"
+  width={1440}
+  height={900}
+  caption="Verify each acceptance criterion; the banner shows when all required ones pass."
+/>
+
+## Verify the task
+
+Once every **required** criterion has passed, the task panel enables **Mark as Verified**.
+Select it to move the task to **Done**. Chorus blocks verification while any required
+criterion is still unpassed, so you cannot accept work that misses its bar.
+
+If the work is not acceptable, reopen it instead of verifying: send the task back so the
+assignee can fix the specific criteria you failed. Reopening returns the task to
+**In Progress** and resets its acceptance criteria.
+
+Verifying a task also **unblocks its dependents** — a downstream task that was waiting can
+now start. If more tasks remain, return to [Run tasks](/guides/run-tasks/) to move the next
+one forward.
+
+:::note[What the agent does]
+Before submitting, the agent self-checks each acceptance criterion and records its evidence
+in the **Dev Self-Check** track. Your **Pass**/**Fail** marks are independent of that
+self-check. If you reopen the task, the agent picks it back up and addresses the failed
+criteria. See the [agent platforms reference](/reference/agents/) for how that connection
+works.
+:::
+
+## Complete the idea and read its report
+
+An idea completes when every task across its approved proposals reaches **Done**. Its status
+badge advances to **Done**, and no manual step is needed — idea progress is derived from its
+tasks.
+
+At completion the agent can produce a **completion report** — a document that summarizes
+what was delivered against the original idea. Find it on the idea's detail panel, in the
+**Overview** tab, under a **Reports** section that aggregates reports across the idea's
+approved proposals. Select a report to open and read it. Completion reports also appear in
+the project's **Documents** section with the **Report** type.
+
+<Screenshot
+  src="/images/workflow/idea-completion-report.webp"
+  alt="Idea Overview tab with a Reports section listing the completion report for a done idea"
+  width={1440}
+  height={900}
+  caption="When every task is verified, the idea completes and its completion report appears."
+/>
+
+:::note[What the agent does]
+When the last task is verified, the agent writes the completion report summarizing the
+delivered work. You read it to confirm the idea landed as intended; the agent compiles the
+evidence. See the [agent platforms reference](/reference/agents/) for how that connection
+works.
+:::
+
+## You have run the pipeline
+
+You have taken an idea from capture through a verified, done result — the full
+[AI-DLC workflow](/guides/ai-dlc-workflow/). For the stable, at-a-glance version of the
+stages and their handoffs, see the [workflow reference](/reference/workflow/).
+
+Where to go from here:
+
+- [Capture another idea](/guides/capture-an-idea/) to keep the pipeline moving.
+- [Follow project activity](/guides/activity-stream/) to see everything your agents are
+  doing across the project.
+- [Find your way around](/guides/find-your-way-around/) with global search and the resource
+  graph as the project grows.

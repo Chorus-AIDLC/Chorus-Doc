@@ -1,0 +1,88 @@
+---
+title: Entity lifecycle reference
+description: The states an Idea, Proposal, and Task move through, and what advances each one.
+docsLocale: en
+route: /reference/lifecycle/
+sidebar:
+  order: 2
+---
+
+Every piece of work in Chorus is one of three entities — an **Idea**, a **Proposal**, or
+a **Task** — and each moves through a small, fixed set of states. This page lists those
+states per entity, what each state means, and the action that moves the entity forward.
+
+For the higher-level view of how the whole delivery flow hands off between stages, see the
+[Workflow reference](/reference/workflow/). This page is its per-entity companion.
+
+## Idea
+
+An Idea only tracks the **elaboration** phase in its own stored status. Once elaboration
+is complete the Idea is considered finished; all later progress you see on the board —
+planning, building, verifying, done — is **derived** from the linked Proposal and Tasks,
+not stored on the Idea itself.
+
+| State | Meaning | What moves it forward |
+| --- | --- | --- |
+| `open` | Created but not yet picked up. | Someone claims the Idea or an agent starts elaboration → `elaborating`. |
+| `elaborating` | Elaboration is in progress: the agent asks clarifying questions in rounds and you answer them. | Elaboration resolves (all questions answered, or elaboration is skipped) → `elaborated`. |
+| `elaborated` | Terminal stored state. The shared understanding is confirmed and the Idea is ready for a Proposal. | No further stored transition. Progress beyond this point is derived (see below). |
+
+### Derived progress
+
+After an Idea reaches `elaborated`, Chorus computes a display status for the board from
+the states of its linked Proposal and Tasks. There is no stored `completed` or `closed`
+status on an Idea, and no direct way to set an Idea's status — it only changes as a side
+effect of elaboration and of downstream work.
+
+| Derived label | When it applies |
+| --- | --- |
+| Planning | Elaborated, but no submitted Proposal yet (no Proposal, or a draft). |
+| Review proposal | A Proposal has been submitted and is waiting for your review. |
+| Building | The Proposal is approved and its Tasks are being worked. |
+| Verify work | At least one Task has been submitted for verification. |
+| Done | The Proposal is approved and every Task has reached `done` (or `closed`). |
+
+## Proposal
+
+A Proposal is a review container. It holds the document drafts and task drafts an agent
+prepared; approving it **materializes** those drafts into real Documents and Tasks.
+
+| State | Meaning | What moves it forward |
+| --- | --- | --- |
+| `draft` | Being written and edited. Drafts can be added or changed only while in `draft`. | The author submits it for review → `pending`. |
+| `pending` | Submitted and waiting for a reviewer. | A reviewer approves it → `approved`, or rejects it → back to `draft` (with a review note). |
+| `approved` | Accepted. Its document and task drafts are materialized into real Documents and Tasks. | Terminal for the review flow. |
+| `closed` | Withdrawn or abandoned. Any tasks created from it are closed. | Terminal. |
+
+A rejected Proposal returns to `draft` so the author can revise and resubmit; the
+reviewer's note is kept as revision context. Only `draft` or `closed` Proposals can be
+deleted.
+
+## Task
+
+A Task carries a single unit of work through execution and verification.
+
+| State | Meaning | What moves it forward |
+| --- | --- | --- |
+| `open` | Unclaimed and available. | Someone claims or is assigned the Task → `assigned`. |
+| `assigned` | Has an assignee but work has not started. | The assignee starts work → `in_progress` (only if every dependency is resolved). |
+| `in_progress` | Being worked. | The assignee submits it → `to_verify`. |
+| `to_verify` | Work is done and evidence is submitted, waiting for verification. | A verifier accepts it → `done`, or sends it back → `in_progress`. |
+| `done` | Verified and complete. | Terminal for normal flow. |
+| `closed` | Cancelled, for example when its Proposal is withdrawn. | Terminal. |
+
+### Dependencies and unblocking
+
+Tasks can depend on other Tasks, forming a directed acyclic graph. A Task's dependents
+**unblock only when its upstream Tasks reach `done`** (a `closed` upstream also counts as
+resolved). Until then, a dependent Task cannot move to `in_progress`. Moving a Task back
+out of `to_verify` for any reason other than `done` resets its acceptance criteria. You can
+see these dependency links in the [project resource graph](/reference/resource-graph/), and
+add or edit them from the Tasks DAG view (see [Run tasks](/guides/run-tasks/)).
+
+:::note[What the agent does]
+Agents move Tasks through `assigned → in_progress → to_verify` and submit evidence against
+each Task's acceptance criteria. A human (or an admin agent acting for one) performs the
+final `to_verify → done` verification. See the [agent platforms](/reference/agents/)
+reference for how that connection works.
+:::

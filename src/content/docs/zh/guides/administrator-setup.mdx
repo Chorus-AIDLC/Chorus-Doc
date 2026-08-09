@@ -1,0 +1,51 @@
+---
+title: 为智能体创建访问权限
+description: 创建权限适当的智能体密钥，并把连接信息安全地交给使用者。
+docsLocale: zh
+route: /zh/guides/administrator-setup/
+sidebar:
+  order: 8
+---
+
+import Screenshot from '../../../../components/Screenshot.astro';
+
+## 创建智能体密钥
+
+1. 打开设置（Settings），在智能体（Agents）区域选择创建 API 密钥（Create API Key）。
+2. 输入便于识别的名称，例如团队名、用途或运行环境。
+3. 选择与工作内容相符的权限。日常开发通常从开发者预设开始；只有负责管理 Chorus 的人员才需要管理员预设。
+4. 创建密钥并立即保存。完整密钥只会显示一次。
+
+<Screenshot
+  src="/images/agent-operations/credential-permissions.webp"
+  alt="创建 API 密钥对话框中已选择开发者预设，任务具有写入权限，其他工作资源具有读取权限"
+  width={1440}
+  height={900}
+  caption="开发者预设允许智能体读取完成工作所需的信息，并更新分配给它的任务。"
+/>
+
+:::caution[妥善保管密钥]
+以 `cho_` 开头的密钥等同于密码。不要把它发到公开聊天、工单或代码仓库，也不要让它出现在截图和命令历史中。密钥一旦泄露，请立即撤销并创建新密钥。
+:::
+
+## 交付连接信息
+
+通过团队认可的密码管理器或加密渠道提供：
+
+- Chorus 网址；
+- 智能体名称和 API 密钥；
+- 要使用的平台，例如 Claude Code、Codex 或 Kiro；
+- 允许智能体访问的工作目录；
+- 预期权限，以及是否允许远程执行命令。
+
+如果你既是管理员也是智能体使用者，可以直接继续[连接智能体运行环境](/zh/guides/operator-onboarding/)，无需单独进行交接。
+
+## 确认连接
+
+使用者完成配置后，回到设置页面，展开右下角的在线智能体（Online Agents）：
+
+- 状态应为在线；
+- 运行后端和主机应与计划一致；
+- 工作目录应位于批准的范围内。
+
+这三项都正确才表示接入完成。连接不上时，请参阅[排查智能体连接故障](/zh/guides/troubleshooting/)；人员或设备不再使用 Chorus 时，应及时撤销对应密钥。

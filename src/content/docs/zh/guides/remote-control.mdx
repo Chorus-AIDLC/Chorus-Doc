@@ -1,0 +1,41 @@
+---
+title: 从 Chorus 发起远程工作
+description: 选择在线智能体和工作目录，发送指令并观察执行进度。
+docsLocale: zh
+route: /zh/guides/remote-control/
+sidebar:
+  order: 11
+---
+
+import Screenshot from '../../../../components/Screenshot.astro';
+
+## 选择执行位置
+
+打开会话（Conversations），选择要使用的智能体和工作目录。发送指令前请确认：
+
+- 智能体显示为在线；
+- 主机是预期的设备；
+- 工作目录是本次工作对应的代码目录；
+- 指令说明了目标、范围和期望结果。
+
+项目可以保存默认的智能体、主机和工作目录。任务若已经指定了某个连接，Chorus 会严格使用该连接；它离线时不会自动改派到其他目录，避免在错误的代码副本中继续工作。
+
+:::caution[发送前检查工作目录]
+智能体会在所选目录中读取和修改文件。名称相似的目录可能对应不同分支、仓库或环境，请不要只凭智能体名称判断执行位置。
+:::
+
+## 创建会话
+
+在新建会话（New conversation）中选择工作目录，输入一条可以独立执行的指令，然后点击“开始会话（Start session）”。
+
+<Screenshot
+  src="/images/agent-operations/remote-wake.webp"
+  alt="新建会话窗口中已选择智能体和工作目录，并填写了待执行的文档检查指令"
+  width={1440}
+  height={900}
+  caption="新会话会在选定的工作目录中执行输入的第一条指令。"
+/>
+
+会话开始后，页面会显示智能体的回复、工具调用和当前运行状态。你可以离开页面，稍后从会话列表返回查看进度。
+
+需要停止或继续执行时，请参阅[中断与恢复会话](/zh/guides/session-recovery/)；会话没有启动时，请参阅[排查智能体连接故障](/zh/guides/troubleshooting/)。

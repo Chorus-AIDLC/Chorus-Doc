@@ -1,0 +1,31 @@
+---
+interface Props {
+  src: string;
+  alt: string;
+  width: number;
+  height: number;
+  caption?: string;
+}
+
+const { src, alt, width, height, caption } = Astro.props;
+
+if (!alt.trim()) {
+  throw new Error('Screenshot alt text must be descriptive.');
+}
+
+if (!Number.isInteger(width) || !Number.isInteger(height) || width <= 0 || height <= 0) {
+  throw new Error('Screenshot width and height must be positive integers.');
+}
+---
+
+<figure class="docs-screenshot">
+  <img
+    src={src}
+    alt={alt}
+    width={width}
+    height={height}
+    loading="lazy"
+    decoding="async"
+  />
+  {caption && <figcaption>{caption}</figcaption>}
+</figure>

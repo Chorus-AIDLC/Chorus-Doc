@@ -1,0 +1,44 @@
+---
+title: OpenCode
+description: 通过社区维护的集成在 OpenCode 中使用 Chorus。
+docsLocale: zh
+route: /zh/reference/agents/opencode/
+---
+
+# OpenCode
+
+OpenCode 集成由社区项目 [etnperlong/opencode-chorus](https://github.com/etnperlong/opencode-chorus) 维护，不属于 Chorus 第一方支持范围。安装前请查看社区项目的兼容性说明和已知问题。
+
+## 安装集成
+
+设置 Chorus 根地址和 API 密钥，然后运行安装脚本：
+
+```bash
+export CHORUS_URL="https://chorus.example.com"
+export CHORUS_API_KEY="cho_REDACTED"
+curl -fsSL "$CHORUS_URL/install-opencode.sh" | bash
+```
+
+`CHORUS_URL` 应填写 Chorus 根地址，不要附加 `/api/mcp`。脚本会把社区包加入 `~/.config/opencode/opencode.json`，OpenCode 会在启动时下载该包。
+
+## 验证连接
+
+1. 启动 `opencode`。
+2. 输入 `check in to chorus`。
+3. 确认 `chorus_checkin` 返回正确的智能体身份和权限。
+
+成功签入表示 MCP 连接可用，不代表第一方平台的全部运行能力均受支持。
+
+## 能力与限制
+
+- 社区集成提供 MCP 工具、技能和社区维护的钩子。
+- Chorus 不负责该项目的发布节奏、兼容性或故障修复。
+- OpenCode 不是 Chorus 后台服务的运行后端。
+- 不支持从 Chorus 远程启动、追加指令、中断或恢复 OpenCode 会话。
+
+## 常见问题
+
+- **社区包未加载**：检查 `~/.config/opencode/opencode.json`，并参考社区项目的安装说明。
+- **连接返回 `401`**：在 Chorus 中更新 API 密钥，重新设置环境变量后启动 OpenCode。
+- **升级后工作流异常**：核对 OpenCode、Chorus 和社区包的版本兼容性，并查看社区项目的问题列表。
+- **需要远程会话控制**：改用 Claude Code、Codex、Kiro 或 OpenClaw。

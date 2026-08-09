@@ -1,0 +1,175 @@
+---
+title: コマンドとスキルルーティング
+description: 各 AI-DLC 段階に対応する Chorus プラグインコマンド：トリガー、必要な権限、産出物、そして Codex での命名の違い。
+docsLocale: ja
+route: /ja/guides/plugin-commands/
+---
+
+Chorus プラグインは、AI-DLC パイプラインの各段階につき 1 つのコマンドを追加します。本ページは
+それらのコマンドのリファレンスです。各コマンドをいつ実行するか、その API キーにどの権限が必要か、
+そして何を産出するか。パイプラインそのものは再説明しません。それについては
+[AI-DLC ワークフロー](/ja/guides/ai-dlc-workflow/)と、下記にリンクした各段階のガイドをお読みください。
+
+## 実行時によって呼び出し方が異なる
+
+Claude Code はこれらのコマンドを `chorus` 名前空間下のスラッシュコマンドとして公開します。Codex は
+同じスキルを `$` 接頭辞で公開します。動作は同一で、コマンドの入力方法だけが異なります。
+
+```text
+# Claude Code — /chorus: スラッシュコマンド
+/chorus
+/chorus:idea
+/chorus:proposal
+/chorus:develop
+/chorus:review
+/chorus:quick-dev
+/chorus:yolo
+
+# Codex — $ 接頭辞のスキル名
+$chorus
+$idea
+$proposal
+$develop
+$review
+$quick-dev
+$yolo
+```
+
+本ページのコマンドはすべて Claude Code 形式（`/chorus:develop`）で表記します。Codex では `$` 形式
+（`$develop`）に読み替えてください。その他の実行時（OpenClaw、Kiro、Pi）も同じスキルを搭載しています。
+実行時ごとの呼び出しの注意点は、[エージェントを設定](/ja/reference/agents/)下の各ページを参照してください。
+
+## `/chorus` — ルーティングと設定
+
+```text
+/chorus      # Claude Code
+$chorus      # Codex
+```
+
+- **トリガー:** セッションの開始時、またはどの段階コマンドを使えばよいか迷ったときに実行します。
+  これは概要とルーターの入口です。
+- **必要な権限:** 接続済みのプラグインと API キー。特定の権限は不要です。
+- **産出物:** ワークフローの状態は変わりません。プラットフォームの概要、あなたの役割と有効な権限を
+  提示し、下記の適切な段階コマンドへ案内します。
+
+## 各段階コマンド
+
+一覧:
+
+| コマンド | 必要な権限 | 産出物 |
+|---|---|---|
+| `/chorus:idea` | `idea:write`（要件詳細化の確定には `idea:admin`） | 要件詳細化が確定し、計画に進める担当済みの着想 |
+| `/chorus:proposal` | `proposal:write` + `document:write` | 提出済みの提案 — 文書ドラフト + 課題 DAG（`draft` → `pending`） |
+| `/chorus:develop` | `task:write` | 作業報告と自己チェック済みの受け入れ基準を伴い `to_verify` まで進んだ課題 |
+| `/chorus:review` | `proposal:admin` + `task:admin` | 承認された提案（ドラフトが実体化）と検証済みの課題（→ `done`） |
+| `/chorus:quick-dev` | `task:write`（自己検証には `task:admin`） | 独立した、または提案に紐づく課題を `to_verify` / `done` まで駆動 |
+| `/chorus:yolo` | 管理者プリセットのキー（全リソースの write + `proposal:admin` + `task:admin`） | プロンプトから 1 つの着想を完了まで駆動し、結項レポートを添付 |
+
+### `/chorus:idea` — 構想
+
+```text
+/chorus:idea     # Claude Code
+$idea            # Codex
+```
+
+- **トリガー:** 要件へと形にすべき未処理の着想があるとき。担当し、構造化された要件詳細化のラウンドを
+  実行します。
+- **必要な権限:** 担当と要件詳細化の実行には `idea:write`。要件詳細化の確定（コミットゲート）には
+  さらに `idea:admin` が必要で、`pm_agent` プリセットのキーはこのステップを管理者プリセットのキーに
+  引き渡す必要があります。
+- **産出物:** 要件詳細化のラウンドに回答・確定した担当済みの着想 — `/chorus:proposal` に進める状態です。
+  [着想を記録する](/ja/guides/capture-an-idea/)を参照してください。
+
+### `/chorus:proposal` — 計画
+
+```text
+/chorus:proposal # Claude Code
+$proposal        # Codex
+```
+
+- **トリガー:** ある着想の要件詳細化が確定し、作業を計画する準備が整ったとき。
+- **必要な権限:** 提案コンテナ、課題ドラフト、依存エッジには `proposal:write`。PRD、技術設計、仕様の
+  ドラフトには `document:write`。
+- **産出物:** 文書ドラフトと課題ドラフトの依存グラフを保持し、検証を経てレビューに提出された提案
+  （`draft` → `pending`）。提出時、フックがメインエージェントに提案レビュー担当の起動を促します。
+  [自動化の挙動](/ja/guides/plugin-automation/)を参照してください。
+
+### `/chorus:develop` — 開発
+
+```text
+/chorus:develop  # Claude Code
+$develop         # Codex
+```
+
+- **トリガー:** 承認済みの課題があり、そのうちの 1 つを実装する準備ができたとき。`start_development`
+  ウェイクは、ある着想の残りの課題すべてを依存順に片付けるよう求めます。
+- **必要な権限:** 担当、作業報告、受け入れ基準の自己チェック、提出には `task:write`。
+- **産出物:** `claim → in_progress → to_verify` を経た課題。作業報告と自己チェック済みの受け入れ基準を
+  伴います。提出時、フックは課題レビュー担当の起動を促します。[課題を実行する](/ja/guides/run-tasks/)を
+  参照してください。
+
+### `/chorus:review` — レビューとガバナンス
+
+```text
+/chorus:review   # Claude Code
+$review          # Codex
+```
+
+- **トリガー:** 提案が `pending`、または課題が `to_verify` にあり、あなたが管理者（人間の代理役）として
+  それらを処理しているとき。
+- **必要な権限:** 提案の承認や終了には `proposal:admin`、課題の検証・再オープン・終了と受け入れ基準の
+  マークには `task:admin`。完全な管理者プリセットのキーは両方に加え、着想と文書を終了するための
+  ガバナンス権限も備えます。
+- **産出物:** 承認された提案（その文書ドラフトと課題ドラフトが実際のエンティティへと実体化）と検証済みの
+  課題（`to_verify` → `done`）、あるいはフィードバック付きで却下・再オープンされた項目。
+  [提案をレビューする](/ja/guides/review-a-proposal/)と[検証して完了する](/ja/guides/verify-and-complete/)を
+  参照してください。
+
+### `/chorus:quick-dev` — 直接課題
+
+```text
+/chorus:quick-dev # Claude Code
+$quick-dev        # Codex
+```
+
+- **トリガー:** 小さくよく理解された作業（バグ修正、ホットフィックス、後続パッチ）で、完全な
+  着想 → 提案の一巡が過剰なとき。
+- **必要な権限:** 課題の作成、担当、実行には `task:write`。結果の自己検証には明示的な `task:admin` が
+  必要で、それがなければエージェントは証拠を投稿し、人間に検証を引き渡します。
+- **産出物:** 独立した課題（または `proposalUuid` で既存の提案に紐づく課題）を `to_verify` まで、
+  キーが `task:admin` を持つ場合は `done` まで駆動します。
+
+### `/chorus:yolo` — 全自動パイプライン
+
+```text
+/chorus:yolo <prompt>                        # Claude Code
+$yolo <prompt>                               # Codex
+/chorus:yolo <prompt> --project <project-uuid>
+```
+
+- **トリガー:** 自然言語のプロンプトから、無人でパイプライン全体を走らせたいとき。`yolo_requested`
+  ウェイクは、着想がどの段階にあってもそこから再開します。
+- **必要な権限:** **管理者プリセット**の API キー — 全リソースの write に加え `proposal:admin` と
+  `task:admin`（具体的には `idea:write`、`proposal:write` + `proposal:admin`、`task:write` +
+  `task:admin`、および `project:write`）。いずれかのビットが欠けると、スキルは起動時に中止します。
+- **産出物:** 完全な一巡 — （未指定なら）プロジェクト、着想、自己要件詳細化、提案、波状の課題実行、
+  レビューのループ、管理者検証、そして必須の結項レポート。人間の明示的な承認なしに PR をマージ・
+  プッシュすることは決してありません。
+
+## エージェント向け
+
+- **トリガー:** ルーティングと役割の確認には `/chorus`（`$chorus`）。各段階コマンドはその段階に達したとき、
+  または人間のウェイクで発火します — `start_development` は着想の残り課題すべてに対して `/chorus:develop`
+  を再開し、`yolo_requested` は着想の現在の段階から `/chorus:yolo` を再開します。
+- **制約:**
+  - ツールの*可視性*はキーの権限セットに従いますが、ハンドラのガードは依然として有効です。例えば
+    `task:write` を持っていても、課題の担当者だけが `chorus_submit_for_verify` を呼び出せます。
+  - `/chorus:yolo` は管理者プリセットのキーを必要とし、必要な権限が 1 つでも欠ければ中止します。
+    `/chorus:quick-dev` は明示的な `task:admin` を持つ場合のみ自己検証し、そうでなければ人間に
+    引き渡します。
+  - Codex では同じスキルを `$` 接頭辞で呼び出します。レビューと自動化の見え方は実行時によって異なります。
+    [自動化の挙動](/ja/guides/plugin-automation/)を参照してください。
+  - `/chorus:yolo` 下も含め、人間の明示的な承認なしに PR をマージ・プッシュすることは決してありません。
+- **出典:** `public/chorus-plugin/skills/chorus/SKILL.md` の Skill Routing とプリセット/権限の表。
+  各段階のスキル `public/chorus-plugin/skills/{idea,proposal,develop,review,yolo,quick-dev}/SKILL.md`。
+  および `plugins/chorus/README.md` の Codex `$` コマンドのチートシート。

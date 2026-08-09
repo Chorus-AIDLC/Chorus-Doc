@@ -1,0 +1,227 @@
+---
+title: 認証と権限
+description: クライアントが Chorus にどう認証し、エージェントの権限モデルがどうすべてのツールとルートを管理するか。
+docsLocale: ja
+route: /ja/reference/authentication/
+sidebar:
+  order: 6
+---
+
+Chorus はすべてのリクエストを一つの統一された `AuthContext` に認証し、そのうえで、きめ細かな権限
+セットに照らしてエージェントに何ができるかを管理します。本ページは、認証方式、エージェント API key の
+約束事、そして MCP ツールの可視性と REST アクセスの両方を駆動する権限モデルを説明します。
+
+引用できる安定したアンカー：[`#統一された-authcontext`](#統一された-authcontext)、
+[`#解決カスケード`](#解決カスケード)、[`#agent-api-key`](#agent-api-key)、
+[`#権限モデル`](#権限モデル)、[`#ロールプリセット`](#ロールプリセット)、
+[`#カスタム権限と有効な権限セット`](#カスタム権限と有効な権限セット)。
+
+## 統一された AuthContext
+
+認証されたすべてのリクエストは、三つのコンテキスト種別のいずれかへ解決されます。マルチテナンシーは
+`companyUuid` を通じて強制されます。すべてのデータアクセスはそれに範囲づけられ、複数の会社にまたがって
+操作できるのは Super Admin だけです。
+
+| コンテキスト種別 | `type` | 主なフィールド | 生成元 |
+| --- | --- | --- | --- |
+| User | `user` | `companyUuid`、`actorUuid`、`email`、`name` | OIDC、Default Auth |
+| Agent | `agent` | `companyUuid`、`actorUuid`、`roles[]`（プリセット選択子）、`permissions[]`（有効セット）、`agentName`、`ownerUuid` | API key |
+| Super Admin | `super_admin` | `email`（`companyUuid` なし） | Super Admin セッション |
+
+エージェントの認可は、その `permissions[]`、つまりフラットな有効セットからすべて生じます。`roles[]`
+フィールドはプリセットの選択子にすぎず、認可の源ではありません。
+
+## 解決カスケード
+
+単一の入口が、優先順位に従って各方式を順に試し、最初の成功で返します。
+
+```text
+1. Authorization: Bearer <token>
+   ├─ cho_… 接頭辞 → API key の検証            → Agent コンテキスト
+   ├─ RS*/ES* JWT   → OIDC トークンの検証        → User コンテキスト
+   └─ HS256 JWT     → Chorus JWT の検証           → User コンテキスト
+2. セッション Cookie
+   └─ user_session | admin_session            → User | Super Admin コンテキスト
+3. OIDC Cookie（SSE / EventSource 用、Authorization ヘッダーなし）
+   └─ oidc_access_token cookie                → User コンテキスト
+4. 一致なし → 未認証
+```
+
+ステップ 1 のトークンは形状で分類されます。`cho_` 接頭辞は API key です。それ以外の三分割 JWT は、
+ヘッダーのアルゴリズムが非対称（`RS*`/`ES*`）なら OIDC、`HS256` なら Chorus の自己署名セッション
+トークンです。
+
+## Agent API key
+
+エージェントは、すべての MCP と REST リクエストで bearer API key により認証します。
+
+```http
+Authorization: Bearer cho_<random>
+```
+
+その約束事は次のとおりです。
+
+- **`cho_` 接頭辞。** すべての key は `cho_` で始まり、その後に base64url エンコードされたランダム
+  バイトが続きます。解決カスケードはこの接頭辞で key と JWT を見分けます。
+- **一度だけ表示。** 生の key は作成時にのみ返されます。そのとき控えてください。あとから取得はできません。
+- **静止時は SHA-256 ハッシュ。** 保存されるのは key の SHA-256 ハッシュだけです。データベースは生の値を
+  決して保持しないため、データベースのダンプが使える資格情報を露出することはありません。
+- **タイミング安全な比較。** 検証は提示されたトークンをハッシュ化し、ハッシュどうしを定数時間で比較します。
+  そのため、先頭が何文字一致しても、不一致にかかる時間は同じです。
+- **ローテーション、失効、失効期限。** key は失効させたり、任意の失効期限を与えたりできます。失効した
+  key や期限切れの key は検証に失敗します。ローテーションは、置き換えの key を作り、古いものを失効させて
+  行います。権限は key ではなくエージェントに載っているため、key をローテーションしてもエージェントの
+  権限は保たれます。権限を変えるのはエージェントの編集です。
+
+:::caution[key は一度だけ表示される]
+作成後に生の key を復元する方法はありません。secret manager に保管し、パスワードのように扱ってください。
+漏れたら失効させ、置き換えを発行してください。
+:::
+
+key の作成、編集、ローテーション、失効は API 呼び出しではなく Settings 内の作業です。資格情報の作成
+手順は[エージェントのアクセスを準備する](/ja/guides/administrator-setup/)、編集と失効は
+[エージェントと API Key を管理する](/ja/guides/manage-agents/)、key をエージェントに組み込む方法は
+[エージェントランタイムを接続する](/ja/guides/operator-onboarding/)をご覧ください。
+
+## その他の認証方式
+
+以下は人間のユーザーとプラットフォーム管理者向けです。ここでは要点をまとめます。設定は運用ガイドが扱います。
+
+### OIDC（ユーザー）
+
+人間のユーザー向けのエンタープライズ SSO で、Super Admin が会社ごとに設定します（issuer、client ID、
+有効化トグル）。ログインは **PKCE** 付きの認可コードフローを使い、client secret は不要です。プロバイダーが
+リダイレクトで戻したあと、Chorus は `(companyUuid, oidcSub)` でユーザーを検索または作成し、HTTP-only の
+Cookie を設定します。
+
+| Cookie | 用途 |
+| --- | --- |
+| `oidc_access_token` | API 呼び出し用のアクセストークン（約 1 時間） |
+| `oidc_refresh_token` | サイレント更新用のリフレッシュトークン（約 30 日） |
+| `oidc_client_id` | トークン更新時に使う client ID |
+| `oidc_issuer` | JWKS 発見に使う issuer |
+
+アクセストークンはプロバイダーの JWKS（キャッシュ済み）に照らして検証され、edge middleware はリクエストが
+アプリに届く前に、期限切れ間近のアクセストークンを透過的に更新します。
+
+### Default Auth（開発用）
+
+OIDC のない開発・デモ向けの、単一のメール／パスワードログインです。`DEFAULT_USER` と `DEFAULT_PASSWORD`
+の両方が設定されているときにのみ有効になります。
+
+```bash
+DEFAULT_USER="dev@example.local"
+DEFAULT_PASSWORD="change-me"
+```
+
+ログイン時、Chorus は会社とユーザーを自動プロビジョニングし、長寿命の自己署名 JWT を一つ、`user_session`
+Cookie に発行します。更新フローはなく、期限が切れたらユーザーが再度ログインします。本番では Default Auth を
+有効にしないでください。
+
+### Super Admin
+
+すべての会社にまたがるプラットフォームレベルの管理（会社管理、会社ごとの OIDC 設定）です。環境変数に、
+メールと **bcrypt** のパスワードハッシュを設定します。
+
+```bash
+SUPER_ADMIN_EMAIL="admin@example.com"
+SUPER_ADMIN_PASSWORD_HASH="$2b$10$…"   # bcrypt ハッシュ
+```
+
+ログインに成功すると `admin_session` Cookie が設定されます。Super Admin コンテキストは **`companyUuid`
+を持たない**ため、会社の範囲づけを受けません。テナントをまたいで読める唯一のコンテキストです。
+
+## 権限モデル
+
+エージェントの認可は権限ビットの集合です。エージェントが持つ有効セットが、あらゆる層で、それに何が
+できるかを決めます。
+
+### 5 × 3 のマトリクス
+
+権限は `{resource}:{action}` と書きます。五つの資源に三つの動作を掛けて、15 個の可能なビットになります。
+
+| | `read` | `write` | `admin` |
+| --- | --- | --- | --- |
+| **`idea`** | idea を閲覧 | idea の作成 / 担当 / 解除 / 更新；要件詳細化の実行 | idea のクローズ / 削除 |
+| **`proposal`** | proposal と草稿を閲覧 | 作成 / 提出 / 却下 / 撤回；草稿の管理；課題の一括作成；課題 DAG の管理；課題の割り当て | proposal の承認 / クローズ |
+| **`document`** | 文書を閲覧 | 文書の作成 / 更新 | 文書の削除 |
+| **`task`** | 課題を閲覧 | 担当 / 解除 / 提出 / 報告；受け入れ基準の自己確認 | 課題の検証 / 再オープン / クローズ / 削除；受け入れ基準のマーク |
+| **`project`** | プロジェクトとグループを閲覧 | プロジェクトとグループの作成 / 更新 / 削除；プロジェクトの移動 | 予約（`admin_agent` が付与するが、まだ管理されていない） |
+
+動作は慣習上は累積的ですが、自動的には**継承されません**。`task:admin` を付与しても `task:read` や
+`task:write` は含意されません。各ビットは明示的に付与します。
+
+:::caution[`*:admin` ビットは人間レベル]
+`admin` の列は、通常は人間のレビュー担当者を要する動作、つまり proposal の承認、課題の検証、エンティティの
+削除を扱います。`*:admin` ビットを付与すると、エージェントがその人間の判断を肩代わりできます（作者に
+範囲づけられません。`task:admin` はエージェントが手がけた課題だけでなく、会社内の任意の課題を検証できます）。
+admin ビットは、承認ワークフローを意図的に自動化するエージェントにだけ付与してください。
+:::
+
+### ロールプリセット
+
+三つの名前付きプリセットは、15 個のビットの固定された部分集合に展開されます。プリセットは近道であって、
+独立した認可のしくみではありません。
+
+| プリセット | 個数 | 展開される権限 |
+| --- | :---: | --- |
+| `developer_agent` | **6** | `*:read` + `task:write` |
+| `pm_agent` | **10** | `*:read` + `idea:write` + `proposal:write` + `document:write` + `task:write` + `project:write` |
+| `admin_agent` | **15** | すべてのビット（`*:read` + `*:write` + `*:admin`） |
+
+展開すると、各プリセットは次のようになります。
+
+```text
+developer_agent (6):
+  idea:read  proposal:read  document:read  project:read  task:read
+  task:write
+
+pm_agent (10):
+  idea:read      idea:write
+  proposal:read  proposal:write
+  document:read  document:write
+  task:read      task:write
+  project:read   project:write
+
+admin_agent (15):
+  idea:read      idea:write      idea:admin
+  proposal:read  proposal:write  proposal:admin
+  document:read  document:write  document:admin
+  task:read      task:write      task:admin
+  project:read   project:write   project:admin
+```
+
+### カスタム権限と有効な権限セット
+
+プリセットに加えて、エージェントはカスタムの権限ビットを持てます。**有効セット**は、展開されたプリセットと
+カスタムビットの和集合です。
+
+```text
+effective = expand(preset) ∪ custom
+```
+
+順序は関係ありません。純粋な集合の和です。よくある形は次のとおりです。
+
+- **読み取り専用の監査者** — プリセットなし、カスタムは `*:read` のみ：すべてを閲覧できるが、何も変更できない。
+- **自己検証する開発者** — `developer_agent` + `task:admin`：管理者を待たずに課題を検証できる。
+- **承認権を持つ PM** — `pm_agent` + `proposal:admin`：proposal を直接承認できる。
+
+### 有効セットがどうアクセスを管理するか
+
+同じ有効セットが、二つの統合面の両方を駆動します。
+
+- **MCP ツールの可視性。** 権限で管理される各 MCP ツールは、必要な権限をちょうど一つ宣言します。接続時、
+  ツールの必要な権限が有効セットに含まれる場合にのみ、そのツールはエージェントのサーバーに登録されます。
+  そうでなければ、そのツールは単にエージェントのツール一覧に現れません。公共ツール（discover / read /
+  list / search / comment / session、そして `chorus_create_tasks` / `chorus_update_task`）は管理されず、
+  すべてのエージェントに現れます。
+- **REST の管理。** 管理される REST ルートは、そのハンドラーを
+  `requireAgentPermission("{resource}:{action}", …)` で包みます。そのビットを欠くエージェントは
+  `403 Missing permission` を受け取ります。人間のユーザーは `requireAgentPermission` の対象ではなく
+  （人間のルートはセッションベースの検査を使う）、Super Admin はすべての権限検査を素通りします。
+
+:::note[エージェントが見るもの]
+エージェントのツール一覧は、ちょうど公共ツールと、その有効な権限が解錠する管理対象ツールの和集合です。
+期待するツールが見当たらないなら、そのエージェントは必要な権限を欠いています。key ではなく、エージェントの
+権限を編集してください。完全なツール → 権限の対応は、[MCP ツールカタログ](/ja/reference/mcp-tools/)をご覧ください。
+:::

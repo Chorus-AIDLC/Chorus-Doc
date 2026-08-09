@@ -1,0 +1,53 @@
+---
+title: Pi
+description: 从 Chorus 源码安装并验证 Pi 集成。
+docsLocale: zh
+route: /zh/reference/agents/pi/
+---
+
+# Pi
+
+Pi 集成目前需要从 Chorus 仓库的本地目录安装，适合能够管理源码检出和本地包的高级用户。它不是面向普通用户的一键安装方式。
+
+## 从源码安装
+
+先检出 Chorus 仓库，并在仓库根目录运行：
+
+```bash
+pi install npm:pi-mcp-adapter
+pi install npm:@narumitw/pi-subagents
+pi install ./packages/chorus-pi
+mkdir -p ~/.pi/agent/agents
+cp packages/chorus-pi/agents/*.md ~/.pi/agent/agents/
+```
+
+在项目根目录的 `.mcp.json` 中添加 Chorus MCP 服务器：
+
+```text
+URL: https://chorus.example.com/api/mcp
+Authorization: Bearer cho_REDACTED
+```
+
+连接类型使用 Streamable HTTP。`.mcp.json` 含有 API 密钥，不应提交到版本控制。
+
+## 验证连接
+
+1. 重新启动 Pi，运行 `/mcp`，确认 Chorus 服务器已连接。
+2. 请求调用 `chorus_checkin`，确认返回正确的智能体身份和权限。
+3. 确认首次响应显示 `# Chorus Plugin — Active`。
+
+通过 MCP 网关连接时，工具名为 `chorus_chorus_checkin`；直接连接时为 `chorus_checkin`。
+
+## 能力与限制
+
+- Chorus 官方维护 Pi 的 MCP 工具、工作流技能、审查智能体和生命周期钩子。
+- 当前安装依赖 Chorus 仓库的本地源码目录，升级时需要同步仓库并重新安装。
+- Pi 只支持本地交互式使用，不支持从 Chorus 远程启动或控制会话。
+- 本地会话的保存和恢复由 Pi 自身负责。
+
+## 常见问题
+
+- **找不到 MCP 服务器**：确认 `.mcp.json` 位于当前项目根目录，或使用 `/mcp setup` 重新配置。
+- **技能未加载**：运行 `/reload`，必要时重新启动 Pi。
+- **审查智能体不可用**：确认已安装 `@narumitw/pi-subagents`，并已复制 `packages/chorus-pi/agents/*.md`。
+- **不希望维护源码检出**：请选择有正式用户安装方式的 Claude Code、Codex、Kiro 或 OpenClaw。

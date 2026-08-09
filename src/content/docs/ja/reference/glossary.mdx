@@ -1,0 +1,52 @@
+---
+title: 用語集
+description: Chorus の中核用語の一行定義。それぞれを説明するガイドや参考ページへのリンク付き。
+docsLocale: ja
+route: /ja/reference/glossary/
+sidebar:
+  order: 9
+---
+
+本ドキュメントで使われる用語の速引きです。各項目は、製品自身での名前、一行の定義、そしてそれが詳しく
+説明されている場所へのリンクを使います。各エンティティが経ていく状態は[ライフサイクル参考](/ja/reference/lifecycle/)を、
+各段階がどう引き継ぐかは[ワークフロー参考](/ja/reference/workflow/)をご覧ください。
+
+## 中核エンティティ
+
+<div class="table-scroll" role="region" aria-label="中核エンティティの用語" tabindex="0">
+
+  | 用語 | 定義 |
+  | --- | --- |
+  | **Idea**（着想） | パイプラインに入るリクエスト。提案が起草される前に要件詳細化を経る。[着想を記録する](/ja/guides/capture-an-idea/)を参照。 |
+  | **Proposal**（提案） | 文書草稿と課題草稿のレビュー用の容れ物。承認すると実体の文書と課題に物化される。[提案を審査する](/ja/guides/review-a-proposal/)を参照。 |
+  | **Task**（課題） | 優先度、見積もり、受け入れ基準、依存を持つ作業単位。完了の前に検証される。[課題を実行](/ja/guides/run-tasks/)と[検証して完了](/ja/guides/verify-and-complete/)を参照。 |
+  | **Document**（文書） | 書かれた成果物、つまり PRD、仕様、設計、レポートで、提案の文書草稿から物化されプロジェクトにひもづく。[提案を審査する](/ja/guides/review-a-proposal/)を参照。 |
+  | **Reference**（参考資料） | 着想・提案・課題にひもづく外部の裏づけへのリンク（ドキュメント、リポジトリ、issue/PR、論文/ブログ）。URL とメモが保存され、ページそのものは保存されない。[参考資料を添付する](/ja/guides/references/)を参照。 |
+  | **Project**（プロジェクト） | あるプロジェクトの着想・提案・文書・課題を収めるワークスペース。[プロジェクトを作成する](/ja/guides/create-a-project/)を参照。 |
+  | **Project group**（プロジェクトグループ） | 関連するプロジェクトを一つの見出しの下にまとめるフォルダー。[プロジェクトを作成する](/ja/guides/create-a-project/)を参照。 |
+
+</div>
+
+## 要件詳細化と着想の形
+
+<div class="table-scroll" role="region" aria-label="要件詳細化と着想の形の用語" tabindex="0">
+
+  | 用語 | 定義 |
+  | --- | --- |
+  | **Acceptance criterion**（受け入れ基準） | 課題が検証されるために満たすべき、検証可能な一つの条件。[検証して完了](/ja/guides/verify-and-complete/)を参照。 |
+  | **Elaboration round**（要件詳細化のラウンド） | 着想の要件を明確にする、構造化された一巡の質問と回答。要件詳細化は確定するまでラウンドを繰り返す。[着想を記録する](/ja/guides/capture-an-idea/)を参照。 |
+  | **Theme**（テーマ着想） | 関連する子の着想を共有の方向の下にまとめるだけの着想。テーマ自体は提案になれない。[着想を記録する](/ja/guides/capture-an-idea/)を参照。 |
+  | **Derived (child) idea**（派生した子の着想） | 自身の要件詳細化・提案・課題を持ち、親の着想にひもづいた完全な着想。[着想を記録する](/ja/guides/capture-an-idea/)を参照。 |
+
+</div>
+
+## エージェントとリモート作業
+
+<div class="table-scroll" role="region" aria-label="エージェントとリモート作業の用語" tabindex="0">
+
+  | 用語 | 定義 |
+  | --- | --- |
+  | **Session / Conversation**（セッション / 会話） | エージェントの一回の作業セッション。デーモンのチャット画面はこれらを会話として、一つのやり取りを一つのターンとして示す。[Chorus デーモンを運用する](/ja/guides/daemon-operations/)を参照。 |
+  | **Daemon**（デーモン） | エージェントをオンラインに保ち、リモートで作業するために起こせるようにする、長寿命のローカルプロセス。[Chorus デーモンを運用する](/ja/guides/daemon-operations/)と[リモートエージェントで作業を始める](/ja/guides/remote-control/)を参照。 |
+
+</div>

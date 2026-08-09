@@ -1,0 +1,76 @@
+name: Deploy Docs
+
+on:
+  workflow_dispatch:
+    inputs:
+      branch:
+        description: Cloudflare Pages deployment branch
+        required: true
+        default: main
+        type: string
+
+permissions:
+  contents: read
+
+concurrency:
+  group: docs-production
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    environment:
+      name: docs-production
+      url: ${{ vars.DOCS_SITE_URL }}
+    env:
+      DOCS_SITE_URL: ${{ vars.DOCS_SITE_URL }}
+      CLOUDFLARE_ACCOUNT_ID: ${{ vars.CLOUDFLARE_ACCOUNT_ID }}
+      CLOUDFLARE_PROJECT_NAME: ${{ vars.CLOUDFLARE_PROJECT_NAME }}
+      CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+      # Optional GA4. Unset => the build injects no analytics (see analytics.mjs);
+      # deliberately not in the required-vars validation loop below.
+      PUBLIC_GA_MEASUREMENT_ID: ${{ vars.PUBLIC_GA_MEASUREMENT_ID }}
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: pnpm
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Install Playwright browser
+        run: pnpm exec playwright install --with-deps chromium
+
+      - name: Validate deployment configuration
+        shell: bash
+        run: |
+          set -euo pipefail
+          for name in DOCS_SITE_URL CLOUDFLARE_ACCOUNT_ID CLOUDFLARE_PROJECT_NAME CLOUDFLARE_API_TOKEN; do
+            if [[ -z "${!name:-}" ]]; then
+              echo "::error::$name is not configured in the docs-production environment"
+              exit 1
+            fi
+          done
+          node -e "new URL(process.env.DOCS_SITE_URL)"
+          pnpm deploy:check
+
+      - name: Run documentation quality gate
+        run: pnpm check
+
+      - name: Publish static documentation
+        run: >
+          pnpm exec wrangler pages deploy dist
+          --project-name "$CLOUDFLARE_PROJECT_NAME"
+          --branch "${{ inputs.branch }}"
+          --commit-hash "${{ github.sha }}"
+          --commit-dirty=false

@@ -1,0 +1,82 @@
+---
+title: Claude Code
+description: Claude Code を Chorus に接続し、必要に応じてリモート作業に利用できるようにします。
+docsLocale: ja
+route: /ja/reference/agents/claude-code/
+---
+
+# Claude Code
+
+Claude Code には第一者の Chorus プラグインがあります。対話的な Claude Code セッションで Chorus
+ツールとワークフロースキルをサポートし、サポートされる Chorus デーモンのバックエンドとしても
+動作します。
+
+インストール前に、[エージェントのアクセスを準備する](/ja/guides/administrator-setup/)に従って
+エージェントキーを作成します。
+
+## プラグインをインストールする
+
+Claude Code を起動するシェルで、Chorus URL と専用のエージェントキーを設定します。
+
+```bash
+export CHORUS_URL="https://chorus.example.com"
+export CHORUS_API_KEY="cho_REDACTED"
+```
+
+次に、Claude Code 内で以下のコマンドを実行します。
+
+```text
+/plugin marketplace add Chorus-AIDLC/chorus
+/plugin install chorus@chorus-plugins
+```
+
+インストール後に Claude Code を再起動します。
+
+## リモート起動を有効にする
+
+対話的な Claude Code セッションからのみ Chorus を使う場合は、このセクションを飛ばしてください。
+それ以外の場合は、[ランタイムを接続する](/ja/guides/operator-onboarding/)に従い、バックエンドとして
+`claude-code` を選びます。[デーモンの運用](/ja/guides/daemon-operations/)でオンラインを維持する前に、
+フォアグラウンドで接続を確認してください。
+
+## 接続を確認する
+
+Claude Code で `/plugin list` を実行し、`chorus@chorus-plugins` が有効になっていることを確認します。
+次に、Claude Code に `check in to chorus` を依頼します。成功すると、応答が接続されたエージェントと
+その権限を示します。
+
+デーモンモードでは、Chorus の**設定 → エージェント**を開き、想定したホストと作業ディレクトリが
+オンラインであることを確認します。
+
+## 機能と制限
+
+- プラグインは Chorus MCP ツール、ワークフロースキル、そしてライフサイクル統合を提供します。
+- デーモンモードは、リモート起動、追加指示、中断、再開をサポートします。
+- リモート作業は、登録された作業ディレクトリ内で、ローカルの OS ユーザーが利用できるすべてに
+  アクセスできます。信頼できるディレクトリのみを登録してください。
+
+共通の運用手順については、[リモート制御](/ja/guides/remote-control/)と
+[セッションの復旧](/ja/guides/session-recovery/)を使ってください。
+
+## ターミナルから再開する
+
+自分のターミナルから進行中の会話を引き継ぐには、チャット UI からそのセッション ID をコピーし
+（トランスクリプトのヘッダーにある**Copy session ID**）、その会話の作業ディレクトリで実行します。
+
+```bash
+claude --resume <sessionId>
+```
+
+コピーした ID は、Chorus がセッションを再開するときに Claude Code へ渡すのと同じ ID です。
+Claude Code バックエンドの場合、それは直接の着想の UUID です。完全な流れは
+[セッションの中断と再開](/ja/guides/session-recovery/#ターミナルから引き継ぐ)を参照してください。
+
+## よくある問題
+
+- **プラグインが表示されない：** Claude Code を再起動し、`/plugin list` を確認します。
+- **チェックインが認可されない：** エージェントキーを作成またはローテーションし、
+  `CHORUS_API_KEY` を更新して、Claude Code を再起動します。
+- **デーモンがオフライン：** `chorus daemon status` を実行し、次に
+  [トラブルシューティング](/ja/guides/troubleshooting/)を参照します。
+- **想定と異なるプロジェクトが表示される：** 意図した絶対パスの `--cwd` 値でデーモンを
+  再インストールします。

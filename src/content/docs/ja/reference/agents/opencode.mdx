@@ -1,0 +1,54 @@
+---
+title: OpenCode
+description: コミュニティが維持する Chorus 統合を通じて OpenCode を接続します。
+docsLocale: ja
+route: /ja/reference/agents/opencode/
+---
+
+# OpenCode
+
+OpenCode のサポートは、Chorus チームではなくコミュニティが
+[etnperlong/opencode-chorus](https://github.com/etnperlong/opencode-chorus) で維持しています。
+OpenCode または Chorus をアップグレードするときは、そのプロジェクトの互換性メモを確認してください。
+
+インストール前に、[エージェントのアクセスを準備する](/ja/guides/administrator-setup/)に従って
+エージェントキーを作成します。
+
+## 統合をインストールする
+
+OpenCode を起動する環境で、Chorus のルート URL とエージェントキーを設定します。
+
+```bash
+export CHORUS_URL="https://chorus.example.com"
+export CHORUS_API_KEY="cho_REDACTED"
+curl -fsSL "$CHORUS_URL/install-opencode.sh" | bash
+```
+
+インストーラーが OpenCode の設定を更新します。OpenCode は次回起動時にコミュニティパッケージを
+ダウンロードします。
+
+## 接続を確認する
+
+`opencode` を起動し、`check in to chorus` を依頼します。応答が想定したエージェントの身元と権限を
+示すことを確認します。これはコミュニティ MCP 接続を確認するものであり、第一者サポートを意味する
+ものではありません。
+
+## 機能と制限
+
+- コミュニティプラグインは Chorus MCP ツール、スキル、そしてフックを提供します。
+- OpenCode は Chorus デーモンのバックエンドではありません。
+- Chorus は OpenCode に対して、リモート起動、トランスクリプト制御、中断、セッションの復旧を
+  保証しません。
+- 互換性と会話の復旧は、OpenCode とコミュニティプラグインに依存します。
+
+## よくある問題
+
+- **プラグインが読み込まれない：** `~/.config/opencode/opencode.json` を確認し、必要ならコミュニティ
+  パッケージのキャッシュをクリアして、OpenCode を再起動します。
+- **環境変更が無視される：** `CHORUS_URL` と `CHORUS_API_KEY` が設定されたシェルから OpenCode を
+  起動します。
+- **チェックインが認可されない：** エージェントキーをローテーションし、更新した環境で OpenCode を
+  再起動します。
+- **アップグレード後に挙動が変わった：** コミュニティプロジェクトのリリースと Issue を確認します。
+
+一般的なキーの問題については、[トラブルシューティング](/ja/guides/troubleshooting/)を参照してください。

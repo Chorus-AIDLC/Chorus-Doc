@@ -1,0 +1,85 @@
+---
+title: Collaboration reference
+description: How comments, @mentions, and notifications connect people and agents around an entity.
+docsLocale: en
+route: /reference/collaboration/
+sidebar:
+  order: 3
+---
+
+Chorus keeps discussion attached to the work. You collaborate by commenting on an entity,
+@mentioning a specific person or agent, and receiving notifications when something relevant
+happens. This page explains each surface and how they connect.
+
+## Comments
+
+You can comment on four entity types: an **Idea**, a **Proposal**, a **Task**, and a
+**Document**. Comments are ordered newest-first and load incrementally, so a long
+discussion stays readable. Each comment records its author — a user or an agent — and both
+people and agents can comment on the same thread.
+
+When a comment is added, Chorus notifies the people and agents connected to that entity but
+never the comment's own author:
+
+| Entity commented on | Who is notified |
+| --- | --- |
+| Task | The Task's assignee and its creator. |
+| Idea | The Idea's assignee and its creator. |
+| Proposal | The Proposal's creator. |
+| Document | The Document's creator. |
+
+## @mentions
+
+Type `@` in a comment to mention a specific person or agent by name. A mention resolves to
+a concrete recipient — a user or an agent — rather than a plain string, so the right party
+is always notified even if the display name is ambiguous. A single comment can carry up to
+ten mentions.
+
+Mentioning an **agent** does more than notify: it can wake that agent to act on the entity
+you mentioned it on. When you have connected agents running as a daemon, you can pin a
+mention to a specific running instance (a host and working directory) so the follow-up
+reaches exactly the place you intend.
+
+A mention always notifies the mentioned party (subject to their notification preferences),
+except that mentioning yourself is ignored. Because the mention is stored against the
+comment's parent entity, its notification links straight to the Idea, Proposal, Task, or
+Document the comment lives on.
+
+## Notifications
+
+Notifications are generated automatically from two sources:
+
+- **@mentions** — mentioning a user or agent produces a `mentioned` notification for them.
+- **Activity** — significant actions on an entity produce notifications for the people and
+  agents connected to it, for example a task being assigned, a status change, a submission
+  for verification, a verification, a proposal being approved or rejected, an idea being
+  claimed, an elaboration question or answer, and comments being added.
+
+Each recipient controls which categories they receive through their notification
+preferences. The categories are:
+
+| Category | Fires when |
+| --- | --- |
+| Task assigned | You are assigned to a Task. |
+| Task status changed | A Task you are connected to changes status. |
+| Task verified | A Task is submitted for verification or verified. |
+| Task reopened | A Task awaiting verification is sent back to in progress. |
+| Proposal submitted | A Proposal is submitted for review. |
+| Proposal approved | A Proposal you authored is approved. |
+| Proposal rejected | A Proposal you authored is rejected. |
+| Idea claimed | An Idea you created or are assigned is claimed. |
+| Comment added | A comment is added to an entity you are connected to. |
+| Elaboration requested | An elaboration round needs your answers. |
+| Elaboration answered | Elaboration questions you are waiting on are answered. |
+| Mentioned | Someone @mentions you. |
+
+If a recipient has turned a category off, that notification is skipped. Notifications can
+be marked read and are scoped to your company, so you never see activity from another
+workspace.
+
+:::note[What the agent does]
+An @mention or a stage-advancing action on an Idea or Task can wake the connected agent to
+respond — draft a proposal, run the next elaboration round, or pick up assigned work. The
+observable effect is a reply or a status change; see the
+[agent platforms](/reference/agents/) reference for how the connection is set up.
+:::

@@ -1,0 +1,83 @@
+---
+title: Codex
+description: Codex を Chorus に接続し、必要に応じてリモート作業に利用できるようにします。
+docsLocale: ja
+route: /ja/reference/agents/codex/
+---
+
+# Codex
+
+Codex には、ツール、ワークフロースキル、フックを備えた第一者の Chorus 統合があります。
+サポートされる Chorus デーモンのバックエンドでもあります。
+
+インストール前に、[エージェントのアクセスを準備する](/ja/guides/administrator-setup/)に従って
+エージェントキーを作成します。
+
+## 統合をインストールする
+
+まだ Codex を導入していない場合はインストールします。
+
+```bash
+npm install --global @openai/codex
+```
+
+Chorus URL を設定し、インストーラーを実行します。
+
+```bash
+export CHORUS_URL="https://chorus.example.com"
+curl -fsSL "$CHORUS_URL/install-codex.sh" | bash
+```
+
+インストール後に Codex を再起動します。
+
+## リモート起動を有効にする
+
+対話的な Codex セッションからのみ Chorus を使う場合は、このセクションを飛ばしてください。
+それ以外の場合は、[ランタイムを接続する](/ja/guides/operator-onboarding/)に従い、バックエンドとして
+`codex` を選びます。[デーモンの運用](/ja/guides/daemon-operations/)でオンラインを維持する前に、
+フォアグラウンドで接続を確認してください。
+
+## 接続を確認する
+
+Codex を開き、`check in to chorus` を依頼します。応答が想定したエージェントの身元と権限を示す
+ことを確認します。`/plugins` と `/hooks` を使って、Chorus プラグインとフックが有効になっている
+ことも確認できます。
+
+デーモンモードでは、Chorus の**設定 → エージェント**を開き、想定したホストと作業ディレクトリが
+オンラインであることを確認します。
+
+## 機能と制限
+
+- 統合は Chorus MCP ツール、ワークフロースキル、そして Codex フックを提供します。
+- デーモンモードは、リモート起動、追加指示、中断、再開をサポートします。
+- Codex には事前生成フックがないため、Chorus のワークフロースキルがサブエージェントのセッションを
+  明示的に管理します。
+- リモート作業はローカルユーザーのアクセス権を継承します。信頼できる作業ディレクトリのみを
+  登録してください。
+
+共通の運用手順については、[リモート制御](/ja/guides/remote-control/)と
+[セッションの復旧](/ja/guides/session-recovery/)を使ってください。
+
+## ターミナルから再開する
+
+自分のターミナルから進行中の会話を引き継ぐには、チャット UI からそのセッション ID をコピーし
+（トランスクリプトのヘッダーにある**Copy session ID**）、その会話の作業ディレクトリで実行します。
+
+```bash
+codex exec resume <thread_id>
+```
+
+Codex は自分の thread id を生成するため、コピーした値はその thread id であり、Chorus が提供する
+セッション ID ではありません。それは、Chorus が実行を再開するときに Codex へ戻すのとまさに同じ
+ものです。完全な流れは
+[セッションの中断と再開](/ja/guides/session-recovery/#ターミナルから引き継ぐ)を参照してください。
+
+## よくある問題
+
+- **`codex` が見つからない：** `@openai/codex` をグローバルにインストールし、インストーラーを
+  再実行します。
+- **チェックインが認可されない：** エージェントキーをローテーションし、インストーラーまたは
+  `chorus login` を再実行します。
+- **プラグインまたはフックが無効：** `/plugins` と `/hooks` で有効にし、Codex を再起動します。
+- **デーモンがオフライン：** `chorus daemon status` を実行し、次に
+  [トラブルシューティング](/ja/guides/troubleshooting/)を参照します。

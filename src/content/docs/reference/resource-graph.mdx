@@ -1,0 +1,65 @@
+---
+title: Resource graph reference
+description: What the project resource graph shows and how it links Ideas, Proposals, Tasks, and Documents.
+docsLocale: en
+route: /reference/resource-graph/
+sidebar:
+  order: 5
+---
+
+Every project has a **resource graph** — a mind-map view, opened from **Graph** in the
+project sidebar, that lays out the whole project as connected nodes. It answers "how does
+this project's work fit together?" by showing each entity and the links between them in one
+picture. The graph is scoped to a single project; it never mixes in work from another
+project or company.
+
+## What the graph shows
+
+The graph draws four kinds of node, each with its own color and icon:
+
+| Node | Represents | Status shown on the node |
+| --- | --- | --- |
+| Idea | An Idea in the project. | Its derived board status (for example Planning, Building, Verify work, Done). |
+| Proposal | A Proposal. | Its raw status (draft, pending, approved, closed). |
+| Task | A Task. | Its raw status (open, assigned, in_progress, to_verify, done, closed). |
+| Document | A materialized Document. | Its document type (for example PRD, Tech Design, Spec, Report). |
+
+A node also shows a live presence ring when an agent is currently viewing or editing that
+entity, so you can see activity as it happens.
+
+## How entities are linked
+
+Edges between nodes show how one entity gave rise to another. There are three kinds of
+link:
+
+| Link | Direction | Meaning |
+| --- | --- | --- |
+| Lineage | Parent Idea → child Idea | A derived child Idea split off from a parent (theme) Idea. |
+| Derivation | Idea → Proposal, Proposal → Task, Proposal → Document | A Proposal was raised from an Idea, and approving it materialized its Tasks and Documents. |
+| Dependency | Prerequisite Task → dependent Task | The downstream Task is blocked until the upstream one is done. |
+
+Read together, these edges trace the full path a piece of work took: from a parent Idea,
+down through its child Ideas and their Proposals, out to the Documents and the dependency
+graph of Tasks that a Proposal produced. This is the same dependency relationship described
+in the [entity lifecycle reference](/reference/lifecycle/), shown visually.
+
+## Working with the graph
+
+The graph lays entities out left to right by derivation depth and updates live as work
+changes. You can:
+
+- **Pan and zoom** by dragging, scrolling, pinching, or using the on-screen controls, and
+  fit the whole graph back into view.
+- **Expand or collapse** a hub: an Idea expands to its Proposals, and a Proposal expands to
+  its Tasks and Documents, so you can start from the big picture and drill in.
+- **Filter** which node types are shown with the type legend.
+- **Search** for a node by title; matches are highlighted and their parent hubs expand
+  automatically.
+- **Open** an entity by clicking its node, which opens that Idea, Proposal, Task, or
+  Document in a side panel without leaving the graph.
+
+:::note[What the agent does]
+The graph reflects work agents do — the Proposals they draft, the Tasks they materialize
+and complete — so their progress appears here in real time. See the
+[agent platforms](/reference/agents/) reference for how agents connect.
+:::

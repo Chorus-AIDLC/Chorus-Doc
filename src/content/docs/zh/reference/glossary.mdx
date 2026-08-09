@@ -1,0 +1,52 @@
+---
+title: 术语表
+description: Chorus 核心术语的一句话释义，每条都链接到详细讲解它的指南或参考页。
+docsLocale: zh
+route: /zh/reference/glossary/
+sidebar:
+  order: 9
+---
+
+这是本文档中所用术语的速查表。每条都保留该术语在产品中的英文名称，给出一句话释义，并链接到
+详细讲解它的页面。想了解每类实体经历的状态，参阅[实体生命周期参考](/zh/reference/lifecycle/)；
+想了解各阶段如何交接，参阅[工作流参考](/zh/reference/workflow/)。
+
+## 核心实体
+
+<div class="table-scroll" role="region" aria-label="核心实体术语" tabindex="0">
+
+  | 术语 | 释义 |
+  | --- | --- |
+  | **Idea**（想法） | 进入流水线的一个需求；在起草提案之前先经过需求细化。参阅[记录想法](/zh/guides/capture-an-idea/)。 |
+  | **Proposal**（提案） | 承载文档草稿与任务草稿的审查容器；批准后这些草稿会物化为真实的文档与任务。参阅[审核提案](/zh/guides/review-a-proposal/)。 |
+  | **Task**（任务） | 单个工作单元，带有优先级、工时估算、验收标准和依赖关系；完成前需先经过验证。参阅[执行任务](/zh/guides/run-tasks/)与[验证与完成](/zh/guides/verify-and-complete/)。 |
+  | **Document**（文档） | 一份书面产物，比如 PRD、规格、设计或报告，由提案的文档草稿物化而来并挂在项目下。参阅[审核提案](/zh/guides/review-a-proposal/)。 |
+  | **Reference**（参考资料） | 挂在想法、提案或任务上的一条外部佐证链接，可以是文档、代码仓库、issue/PR 或论文/博客；系统只保存链接和备注，从不抓取页面本身。参阅[附加参考资料](/zh/guides/references/)。 |
+  | **Project**（项目） | 承载某个项目的想法、提案、文档与任务的工作空间。参阅[创建项目](/zh/guides/create-a-project/)。 |
+  | **Project group**（项目组） | 把相关项目归拢在同一标题下的文件夹。参阅[创建项目](/zh/guides/create-a-project/)。 |
+
+</div>
+
+## 需求细化与想法形态
+
+<div class="table-scroll" role="region" aria-label="需求细化与想法形态术语" tabindex="0">
+
+  | 术语 | 释义 |
+  | --- | --- |
+  | **Acceptance criterion**（验收标准） | 任务必须满足、且可检验的一项条件，用于验证任务。参阅[验证与完成](/zh/guides/verify-and-complete/)。 |
+  | **Elaboration round**（细化轮次） | 一轮结构化问答，用于澄清想法的需求；细化会一轮一轮循环，直到解决为止。参阅[记录想法](/zh/guides/capture-an-idea/)。 |
+  | **Theme**（主题想法） | 只用来把相关子想法归拢在同一方向下的想法；主题本身不能变成提案。参阅[记录想法](/zh/guides/capture-an-idea/)。 |
+  | **Derived (child) idea**（派生子想法） | 一个完整的想法，拥有自己的细化、提案与任务，并关联到一个父想法。参阅[记录想法](/zh/guides/capture-an-idea/)。 |
+
+</div>
+
+## 智能体与远程工作
+
+<div class="table-scroll" role="region" aria-label="智能体与远程工作术语" tabindex="0">
+
+  | 术语 | 释义 |
+  | --- | --- |
+  | **Session / Conversation**（会话 / 对话） | 智能体的一次工作会话；后台服务的聊天界面把它们呈现为对话，每一次交互为一个回合。参阅[管理后台服务](/zh/guides/daemon-operations/)。 |
+  | **Daemon**（后台服务） | 一个长期运行的本地进程，让智能体保持在线，从而可以被唤醒以远程开展工作。参阅[管理后台服务](/zh/guides/daemon-operations/)与[从 Chorus 发起远程工作](/zh/guides/remote-control/)。 |
+
+</div>

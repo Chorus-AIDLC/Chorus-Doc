@@ -1,0 +1,33 @@
+{
+  "name": "chorus-docs",
+  "version": "0.0.1",
+  "private": true,
+  "type": "module",
+  "engines": {
+    "node": ">=22.12.0"
+  },
+  "scripts": {
+    "dev": "astro dev",
+    "content:check": "node scripts/validate-content.mjs --manifest .astro/docs-route-manifest.json && node tests/content-validation.mjs && node tests/route-manifest.mjs && node tests/agent-docs-contract.mjs && node tests/locale-coverage.mjs && node tests/analytics.mjs",
+    "build": "pnpm content:check && astro check && astro build && node scripts/generate-artifacts.mjs && node tests/generated-artifacts.mjs && node tests/pagefind-search.mjs && node tests/locale-fallback.mjs && node tests/analytics-build.mjs",
+    "check": "node scripts/run-quality-gate.mjs",
+    "check:links": "node scripts/check-links.mjs",
+    "check:browser": "node tests/browser-quality.mjs",
+    "check:preview": "node tests/preview-integration.mjs",
+    "deploy:check": "node tests/deployment-contract.mjs && wrangler pages deploy --help",
+    "test:quality-gate": "node tests/quality-gate-contract.mjs",
+    "preview": "astro preview"
+  },
+  "dependencies": {
+    "@astrojs/starlight": "0.39.3",
+    "astro": "^6.1.4",
+    "sharp": "^0.34.3"
+  },
+  "devDependencies": {
+    "@astrojs/check": "^0.9.6",
+    "@axe-core/playwright": "^4.12.1",
+    "@playwright/test": "^1.62.1",
+    "typescript": "^5.9.2",
+    "wrangler": "^4.30.0"
+  }
+}

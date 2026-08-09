@@ -1,0 +1,58 @@
+---
+title: 中断与恢复会话
+description: 停止正在运行的智能体，并在检查结果后继续原有会话。
+docsLocale: zh
+route: /zh/guides/session-recovery/
+sidebar:
+  order: 12
+---
+
+import Screenshot from '../../../../components/Screenshot.astro';
+
+## 中断正在执行的会话
+
+打开运行中的会话，选择中断（Interrupt）。Chorus 会通知当前连接停止执行；如果智能体未能及时退出，后台服务会在超时后结束对应进程。
+
+<Screenshot
+  src="/images/agent-operations/session-control.webp"
+  alt="运行中的智能体会话显示当前轮次、已运行时间和中断按钮"
+  width={1440}
+  height={900}
+  caption="运行中的会话会显示当前轮次、持续时间以及中断操作。"
+/>
+
+中断适用于指令有误、执行时间异常或需要先补充信息的情况。它不会撤销智能体已经修改的文件、执行的命令或发送的外部请求。
+
+## 检查已完成的工作
+
+在继续之前：
+
+1. 阅读会话中最后一条输出，确认智能体停在什么步骤。
+2. 检查工作目录中的文件修改和仍在运行的进程。
+3. 判断应继续原计划、补充新指令，还是放弃当前结果重新开始。
+
+对于代码工作，可在工作目录运行 `git status` 和相关测试，避免重复修改或覆盖已有成果。
+
+## 恢复原会话
+
+会话进入已中断或失败状态后，选择恢复（Resume）。Chorus 会尽量使用原来的智能体连接和工作目录继续上下文。后台服务重启后，也不会自动把会话迁移到另一个目录。
+
+如果原连接已经离线，请先恢复该主机上的后台服务。改用其他连接会创建不同的执行环境，应当作为明确的新选择，而不是故障恢复的默认操作。
+
+反复中断、崩溃或无法恢复时，请参阅[排查智能体连接故障](/zh/guides/troubleshooting/)。
+
+## 从终端接管会话
+
+除了界面上的恢复（Resume）按钮，你也可以直接在自己的终端里继续同一个会话。打开会话，在对话记录顶部选择复制 session ID（Copy session ID）。它复制的是后台持有的恢复 id，也就是后台服务恢复会话时传给智能体 CLI 的那个 id，因此手动恢复会接续同一个会话，而不是新开一个。
+
+{/* Screenshot surface: 对话记录顶部的复制 session ID 控件。 */}
+
+在会话原本运行的工作目录下，把复制的 id 传给对应运行后端的恢复命令：
+
+- **Claude Code**：`claude --resume <sessionId>`
+- **Codex**：`codex exec resume <thread_id>`
+- **Kiro**：`kiro-cli chat --resume-id <sessionId>`
+
+每种运行后端使用自己的 id 格式，复制到的值就是该后端所接受的形式。各平台的精确命令见对应参考页：[Claude Code](/zh/reference/agents/claude-code/)、[Codex](/zh/reference/agents/codex/) 和 [Kiro](/zh/reference/agents/kiro/)。
+
+Chorus 对每个想法只维护一个规范会话。直接处理某个想法时，它的 session id 就是该想法自身的 UUID（`sessionId === directIdeaUuid`）；当唤醒切换到不同的工作目录时，会重新指向这同一个会话，而不是派生出新的会话，因此无论它最后在哪里运行，需要接管的始终只有一个会话。完整模型见[在线智能体总览](/zh/guides/online-agents-overview/)。

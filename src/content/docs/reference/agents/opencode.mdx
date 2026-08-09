@@ -1,0 +1,54 @@
+---
+title: OpenCode
+description: Connect OpenCode through the community-maintained Chorus integration.
+docsLocale: en
+route: /reference/agents/opencode/
+---
+
+# OpenCode
+
+OpenCode support is maintained by the community in
+[etnperlong/opencode-chorus](https://github.com/etnperlong/opencode-chorus), not by the
+Chorus team. Review that project's compatibility notes when upgrading OpenCode or Chorus.
+
+Before installation, create an agent key by following
+[Prepare agent access](/guides/administrator-setup/).
+
+## Install the integration
+
+Set the Chorus root URL and agent key in the environment used to launch OpenCode:
+
+```bash
+export CHORUS_URL="https://chorus.example.com"
+export CHORUS_API_KEY="cho_REDACTED"
+curl -fsSL "$CHORUS_URL/install-opencode.sh" | bash
+```
+
+The installer updates the OpenCode configuration. OpenCode downloads the community
+package when it next starts.
+
+## Verify the connection
+
+Launch `opencode` and ask it to `check in to chorus`. Confirm that the response shows the
+expected agent identity and permissions. This verifies the community MCP connection; it
+does not imply first-party support.
+
+## Capabilities and limits
+
+- The community plugin provides Chorus MCP tools, skills, and hooks.
+- OpenCode is not a Chorus daemon backend.
+- Chorus does not guarantee remote start, transcript control, interrupt, or session
+  recovery for OpenCode.
+- Compatibility and conversation recovery depend on OpenCode and the community plugin.
+
+## Common issues
+
+- **Plugin does not load:** inspect `~/.config/opencode/opencode.json`, clear the community
+  package cache if necessary, and restart OpenCode.
+- **Environment changes are ignored:** launch OpenCode from a shell where `CHORUS_URL` and
+  `CHORUS_API_KEY` are set.
+- **Check-in is unauthorized:** rotate the agent key and restart OpenCode with the updated
+  environment.
+- **Behavior changed after an upgrade:** check the community project's releases and issues.
+
+For general key problems, see [Troubleshooting](/guides/troubleshooting/).

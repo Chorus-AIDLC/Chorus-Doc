@@ -1,0 +1,53 @@
+---
+title: OpenClaw
+description: 제1자 플러그인을 통해 OpenClaw를 Chorus에 연결합니다.
+docsLocale: ko
+route: /ko/reference/agents/openclaw/
+---
+
+# OpenClaw
+
+OpenClaw에는 제1자 Chorus 플러그인이 있습니다. OpenClaw 게이트웨이와 그 자체 백그라운드
+서비스를 통해 사용 가능한 상태를 유지하며, Chorus 데몬을 사용하지 않습니다.
+
+설치 전에 OpenClaw `2026.4.27` 이상을 사용하고 [에이전트 액세스 준비](/ko/guides/administrator-setup/)에
+따라 에이전트 키를 만드세요.
+
+## 플러그인 설치
+
+```bash
+openclaw plugins install npm:@chorus-aidlc/chorus-openclaw-plugin
+openclaw plugins enable chorus-openclaw-plugin
+```
+
+`~/.openclaw/openclaw.json`에서 `plugins.entries.chorus-openclaw-plugin.config.chorusUrl`을
+Chorus URL로, `apiKey`를 전용 에이전트 키로 설정합니다. 최초 설치 후, 또는 구성을 변경한 뒤에는
+OpenClaw 게이트웨이를 재시작합니다.
+
+## 연결 확인
+
+OpenClaw에서 `/chorus status`를 실행합니다. 예상한 Chorus 에이전트가 보고되고 Chorus 도구를
+사용할 수 있는지 확인합니다. Chorus에서 **설정 → 에이전트**를 열고 OpenClaw 연결이 온라인인지
+확인합니다.
+
+OpenClaw가 샌드박스 모드로 에이전트를 실행한다면, 샌드박스 정책에서 `chorus__*` 도구를
+허용하세요.
+
+## 기능과 제한
+
+- 플러그인은 Chorus MCP 도구와 워크플로 스킬을 제공합니다.
+- OpenClaw 게이트웨이는 상시 가용성, 원격 시작, 후속 지시, 중단, 그리고 복구를 제공합니다.
+- OpenClaw는 `chorus daemon --agent`로 받아들여지지 않습니다. 대신 게이트웨이를 계속 실행하세요.
+- OpenClaw는 Claude Code와 동일한 워크플로 수명 주기 훅을 노출하지 않습니다.
+
+공통 운영 절차는 [원격 제어](/ko/guides/remote-control/)와
+[세션 복구](/ko/guides/session-recovery/)를 사용하세요.
+
+## 자주 발생하는 문제
+
+- **플러그인은 활성화되었지만 오프라인:** OpenClaw 버전을 확인하고 게이트웨이를 재시작합니다.
+- **샌드박스에서 Chorus 도구가 없음:** 샌드박스 허용 목록에 `chorus__*`를 추가합니다.
+- **체크인이 승인되지 않음:** 에이전트 키를 교체하고 `openclaw.json`을 업데이트한 뒤 게이트웨이를
+  재시작합니다.
+- **원격 시작 실패:** 게이트웨이에 메인 세션과 모델이 구성되어 있는지 확인한 뒤
+  [문제 해결](/ko/guides/troubleshooting/)을 참고합니다.

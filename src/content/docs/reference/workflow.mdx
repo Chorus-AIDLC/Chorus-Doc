@@ -1,0 +1,20 @@
+---
+title: Workflow reference
+description: The stable stages and handoffs in a Chorus delivery workflow.
+docsLocale: en
+route: /reference/workflow/
+sidebar:
+  order: 1
+---
+
+| Stage | Output | Exit condition |
+| --- | --- | --- |
+| Idea | Verified elaboration | The requester confirms the shared understanding |
+| Proposal | Approved documents and task graph | Independent review passes |
+| Develop | Implementation evidence | Every required criterion is self-checked |
+| Verify | Reviewed task | An administrator accepts the evidence |
+
+## Task states
+
+Tasks progress from `open` to `assigned`, `in_progress`, `to_verify`, and `done`.
+Dependencies unblock only when their upstream tasks reach `done`.

@@ -1,0 +1,81 @@
+---
+title: Codex
+description: Codex를 Chorus에 연결하고 필요하면 원격 작업에 사용할 수 있게 합니다.
+docsLocale: ko
+route: /ko/reference/agents/codex/
+---
+
+# Codex
+
+Codex에는 도구, 워크플로 스킬, 훅을 갖춘 제1자 Chorus 통합이 있습니다. 지원되는 Chorus 데몬
+백엔드이기도 합니다.
+
+설치 전에 [에이전트 액세스 준비](/ko/guides/administrator-setup/)에 따라 에이전트 키를
+만드세요.
+
+## 통합 설치
+
+아직 Codex가 없다면 설치합니다.
+
+```bash
+npm install --global @openai/codex
+```
+
+Chorus URL을 설정하고 설치 프로그램을 실행합니다.
+
+```bash
+export CHORUS_URL="https://chorus.example.com"
+curl -fsSL "$CHORUS_URL/install-codex.sh" | bash
+```
+
+설치 후 Codex를 재시작합니다.
+
+## 원격 시작 활성화
+
+대화식 Codex 세션에서만 Chorus를 사용한다면 이 섹션을 건너뛰세요. 그렇지 않다면
+[런타임 연결](/ko/guides/operator-onboarding/)에 따라 백엔드로 `codex`를 선택합니다.
+[데몬 운영](/ko/guides/daemon-operations/)으로 온라인 상태를 유지하기 전에, 포그라운드에서
+연결을 확인하세요.
+
+## 연결 확인
+
+Codex를 열고 `check in to chorus`를 요청합니다. 응답이 예상한 에이전트 신원과 권한을 보여
+주는지 확인합니다. `/plugins`와 `/hooks`를 사용해 Chorus 플러그인과 훅이 활성화되어 있는지도
+확인할 수 있습니다.
+
+데몬 모드에서는 Chorus의 **설정 → 에이전트**를 열고 예상한 호스트와 작업 디렉터리가 온라인인지
+확인합니다.
+
+## 기능과 제한
+
+- 통합은 Chorus MCP 도구, 워크플로 스킬, 그리고 Codex 훅을 제공합니다.
+- 데몬 모드는 원격 시작, 후속 지시, 중단, 재개를 지원합니다.
+- Codex에는 사전 생성 훅이 없으므로, Chorus 워크플로 스킬이 서브 에이전트 세션을 명시적으로
+  관리합니다.
+- 원격 작업은 로컬 사용자의 접근 권한을 상속합니다. 신뢰하는 작업 디렉터리만 등록하세요.
+
+공통 운영 절차는 [원격 제어](/ko/guides/remote-control/)와
+[세션 복구](/ko/guides/session-recovery/)를 사용하세요.
+
+## 터미널에서 재개하기
+
+자신의 터미널에서 진행 중인 대화를 넘겨받으려면, 채팅 UI에서 해당 세션 ID를 복사한 뒤
+(대화 기록 헤더의 **Copy session ID**), 그 대화의 작업 디렉터리에서 실행합니다.
+
+```bash
+codex exec resume <thread_id>
+```
+
+Codex는 자체 thread id를 생성하므로, 복사한 값은 그 thread id이며 Chorus가 제공한 세션 ID가
+아닙니다. 그것은 Chorus가 실행을 재개할 때 Codex에 되돌려 주는 바로 그것입니다. 전체 흐름은
+[세션 중단과 재개](/ko/guides/session-recovery/#터미널에서-이어받기)를 참고하세요.
+
+## 자주 발생하는 문제
+
+- **`codex`를 찾을 수 없음:** `@openai/codex`를 전역으로 설치하고 설치 프로그램을 다시
+  실행합니다.
+- **체크인이 승인되지 않음:** 에이전트 키를 교체하고 설치 프로그램 또는 `chorus login`을 다시
+  실행합니다.
+- **플러그인 또는 훅이 비활성화됨:** `/plugins`와 `/hooks`에서 활성화한 뒤 Codex를 재시작합니다.
+- **데몬이 오프라인:** `chorus daemon status`를 실행한 뒤
+  [문제 해결](/ko/guides/troubleshooting/)을 참고합니다.

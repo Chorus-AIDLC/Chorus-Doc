@@ -1,0 +1,176 @@
+---
+title: エージェントプラットフォーム
+description: サポートされるエージェントプラットフォームを比較し、適切な Chorus 接続を選びます。
+docsLocale: ja
+route: /ja/reference/agents/
+---
+
+# エージェントプラットフォーム
+
+すでに使っているエージェントを選び、そのうえで、そのエージェントで Chorus から
+リモートに作業を開始する必要があるかどうかを判断します。
+
+| プラットフォーム | サポート提供元 | 適した用途 | リモート起動 | 常駐ランタイム |
+| --- | --- | --- | --- | --- |
+| [Claude Code](./claude-code/) | Chorus チーム | 完全な Chorus ワークフローを求める Claude Code ユーザー | 対応（Chorus デーモン経由） | Chorus デーモン |
+| [Codex](./codex/) | Chorus チーム | 完全な Chorus ワークフローを求める Codex ユーザー | 対応（Chorus デーモン経由） | Chorus デーモン |
+| [Kiro](./kiro/) | Chorus チーム | 完全な Chorus ワークフローを求める Kiro CLI ユーザー | 対応（Chorus デーモン経由） | Chorus デーモン |
+| [OpenClaw](./openclaw/) | Chorus チーム | すでにゲートウェイを運用している OpenClaw ユーザー | 対応（OpenClaw 経由） | OpenClaw ゲートウェイ |
+| [OpenCode](./opencode/) | コミュニティ | コミュニティサポートで問題ない OpenCode ユーザー | 非対応 | 非対応 |
+| [Pi](./pi/) | Chorus チーム（高度なセットアップ） | ソースチェックアウトから Chorus を評価するコントリビューター | 非対応 | 非対応 |
+| [Generic MCP client](./generic-mcp/) | MCP 互換のみ | 別の MCP クライアントから Chorus ツールを呼び出す | 非対応 | 非対応 |
+
+Claude Code、Codex、Kiro が、サポートされる Chorus デーモンのバックエンドです。OpenClaw は
+自前のゲートウェイとプラグインを通じてオンラインを維持します。OpenCode、Pi、および汎用 MCP
+クライアントは対話的に接続し、Chorus デーモンのバックエンドとしては選択できません。
+
+アクセスキーと権限については、まず[エージェントのアクセスを準備する](/ja/guides/administrator-setup/)を
+ご覧ください。Claude Code、Codex、Kiro をリモートで利用可能にするには、プラットフォームの
+セットアップを終えたあとで[デーモンの運用](/ja/guides/daemon-operations/)に進みます。
+
+## プラグインが同梱するもの
+
+上記の各プラットフォームページでは、初回インストールと接続チェックを順に説明します。この
+セクションでは、Chorus プラグインが各ランタイムに実際に同梱するもの、そしてそれを最新に保つ
+方法を扱います。インストール手順は繰り返しません。
+
+プラグインは、AI コーディングランタイムを Chorus の協働者に変えます。Chorus MCP ツール、各段階の
+ワークフロースキル、レビュー用サブエージェント、そしてセッションのライフサイクル自動化を提供します。
+ランタイムごとに一度ずつ公開され、名前はいずれも `chorus` です。以下では Claude Code と Codex を
+完全に説明します。OpenClaw、Kiro、Pi は、機能がより狭い、あるいは形の異なる移植版であるため、
+同等のものとしてではなく、差分と参照先を示すかたちで扱います。
+
+### Claude Code
+
+Claude Code プラグイン（`chorus@chorus-plugins`）は次を同梱します。
+
+- **Chorus MCP ツール**：起動シェルで設定した `CHORUS_URL` と `CHORUS_API_KEY` から Chorus MCP
+  サーバーを設定する `.mcp.json` テンプレート。
+- **ワークフロースキル**：`/chorus` の総覧に加え、`/chorus:idea`、`/chorus:proposal`、
+  `/chorus:develop`、`/chorus:review`、`/chorus:quick-dev`、`/chorus:yolo` として呼び出す各段階の
+  スキル。
+- **レビュー用サブエージェント**：3 つの読み取り専用レビュアー `chorus:proposal-reviewer`、
+  `chorus:task-reviewer`、`chorus:code-reviewer`。それぞれが `VERDICT` コメントを投稿します。
+- **セッションライフサイクルフック**：チェックイン、セッションの発見と作成、ハートビートの送信、
+  そしてチェックアウトとセッションのクローズを自動で行うフック。加えて、提出後にメインエージェントへ
+  レビュアーの起動を促す `PostToolUse` フック。
+- **設定トグル**：各レビュアーの有効・無効化、レビュー回数の上限設定、OpenSpec モードのオン・オフを
+  切り替えるプラグインの `userConfig` オプション。
+
+### Codex
+
+Codex プラグイン（Codex 版 `chorus@chorus-plugins`）は次を同梱します。
+
+- **ワークフロースキル**：`$` プレフィックスで呼び出す 7 つのスキル `$chorus`、`$idea`、
+  `$proposal`、`$develop`、`$review`、`$quick-dev`、`$yolo`。名前空間付きのため、完全修飾名は
+  `chorus:<skill>` です。
+- **レビュー用サブエージェント**：Claude Code と同じ 3 つの読み取り専用レビュアー
+  `chorus-proposal-reviewer`、`chorus-task-reviewer`、`chorus-code-reviewer`。
+- **セッション対応フック**：セッション開始時のチェックイン、ターンごとのリマインダー、そして提案の
+  提出、課題の提出、または着想の提案の最後の課題が検証されたあとに促す `PostToolUse` レビュアー
+  通知。Codex には、Claude Code の `TeammateIdle` および `TaskCompleted` フックに相当するものは
+  ありません。
+
+Codex の MCP サーバーはプラグインに同梱**されません**。Codex はプラグインの MCP 設定内で
+`${VAR}` を展開せず、シェル環境を MCP サブプロセスに渡さないため、インストーラーは代わりに、
+リテラルの URL と bearer トークンを含む `[mcp_servers.chorus]` セクションを
+`~/.codex/config.toml` に書き込みます。Codex には `userConfig` の面もないため、レビューと
+OpenSpec の挙動は、プラグインのトグルではなくスキルのロジックによって制御されます。
+
+### 移植版：OpenClaw、Kiro、Pi
+
+これらのランタイムには第一者統合がありますが、その機能は Claude Code や Codex とは異なります。
+以下の説明は、同等性の主張ではなく参照先として扱ってください。
+
+- **OpenClaw**：Chorus MCP ツールとワークフロースキルを備えたプラグイン。Chorus デーモンではなく
+  OpenClaw ゲートウェイを通じて利用可能な状態を保ち、同じワークフローライフサイクルフックは公開
+  しません。[OpenClaw](/ja/reference/agents/openclaw/) を参照してください。
+- **Kiro**：ツール、ワークフロースキル、レビューエージェント、フックを備えた統合。ワークスペース
+  単位でもユーザー全体でもインストールできます。[Kiro](/ja/reference/agents/kiro/) を参照してください。
+- **Pi**：高度な評価向けのソースのみの統合で、ツール、ワークフロースキル、レビューエージェント、
+  Pi フックを備えます。Pi は Chorus デーモンのバックエンドではなく、リモートで起動・中断・再開する
+  ことはできません。[Pi](/ja/reference/agents/pi/) を参照してください。
+
+## プラグインをアップグレードする
+
+その場でアップグレードできます。エージェントキーと Chorus URL は影響を受けません。
+
+- **Claude Code**：`/plugin` メニューからプラグインを管理するか、marketplace add と install を
+  再実行して最新版を取得します。
+
+  ```text
+  /plugin marketplace add Chorus-AIDLC/chorus
+  /plugin install chorus@chorus-plugins
+  ```
+
+  Claude Code を再起動し、`/plugin list` を実行して新しいバージョンが有効になっていることを
+  確認します。
+
+- **Codex**：インストーラーを再実行します。冪等であり、すべてを一度に更新します。
+
+  ```bash
+  curl -sSL https://raw.githubusercontent.com/Chorus-AIDLC/Chorus/main/public/install-codex.sh | bash
+  ```
+
+  `install-codex.sh` を再実行すると MCP 設定が書き換えられ、プラグインが更新されます。これは
+  エージェントキーをローテーションする方法でもあります。最後に Codex 内で `/plugins` を実行します。
+
+OpenClaw、Kiro、Pi は、インストール時と同じ仕組みでアップグレードします。手順は上記の各
+プラットフォームページに記載しています。
+
+## プラグインをアンインストールする
+
+- **Claude Code**：`/plugin` メニューを開き、`chorus@chorus-plugins` を無効化または削除します。
+  プラグインを削除すると、そのフックとレビュー用サブエージェントも削除されます。環境内の
+  エージェントキーはプラグインの成果物ではありません。不要になった場合は別途削除してください。
+- **Codex**：`/plugins` メニューからプラグインを無効化または削除します。MCP サーバーは別に
+  設定されているため、完全に切断するには `~/.codex/config.toml` から `[mcp_servers.chorus]` と
+  `[mcp_servers.chorus.http_headers]` の 2 つのセクションも削除します。インストーラーは一度限りの
+  バックアップを `config.toml.chorus-bak` に保存します。
+
+OpenClaw、Kiro、Pi は、上記の各プラットフォームページで説明しているとおり、ランタイム自身の
+プラグインまたはパッケージマネージャーから統合を削除します。
+
+## バージョンの整合
+
+プラグインと同梱スキルはまとめてバージョン管理され、**単一の Chorus アプリケーションバージョン**を
+追随します。プラグインマニフェストの `version` フィールドは稼働中の Chorus リリースと一致し、
+スキルの frontmatter の `version` もそれに合わせて変わるため、プラグインのリリースは対象とする
+アプリケーションと揃います。Chorus をアップグレードするときは、プラグインも一致するバージョンに
+アップグレードしてください。プラグインが報告するバージョンは、そのスキルのバージョンでもあります。
+
+スキルを個別に管理する必要はありません。Claude Code ではスキルはプラグインに同梱され、プラグインの
+更新とともに配信されます。Codex ではスキルはプラグインパッケージ内に同梱されています。個別に
+同期を保つべきスキルのインストールは存在しません。
+
+## 次のステップ
+
+- [コマンドとスキルのルーティング](/ja/guides/plugin-commands/)：どのコマンドが各ワークフロー段階を
+  実行し、何を生み出すか。
+- [自動化の挙動](/ja/guides/plugin-automation/)：レビュー用サブエージェント、セッションフック、
+  ヘッドレスの制約がどのように動作するか。
+- [OpenSpec モード](/ja/guides/openspec-mode/)：任意の仕様駆動オーサリングの経路。
+
+これらのコマンドが駆動するワークフローについては [AI-DLC ワークフロー](/ja/guides/ai-dlc-workflow/)を、
+ランタイムをバックグラウンドサービスとして実行する方法については[デーモンの運用](/ja/guides/daemon-operations/)を
+参照してください。
+
+## エージェント向け
+
+- **トリガー：** 読者（またはエージェント）がこのページに来るのは、プラットフォームを選ぶため、
+  あるいは、あるランタイムでプラグインが何を提供するか、そしてアップグレード・アンインストール・
+  バージョン整合の確認方法を知るためです。初回接続は、上の表でリンクされた各ランタイムの
+  プラットフォームページにあります。
+- **制約：**
+  - 初回インストール手順を繰り返さない。対応するプラットフォームページにリンクする。
+  - Claude Code と Codex の機能を正確に述べる。両者とも 3 つのレビュアー（提案・課題・コード）を
+    すべて備える。`userConfig` のトグル面を公開するのは Claude Code だけであり、Codex ではそれらの
+    挙動はスキルとフックが直接制御する。OpenClaw、Kiro、Pi を主要ランタイムと同等であるかのように
+    示してはならない。
+  - プラグインとスキルのバージョンは、Chorus アプリケーションバージョンを追随する単一の番号である。
+    個別のスキルインストールを説明しない。
+- **参照元：** Claude Code のマニフェストとトグル：
+  `public/chorus-plugin/.claude-plugin/plugin.json`。Codex のマニフェスト：
+  `plugins/chorus/.codex-plugin/plugin.json` と `plugins/chorus/README.md`。フックとスキルの分担：
+  `docs/chorus-plugin.md`。これらのパスはすべて
+  [Chorus リポジトリ](https://github.com/Chorus-AIDLC/Chorus)にあります。

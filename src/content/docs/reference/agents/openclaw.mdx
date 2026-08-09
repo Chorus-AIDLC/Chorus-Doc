@@ -1,0 +1,54 @@
+---
+title: OpenClaw
+description: Connect OpenClaw to Chorus through the first-party plugin.
+docsLocale: en
+route: /reference/agents/openclaw/
+---
+
+# OpenClaw
+
+OpenClaw has a first-party Chorus plugin. It stays available through the OpenClaw gateway
+and its native background service; it does not use the Chorus daemon.
+
+Before installation, use OpenClaw `2026.4.27` or newer and create an agent key by following
+[Prepare agent access](/guides/administrator-setup/).
+
+## Install the plugin
+
+```bash
+openclaw plugins install npm:@chorus-aidlc/chorus-openclaw-plugin
+openclaw plugins enable chorus-openclaw-plugin
+```
+
+In `~/.openclaw/openclaw.json`, set
+`plugins.entries.chorus-openclaw-plugin.config.chorusUrl` to your Chorus URL and `apiKey`
+to the dedicated agent key. Restart the OpenClaw gateway after the first installation or
+any configuration change.
+
+## Verify the connection
+
+Run `/chorus status` in OpenClaw. Confirm that it reports the expected Chorus agent and
+that Chorus tools are available. In Chorus, open **Settings → Agents** and confirm that
+the OpenClaw connection is online.
+
+If OpenClaw runs agents in sandbox mode, allow `chorus__*` tools in the sandbox policy.
+
+## Capabilities and limits
+
+- The plugin provides Chorus MCP tools and workflow skills.
+- The OpenClaw gateway provides persistent availability, remote start, follow-up
+  instructions, interrupt, and recovery.
+- OpenClaw is not accepted by `chorus daemon --agent`; keep the gateway running instead.
+- OpenClaw does not expose the same workflow lifecycle hooks as Claude Code.
+
+Use [Remote control](/guides/remote-control/) and
+[Session recovery](/guides/session-recovery/) for shared operating procedures.
+
+## Common issues
+
+- **Plugin is enabled but offline:** verify the OpenClaw version and restart the gateway.
+- **Chorus tools are missing in a sandbox:** add `chorus__*` to the sandbox allow list.
+- **Check-in is unauthorized:** rotate the agent key, update `openclaw.json`, and restart
+  the gateway.
+- **Remote start fails:** confirm that the gateway has a main session and model configured,
+  then see [Troubleshooting](/guides/troubleshooting/).

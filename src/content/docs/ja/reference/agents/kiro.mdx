@@ -1,0 +1,82 @@
+---
+title: Kiro
+description: Kiro CLI を Chorus に接続し、必要に応じてリモート作業に利用できるようにします。
+docsLocale: ja
+route: /ja/reference/agents/kiro/
+---
+
+# Kiro
+
+Kiro CLI には、ツール、ワークフロースキル、エージェント、フックを備えた第一者の Chorus 統合が
+あります。Kiro はサポートされる Chorus デーモンのバックエンドでもあります。
+
+インストール前に、Kiro CLI v2 をインストールし、[エージェントのアクセスを準備する](/ja/guides/administrator-setup/)に
+従ってエージェントキーを作成します。
+
+## 統合をインストールする
+
+ユーザー全体にインストールする場合：
+
+```bash
+export CHORUS_URL="https://chorus.example.com"
+export CHORUS_API_KEY="cho_REDACTED"
+curl -fsSL "$CHORUS_URL/install-kiro.sh" | bash
+```
+
+現在のワークスペースのみにインストールする場合：
+
+```bash
+curl -fsSL "$CHORUS_URL/install-kiro.sh" | bash -s -- --workspace
+```
+
+インストール後に Kiro を再起動します。
+
+## リモート起動を有効にする
+
+対話的な Kiro セッションからのみ Chorus を使う場合は、このセクションを飛ばしてください。
+それ以外の場合は、[ランタイムを接続する](/ja/guides/operator-onboarding/)に従い、バックエンドとして
+`kiro` を選びます。[デーモンの運用](/ja/guides/daemon-operations/)でオンラインを維持する前に、
+フォアグラウンドで接続を確認してください。
+
+## 接続を確認する
+
+`kiro-cli --agent chorus` を実行し、Kiro に `check in to chorus` を依頼します。応答が想定した
+エージェントの身元と権限を示すことを確認します。`/chorus-idea` を実行して、Chorus スキルが
+利用できることを確認します。
+
+デーモンモードでは、Chorus の**設定 → エージェント**を開き、想定したホストと作業ディレクトリが
+オンラインであることを確認します。
+
+## 機能と制限
+
+- 統合は Chorus MCP ツール、ワークフロースキル、レビューエージェント、そしてフックを提供します。
+- デーモンモードは、リモート起動、追加指示、中断、再開をサポートします。
+- ワークスペース設定は、ユーザー全体の Kiro 設定より優先されます。
+- リモート作業はローカルユーザーのアクセス権を継承します。信頼できる作業ディレクトリのみを
+  登録してください。
+
+共通の運用手順については、[リモート制御](/ja/guides/remote-control/)と
+[セッションの復旧](/ja/guides/session-recovery/)を使ってください。
+
+## ターミナルから再開する
+
+自分のターミナルから進行中の会話を引き継ぐには、チャット UI からそのセッション ID をコピーし
+（トランスクリプトのヘッダーにある**Copy session ID**）、その会話の作業ディレクトリで実行します。
+
+```bash
+kiro-cli chat --resume-id <sessionId>
+```
+
+コピーした ID は、Chorus がセッションを再開するときに Kiro CLI へ渡すのと同じ ID です。完全な
+流れは
+[セッションの中断と再開](/ja/guides/session-recovery/#ターミナルから引き継ぐ)を参照してください。
+
+## よくある問題
+
+- **Kiro CLI が見つからない：** Kiro CLI v2 をインストールし、インストーラーを再実行します。
+- **スキルが見当たらない：** ワークスペースのインストールがユーザー全体のインストールを上書きして
+  いないか確認し、Kiro を再起動します。
+- **チェックインが認可されない：** Kiro を起動するシェルでエージェントキーが利用できることを確認
+  するか、デーモンモードでは `chorus login` を再実行します。
+- **デーモンがオフライン：** `chorus daemon status` を実行し、次に
+  [トラブルシューティング](/ja/guides/troubleshooting/)を参照します。

@@ -1,0 +1,84 @@
+---
+title: 运维自托管的 Chorus
+description: 引导首次访问、配置认证、运行迁移、安全升级，以及设置 Cookie 与反向代理选项。
+docsLocale: zh
+route: /zh/guides/deploy-operations/
+sidebar:
+  order: 23
+---
+
+本指南介绍部署完成后如何运维自托管的 Chorus：让第一个人登录进来、配置认证、安全升级，以及在 HTTPS 后面需要关注的 Cookie 与反向代理设置。关于如何把部署搭建起来，请参阅[生产环境部署](/zh/guides/deploy-production/)或[使用 Docker 部署](/zh/guides/deploy-docker/)。
+
+## 引导首次访问
+
+全新部署还没有任何账号。设置 `DEFAULT_USER` 和 `DEFAULT_PASSWORD` 即可启用一个内置的邮箱／密码登录，它会绕过单点登录：
+
+```sh
+DEFAULT_USER='admin@example.com' \
+DEFAULT_PASSWORD='choose-a-strong-password'
+```
+
+两个变量都设置后，登录页会显示邮箱／密码表单。首次登录成功时，Chorus 会根据邮箱自动创建该用户及其所属公司，因此无需任何手动配置即可进入。
+
+### 关闭内置登录
+
+内置登录是一种引导机制，而非长期使用的账号体系。一旦已有真实账号，或已经配置了单点登录，就应通过取消设置 `DEFAULT_USER` 和 `DEFAULT_PASSWORD` 两个变量并重启 Chorus 来关闭它。移除这一对变量后，内置的邮箱／密码表单不再出现，访问将改为经由你配置的身份提供方。
+
+## 配置部署侧的认证
+
+有两类认证是在部署层面配置的。
+
+### 超级管理员引导
+
+`/admin` 超级管理员面板由环境变量引导，而不是数据库中的账号：
+
+<div class="table-scroll" role="region" aria-label="超级管理员环境变量" tabindex="0">
+
+| 环境变量 | 说明 |
+| --- | --- |
+| `SUPER_ADMIN_EMAIL` | 可访问 `/admin` 面板的超级管理员账号邮箱。 |
+| `SUPER_ADMIN_PASSWORD_HASH` | 超级管理员密码的 bcrypt 哈希值（绝不是明文）。 |
+
+</div>
+
+生成哈希并作为 `SUPER_ADMIN_PASSWORD_HASH` 传入：
+
+```sh
+node -e "console.log(require('bcryptjs').hashSync('your-password', 10))"
+```
+
+:::caution[存储哈希，而非密码]
+配置中只应包含 bcrypt 哈希值。请让明文密码远离环境文件、命令历史和代码仓库，并尽量通过密钥管理服务注入哈希值。
+:::
+
+### 单点登录（OIDC）
+
+单点登录**不**通过环境变量配置。超级管理员在 `/admin` 面板中按公司分别配置 OIDC，相关设置存储在数据库中。每家公司都有各自的颁发者（issuer）、客户端 ID 和启用开关。Chorus 使用 PKCE，**不**需要客户端密钥（client secret）。因此，部署层面的引导只负责让超级管理员登录进来，随后由超级管理员在管理面板中为各公司启用单点登录，部署层面无需再单独配置密钥。
+
+## 运行迁移与安全升级
+
+Chorus 在启动时会自动应用待执行的数据库迁移（`prisma migrate deploy`）。你无需手动运行迁移，启动新版本时，会先应用所有未完成的迁移，然后 Web 应用才开始提供服务。
+
+升级步骤：
+
+1. **先备份数据库。** 对于外部 PostgreSQL，请先做一次备份；对于内嵌或基于卷的数据库，请备份数据卷。
+2. 拉取新版本，npm 包使用 `npm update -g @chorus-aidlc/chorus`，Docker 部署则拉取新的容器镜像。
+3. 重启 Chorus。迁移会在启动时自动应用，随后应用开始运行。
+
+:::caution[升级前先备份]
+升级前务必备份数据库（内嵌或基于卷的存储则备份数据卷）。迁移会自动运行并可能修改表结构，备份是你唯一可靠的回滚点。请按照标准的 [PostgreSQL 备份文档](https://www.postgresql.org/docs/current/backup.html)操作，而不要自行拼凑针对特定引擎的流程。
+:::
+
+## Cookie 与反向代理
+
+当 Chorus 运行在 TLS 终止或反向代理之后时，有两个设置需要关注：
+
+<div class="table-scroll" role="region" aria-label="Cookie 与反向代理设置" tabindex="0">
+
+| 环境变量 | 设为 | 适用场景 |
+| --- | --- | --- |
+| `COOKIE_SECURE` | `true` | 站点通过 HTTPS 提供服务（包括在终止 TLS 的代理之后）。安全 Cookie 只在加密连接上发送。 |
+| `COOKIE_SECURE` | `false` | 仅用于受信任的内部纯 HTTP 网络。此时 Cookie 会在未加密的 HTTP 上发送，切勿在公网上使用。 |
+| `NEXTAUTH_URL` | 对外的基础网址 | Chorus 运行在反向代理之后。将其设为对外可见的地址（例如 `https://chorus.example.com`），以保证重定向和链接正确解析。 |
+
+</div>

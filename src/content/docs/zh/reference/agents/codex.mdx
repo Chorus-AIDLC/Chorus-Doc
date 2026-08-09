@@ -1,0 +1,65 @@
+---
+title: Codex
+description: 安装并验证 Codex 的 Chorus 第一方集成。
+docsLocale: zh
+route: /zh/reference/agents/codex/
+---
+
+# Codex
+
+Codex 是 Chorus 第一方支持的运行后端。安装集成后，你可以在 Codex 中使用 Chorus 工具和技能；安装 Chorus 后台服务后，还可以从 Chorus 远程启动和管理会话。
+
+## 安装集成
+
+先安装 Codex：
+
+```bash
+npm install --global @openai/codex
+```
+
+设置 Chorus 地址并运行官方安装脚本：
+
+```bash
+export CHORUS_URL="https://chorus.example.com"
+curl -fsSL "$CHORUS_URL/install-codex.sh" | bash
+```
+
+安装脚本会配置 Codex 插件、MCP 服务器和钩子，并在修改现有配置前创建备份。
+
+## 启用远程启动
+
+如果只在 Codex 终端中使用 Chorus，可以跳过这一步。需要从 Chorus 远程发起
+工作时，请按照[连接智能体运行环境](/zh/guides/operator-onboarding/)选择
+`codex` 运行后端。先在前台确认连接无误，再按照
+[管理后台服务](/zh/guides/daemon-operations/)让它保持在线。
+
+## 验证连接
+
+1. 启动 Codex，输入 `check in to chorus`。
+2. 确认 `chorus_checkin` 返回正确的智能体身份和权限。
+3. 使用 `/plugins` 和 `/hooks` 确认 Chorus 插件已启用、钩子已信任。
+4. 如果启用了远程启动，在 Chorus 的在线智能体列表中确认 Codex 和工作目录均已显示。
+
+## 能力与限制
+
+- Chorus 官方维护 MCP 工具、工作流技能和随包提供的钩子。
+- 后台服务支持远程启动会话、追加指令、中断和恢复。
+- Codex 没有预生成子智能体的钩子；工作流技能会显式管理子智能体会话。
+- 远程任务继承运行后台服务的本地用户权限，因此只注册必要的工作目录。
+
+## 从终端恢复会话
+
+要在自己的终端里接管正在进行的会话，先在对话界面复制它的 session id（对话记录顶部的复制 session ID），然后在该会话原本的工作目录下运行：
+
+```bash
+codex exec resume <thread_id>
+```
+
+Codex 会自行生成 thread id，因此复制到的值就是这个 thread id，而不是 Chorus 分配的 session id，它正是 Chorus 恢复会话时回传给 Codex 的那个 id。完整流程见[中断与恢复会话](/zh/guides/session-recovery/#从终端接管会话)。
+
+## 常见问题
+
+- **找不到 `codex`**：确认 npm 全局可执行目录在 `PATH` 中，然后重新运行安装脚本。
+- **`chorus_checkin` 返回 `401`**：更新 API 密钥，并重新运行 `chorus login`。
+- **插件或钩子未启用**：在 `/plugins` 和 `/hooks` 中检查状态，然后重新启动 Codex。
+- **在线智能体离线**：运行 `chorus daemon status` 和 `chorus daemon logs`；必要时执行 `chorus daemon restart`。

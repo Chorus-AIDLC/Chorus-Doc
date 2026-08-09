@@ -1,0 +1,135 @@
+---
+title: 管理后台服务
+description: 为 Claude Code、Codex 或 Kiro 配置工作目录，并让智能体稳定在线。
+docsLocale: zh
+route: /zh/guides/daemon-operations/
+sidebar:
+  order: 10
+---
+
+## 选择运行方式
+
+`chorus daemon` 会把本机的 Claude Code、Codex 或 Kiro 连接到 Chorus。首次接入时，建议先在前台运行，确认登录、运行后端和工作目录都正确：
+
+```sh
+chorus daemon --agent claude-code --cwd /home/demo/workspace --chorus-only
+```
+
+前台运行便于直接查看错误，也可以随时按 `Ctrl+C` 停止。确认正常后，再安装为 Linux 用户服务。
+
+## 配置工作目录
+
+每个 `--cwd` 参数都会注册一个可供 Chorus 选择的工作目录：
+
+```sh
+chorus daemon \
+  --agent claude-code \
+  --cwd /home/demo/workspace \
+  --cwd /home/demo/workspace/service \
+  --chorus-only
+```
+
+只添加智能体确实需要访问的目录。若希望用户能在某个目录树中选择尚未注册的子目录，可另外设置浏览根目录：
+
+```sh
+chorus daemon --browse-root /home/demo/workspace
+```
+
+浏览根目录不会自动把所有子目录注册为连接。项目中已经固定的主机和工作目录会继续用于后续任务与会话，除非用户明确更改。
+
+为项目的智能体[固定工作目录](/zh/guides/create-a-project/)时，该路径必须是本 daemon 所服务的目录之一，请把它加入本 daemon 的 `cwds` 集合，固定的目录才能解析为在线连接。
+
+:::caution[工作目录决定智能体能访问什么]
+远程工作会在选定目录中运行，可能读取和修改其中的文件。不要为了方便把主目录或包含敏感资料的上级目录设为浏览根目录。
+:::
+
+## 配置 `daemon.json`
+
+daemon 的设置都读自 `~/.chorus/daemon.json`，一个扁平的 JSON 文件，同时保存智能体凭据和运行选项。该文件以 `0600` 权限（仅所有者可读写）写入，采用先写临时文件再原子重命名的方式，因此写入过程中崩溃也不会留下被截断的文件。文件路径固定为 `~/.chorus/daemon.json`（从主目录解析而来），没有用于改变文件位置的环境变量。
+
+### 字段
+
+| 字段 | 类型 | 含义 |
+| --- | --- | --- |
+| `url` | string | Chorus 服务器 URL。 |
+| `apiKey` | string | 智能体 API 密钥（`cho_…`）。 |
+| `agentUuid` | string | 已认证的智能体 UUID（仅供参考）。 |
+| `agentName` | string | 已认证的智能体名称（仅供参考）。 |
+| `cwds` | string[] | 本 daemon 服务的工作目录。每个路径都是一个独立的在线连接。 |
+| `browseRoots` | string[] | 向远程工作目录发现开放的根目录。浏览根目录不会创建连接。 |
+| `agent` | string | 要唤起的本地运行后端：`"claude-code"`、`"codex"` 或 `"kiro"`。 |
+| `sigintTimeoutMs` | number | 收到 `SIGINT` 后强制终止已唤起智能体前的宽限时间（毫秒）。默认 `10000`。 |
+
+执行 `chorus login` 加 `chorus daemon install` 后的最简文件：
+
+```json
+{
+  "url": "https://chorus.example.com",
+  "apiKey": "cho_REDACTED",
+  "agentUuid": "8a1c…",
+  "agentName": "Build Agent",
+  "cwds": ["/home/demo/work/project-a"],
+  "browseRoots": ["/home/demo/work"],
+  "agent": "claude-code",
+  "sigintTimeoutMs": 10000
+}
+```
+
+### 文件如何创建
+
+- `chorus login` 校验 URL 和密钥后，写入 `url`、`apiKey`、`agentUuid` 和 `agentName`。
+- `chorus daemon install` 会额外写入 `cwds`、`browseRoots` 和 `agent`（当这些项尚未设置时，会提示输入所服务的目录和运行后端）。
+- 首次在终端运行 `chorus daemon` 时，会以交互方式补全缺失的凭据并写入。
+
+### 文件如何更新
+
+每个写入方都执行**浅合并**：新字段合并到磁盘上已有内容之上，无关字段予以保留。重新运行 `chorus login` 会刷新凭据，而不会清除你的 `cwds`、`agent` 或 `sigintTimeoutMs`；重新运行 `chorus daemon install` 会更新所服务的目录集合，而不会丢弃凭据。缺失或损坏的文件会被当作空对象处理，因此重新登录始终能生成有效文件，而不会失败。
+
+### 字段、命令行参数与环境变量
+
+每个选项都可通过三种方式提供。优先级为命令行参数，其次是环境变量，最后是 `daemon.json`，因此一次性的参数或环境变量覆盖无需写入文件：
+
+| 关注点 | `daemon.json` 字段 | 命令行参数 | 环境变量 |
+| --- | --- | --- | --- |
+| 服务器 URL | `url` | `--url` | `CHORUS_URL` |
+| API 密钥 | `apiKey` | `--api-key` | `CHORUS_API_KEY` |
+| 工作目录 | `cwds` | `--cwd`（可重复） | `CHORUS_DAEMON_CWDS` |
+| 浏览根目录 | `browseRoots` | `--browse-root`（可重复） | `CHORUS_DAEMON_BROWSE_ROOTS` |
+| 运行后端 | `agent` | `--agent` | `CHORUS_AGENT` |
+| SIGINT 宽限 | `sigintTimeoutMs` | `--sigint-timeout` | `CHORUS_DAEMON_SIGINT_TIMEOUT` |
+| 权限模式 | *（不持久化）* | `--yolo` / `--chorus-only` | `CHORUS_YOLO` / `CHORUS_CHORUS_ONLY` |
+
+权限模式特意不保存到 `daemon.json`。请在启动时传入 `--chorus-only`（或设置 `CHORUS_CHORUS_ONLY=1`）；安装为服务时，`--chorus-only` 会被写入服务单元，而不是文件。
+
+## 安装 Linux 用户服务
+
+在 Linux 上，可让 Chorus 自动创建并启动用户级 systemd 服务：
+
+```sh
+chorus daemon install --agent claude-code --cwd /home/demo/workspace --chorus-only
+chorus daemon status
+```
+
+常用管理命令：
+
+```sh
+chorus daemon logs
+chorus daemon restart
+chorus daemon uninstall
+```
+
+更改登录信息、运行后端或工作目录后，请重启服务。需要让服务在用户退出登录后继续运行时，请先确认系统策略允许，再由系统管理员配置用户驻留。
+
+:::note[为什么凭据要存进文件]
+`systemd --user` 单元在干净的启动环境中运行，**不会**继承你在 shell 中导出的 `CHORUS_URL` / `CHORUS_API_KEY`。因此 `chorus daemon install` 会在写入服务单元之前，先解析、校验凭据并将其持久化到 `~/.chorus/daemon.json`（`0600`）。服务单元既不引用文件路径，也不引用凭据，它只设置 `HOME`，让 daemon 在启动时能定位到 `~/.chorus/daemon.json`。所服务的 `cwds` 和所选的 `agent` 也存在同一个文件中；只有 `--chorus-only` 会写入服务单元。
+:::
+
+:::caution[确认运行权限]
+不使用 `--chorus-only` 时，后台智能体可以调用所选平台提供的完整工具，包括执行终端命令。仅在受控主机和可信代码目录中启用这种模式。
+:::
+
+## macOS 与 Windows
+
+在 macOS 和 Windows 上，建议以前台方式运行 `chorus daemon`。`chorus daemon install` 会输出可供检查的 launchd 或任务计划程序模板，但不会直接完成系统服务安装。
+
+服务在线后，可继续阅读[从 Chorus 发起远程工作](/zh/guides/remote-control/)；运行异常时，请查看[排查智能体连接故障](/zh/guides/troubleshooting/)。

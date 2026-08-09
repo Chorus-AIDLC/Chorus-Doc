@@ -1,0 +1,125 @@
+---
+title: 프로덕션에서 배포
+description: 글로벌 npm 패키지에서 외부 PostgreSQL과 Redis에 연결해 Chorus를 실행하거나, 함께 제공되는 AWS CDK 스택을 프로비저닝합니다.
+docsLocale: ko
+route: /ko/guides/deploy-production/
+sidebar:
+  order: 22
+---
+
+이 가이드는 두 가지 프로덕션 경로를 다룹니다. 글로벌 npm 패키지를 당신의 PostgreSQL과 Redis에 연결해 실행하는 방법, 그리고 리포지토리의 설치 프로그램으로 함께 제공되는 AWS 스택을 프로비저닝하는 방법입니다. 단일 머신 시험에는 대신 [시작하기](/ko/guides/getting-started/)를 사용하세요. 컨테이너 배포는 [Docker로 배포](/ko/guides/deploy-docker/)를 참고하세요. 부트스트랩 자격 증명, 싱글 사인온, 안전한 업그레이드는 [셀프 호스팅 Chorus 운영하기](/ko/guides/deploy-operations/)에서 다룹니다.
+
+## 외부 PostgreSQL에 연결해 글로벌 패키지 실행하기
+
+웹 애플리케이션을 실행할 호스트에 Chorus 명령을 글로벌로 설치합니다.
+
+```sh
+npm install --global @chorus-aidlc/chorus
+```
+
+`DATABASE_URL`로 기존 PostgreSQL 데이터베이스를 Chorus에 가리키고, 필요한 인증과 비밀 변수를 제공한 다음 시작합니다.
+
+```sh
+DATABASE_URL='postgresql://chorus:password@db.internal:5432/chorus' \
+NEXTAUTH_SECRET='a-long-random-string' \
+SUPER_ADMIN_EMAIL='admin@example.com' \
+SUPER_ADMIN_PASSWORD_HASH='$2b$10$...' \
+chorus
+```
+
+시작 시 Chorus는 보류 중인 데이터베이스 마이그레이션을 자동으로 적용하고(`prisma migrate deploy`, `db:migrate` 스크립트로 노출됨), 그런 다음 웹 애플리케이션을 `8637` 포트에서 제공합니다. 데이터베이스는 이미 존재하고 도달할 수 있어야 합니다. 이 경로에서 Chorus는 당신을 위해 서버를 만들어 주지 않습니다.
+
+Chorus가 프로덕션 실행에서 읽는 변수:
+
+<div class="table-scroll" role="region" aria-label="프로덕션 환경 변수" tabindex="0">
+
+| 변수 | 필수 | 설명 |
+| --- | --- | --- |
+| `DATABASE_URL` | 예 | PostgreSQL 연결 문자열, `postgresql://user:password@host:port/dbname`. |
+| `NEXTAUTH_SECRET` | 예 | 세션 토큰에 서명하는 데 사용하는 비밀 키. 무작위 값을 생성하세요. 예: `openssl rand -base64 32`. |
+| `SUPER_ADMIN_EMAIL` | 예 | `/admin` SuperAdmin 패널을 부트스트랩하는 이메일. |
+| `SUPER_ADMIN_PASSWORD_HASH` | 예 | SuperAdmin 비밀번호의 bcrypt 해시. |
+| `DEFAULT_USER` | 선택 | 첫 접근을 위한 내장 이메일/비밀번호 로그인을 활성화합니다. |
+| `DEFAULT_PASSWORD` | 선택 | 내장 로그인의 비밀번호. |
+| `REDIS_URL` | 선택 | Redis 연결 문자열. 인스턴스를 두 개 이상 실행하면 필수입니다(아래 참고). |
+
+</div>
+
+이 부트스트랩 자격 증명의 작동 방식, bcrypt 해시 생성 방법, 그리고 내장 로그인을 끄는 방법은 [셀프 호스팅 Chorus 운영하기](/ko/guides/deploy-operations/)를 참고하세요.
+
+:::caution[비밀 정보를 신중히 다루세요]
+`NEXTAUTH_SECRET`과 SuperAdmin 자격 증명은 완전한 접근 권한을 부여합니다. 이들을 셸 히스토리와 소스 관리에서 멀리 두고, 공유 호스트에서 인라인으로 입력하는 대신 프로세스 매니저, systemd 유닛 또는 비밀 저장소를 통해 제공하세요.
+:::
+
+## 인스턴스를 두 개 이상 실행하기
+
+Chorus는 Redis를 통해 인스턴스 간에 실시간 업데이트(SSE 이벤트 스트림)를 전파합니다. `REDIS_URL`을 공유 Redis로 설정해 모든 인스턴스가 같은 이벤트를 게시하고 수신하도록 하세요.
+
+```sh
+REDIS_URL='redis://default:password@redis.internal:6379'
+```
+
+**인스턴스 간 이벤트 전파에는 Redis가 필수입니다.** `REDIS_URL`이 없으면 Chorus는 단일 프로세스로 범위가 한정된 메모리 내 이벤트 버스로 폴백합니다. 한 인스턴스에서 이루어진 업데이트는 다른 인스턴스에 결코 도달하지 않습니다. 단일 인스턴스 배포는 그 메모리 내 폴백으로 Redis 없이 실행할 수 있지만, 인스턴스가 두 개 이상인 배포는 공유 Redis를 반드시 구성해야 합니다.
+
+## AWS CDK 스택 배포하기
+
+Chorus는 `packages/chorus-cdk` 아래에 AWS CDK 스택을 함께 담고 있으며, 그것을 대화식으로 구동하는 리포지토리 루트의 `install.sh`를 제공합니다. 이 스택은 관리형 PostgreSQL과 Redis를 갖춘, HTTPS로 앞단을 두른 완전한 배포를 세웁니다.
+
+### 전제 조건
+
+`install.sh`는 먼저 `aws`, `node`, `pnpm` 명령을 사용할 수 있는지, 그리고 AWS 자격 증명이 유효한지(`aws sts get-caller-identity`를 호출합니다) 확인합니다. 실행하기 전에 `aws configure` 또는 `AWS_PROFILE`로 자격 증명을 구성하고, 배포 리전에 [AWS Certificate Manager](https://aws.amazon.com/certificate-manager/) 인증서를 준비해 두세요.
+
+### 설치 프로그램 실행하기
+
+리포지토리 루트에서:
+
+```sh
+./install.sh
+```
+
+설치 프로그램은 배포 구성을 묻습니다.
+
+<div class="table-scroll" role="region" aria-label="install.sh 대화 프롬프트" tabindex="0">
+
+| 프롬프트 | 필수 | 참고 |
+| --- | --- | --- |
+| Stack name | 아니요 | 기본값 `Chorus`. |
+| ACM Certificate ARN | 예 | `arn:aws:acm:`로 시작해야 합니다. 로드 밸런서가 이를 사용해 HTTPS를 종료합니다. |
+| Custom domain | 아니요 | 예: `chorus.example.com`. 설정하면 그 도메인에 대한 호스트 규칙을 추가합니다. |
+| Super admin email | 예 | `/admin` SuperAdmin 계정을 부트스트랩합니다. |
+| Super admin password | 예 | 최소 8자. synth 시점에 bcrypt로 해시되며, 평문은 템플릿에 저장되지 않습니다. |
+| NextAuth secret | 아니요 | 비워 두면 자동으로 생성됩니다. |
+
+</div>
+
+답변을 모두 수집하면, `install.sh`는 CDK 패키지를 설치하고 빌드하며, CDK 환경을 부트스트랩하고, 스택을 배포합니다. 또한 당신의 답변을 담은 재실행 가능한 `default_deploy.sh`를 기록하므로, 이후 배포에서는 다시 묻지 않습니다.
+
+### 스택이 프로비저닝하는 것
+
+이 스택(`packages/chorus-cdk/lib/{chorus-stack,service,database,cache}.ts`)은 다음을 만듭니다.
+
+<div class="table-scroll" role="region" aria-label="CDK 스택 구성 요소" tabindex="0">
+
+| 구성 요소 | 무엇인가 | 주요 구성 |
+| --- | --- | --- |
+| Application Load Balancer | 당신의 ACM 인증서로 443 포트에서 HTTPS를 종료하는, 인터넷을 향한 진입점. | 서비스로 전달합니다. 커스텀 도메인이 설정되면 호스트 규칙이 그 도메인을 라우팅합니다. 유휴 타임아웃 60분. |
+| ECS Fargate 서비스 | 프라이빗 서브넷에서 Chorus 컨테이너를 실행합니다. | 원하는 개수 2, 1024 CPU 단위 / 2048 MiB, 자동 롤백을 갖춘 배포 서킷 브레이커. |
+| Aurora Serverless v2(PostgreSQL) | 관리형 PostgreSQL 클러스터. | 암호화 스토리지. 자격 증명은 자동 생성되어 Secrets Manager에 저장. 백업 보존 1일. |
+| ElastiCache Serverless(Redis) | 인스턴스 간 이벤트를 위한 관리형 Redis. | RBAC 사용자. 비밀번호는 Secrets Manager에 저장. |
+| Secrets Manager | 생성된 데이터베이스와 Redis 자격 증명, 그리고 앱 비밀 정보를 보관합니다. | 런타임에 ECS 작업에 주입됩니다. |
+
+</div>
+
+### 배포, 업데이트, 파기
+
+<div class="table-scroll" role="region" aria-label="배포 명령" tabindex="0">
+
+| 작업 | 명령 |
+| --- | --- |
+| 첫 배포 | `./install.sh` |
+| 재배포 또는 업데이트 | `./default_deploy.sh`(또는 `pnpm cdk:deploy`) |
+| 파기 | `pnpm cdk:destroy` |
+
+</div>
+
+`packages/chorus-cdk`가 이 스택의 표준 출처입니다. 정확한 리소스 정의가 필요하거나 용량, 보존, 네트워킹을 조정하고 싶을 때는 그곳을 참고하세요.

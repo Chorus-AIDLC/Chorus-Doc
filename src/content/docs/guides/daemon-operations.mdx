@@ -1,0 +1,177 @@
+---
+title: Operate the Chorus daemon
+description: Keep an authenticated agent runtime available and manage its working directories.
+docsLocale: en
+route: /guides/daemon-operations/
+sidebar:
+  order: 10
+---
+
+Use this guide after you have verified a foreground daemon connection. The commands apply
+to the supported resident backends: Claude Code, Codex, and Kiro.
+
+## Choose what the daemon can access
+
+Each `--cwd` registers one working directory as a separate target in Chorus:
+
+```sh
+chorus daemon \
+  --agent claude-code \
+  --cwd ~/work/project-a \
+  --cwd ~/work/project-b \
+  --chorus-only
+```
+
+With no `--cwd`, Chorus uses the directory where you start the command. Use repeatable
+`--browse-root` options only when users need to choose directories below a broader root.
+A browse root allows discovery; it does not register every directory as an online
+connection.
+
+When you [fix a working directory](/guides/create-a-project/) for a project's agent, that
+path must be one the daemon serves — include it in this daemon's `cwds` set so the fixed
+directory resolves to an online connection.
+
+:::caution[Limit filesystem access]
+Register only directories the agent is allowed to read and modify. A remotely started
+agent receives the filesystem and tool permissions of the user running the daemon.
+:::
+
+## Configure `daemon.json`
+
+The daemon reads its settings from `~/.chorus/daemon.json` — a single flat JSON file that
+holds both the agent credential and the runtime options. It is written with `0600`
+(owner read/write only) using an atomic temp-file-plus-rename, so a crash mid-write never
+leaves a truncated file. The path is fixed at `~/.chorus/daemon.json` (resolved from your
+home directory); there is no environment variable to relocate the file itself.
+
+### Fields
+
+| Field | Type | Meaning |
+| --- | --- | --- |
+| `url` | string | Chorus server URL. |
+| `apiKey` | string | Agent API key (`cho_…`). |
+| `agentUuid` | string | Authenticated agent UUID (informational). |
+| `agentName` | string | Authenticated agent name (informational). |
+| `cwds` | string[] | Working directories this daemon serves. Each path is one independent online connection. |
+| `browseRoots` | string[] | Roots exposed to remote working-directory discovery. A browse root does not create a connection. |
+| `agent` | string | Local backend to wake: `"claude-code"`, `"codex"`, or `"kiro"`. |
+| `sigintTimeoutMs` | number | Grace window (ms) after `SIGINT` before a woken agent is force-killed. Default `10000`. |
+
+A minimal file after `chorus login` plus `chorus daemon install`:
+
+```json
+{
+  "url": "https://chorus.example.com",
+  "apiKey": "cho_REDACTED",
+  "agentUuid": "8a1c…",
+  "agentName": "Build Agent",
+  "cwds": ["/home/demo/work/project-a"],
+  "browseRoots": ["/home/demo/work"],
+  "agent": "claude-code",
+  "sigintTimeoutMs": 10000
+}
+```
+
+### How the file is created
+
+- `chorus login` validates your URL and key, then writes `url`, `apiKey`, `agentUuid`,
+  and `agentName`.
+- `chorus daemon install` additionally writes `cwds`, `browseRoots`, and `agent` (it
+  prompts for the served directories and backend when they are not already set).
+- A first `chorus daemon` run on a terminal completes any missing credentials
+  interactively and writes them.
+
+### How the file is updated
+
+Every writer performs a **shallow merge**: the new fields are merged over whatever is
+already on disk, and unrelated fields are preserved. Re-running `chorus login` refreshes
+the credentials without clearing your `cwds`, `agent`, or `sigintTimeoutMs`; re-running
+`chorus daemon install` updates the served set without discarding the credential. A
+missing or corrupt file is treated as an empty object, so a re-login always produces a
+valid file rather than failing.
+
+### Field, flag, and environment variable
+
+Each option can be supplied three ways. Precedence is flag, then environment variable,
+then `daemon.json`, so a one-off flag or env override never has to be written to the file:
+
+| Concern | `daemon.json` field | CLI flag | Environment variable |
+| --- | --- | --- | --- |
+| Server URL | `url` | `--url` | `CHORUS_URL` |
+| API key | `apiKey` | `--api-key` | `CHORUS_API_KEY` |
+| Working directories | `cwds` | `--cwd` (repeatable) | `CHORUS_DAEMON_CWDS` |
+| Browse roots | `browseRoots` | `--browse-root` (repeatable) | `CHORUS_DAEMON_BROWSE_ROOTS` |
+| Backend | `agent` | `--agent` | `CHORUS_AGENT` |
+| SIGINT grace | `sigintTimeoutMs` | `--sigint-timeout` | `CHORUS_DAEMON_SIGINT_TIMEOUT` |
+| Permission mode | *(not persisted)* | `--yolo` / `--chorus-only` | `CHORUS_YOLO` / `CHORUS_CHORUS_ONLY` |
+
+The permission mode is deliberately not stored in `daemon.json`. Pass `--chorus-only`
+(or set `CHORUS_CHORUS_ONLY=1`) at start time; the installed service captures
+`--chorus-only` in its unit, not in the file.
+
+## Install the Linux service
+
+On Linux, install the verified configuration as a user service:
+
+```sh
+chorus daemon install \
+  --agent claude-code \
+  --cwd ~/work/project-a \
+  --chorus-only
+```
+
+The installer starts the service immediately and configures it to start when the user
+logs in. Run `chorus login` first so the service can read the saved credential.
+
+:::note[Why credentials live in the file]
+A `systemd --user` unit starts in a clean boot environment and does **not** inherit the
+`CHORUS_URL` / `CHORUS_API_KEY` you export in your shell. So `chorus daemon install`
+resolves, validates, and persists your credentials into `~/.chorus/daemon.json` (`0600`)
+before writing the unit. The unit references neither the file path nor the credentials —
+it only sets `HOME` so the daemon can locate `~/.chorus/daemon.json` at boot. The served
+`cwds` and chosen `agent` live in the same file; only `--chorus-only` is captured in the
+unit.
+:::
+
+Use these commands for routine operation:
+
+```sh
+chorus daemon status
+chorus daemon logs
+chorus daemon restart
+chorus daemon stop
+chorus daemon uninstall
+```
+
+After changing credentials, working directories, backend, or permission mode, reinstall
+or restart the service and verify the connection in **Settings → Agents**.
+
+:::note[macOS and Windows]
+On macOS and Windows, `chorus daemon install` prints a service template and manual setup
+steps. Use foreground `chorus daemon` as the baseline when testing a connection.
+:::
+
+## Run without a service
+
+For a short-lived connection, keep `chorus daemon` in the foreground. Detached mode is
+also available:
+
+```sh
+chorus daemon -d --agent codex --cwd ~/work/project-a --chorus-only
+```
+
+Manage it with the same `status`, `logs`, `restart`, and `stop` commands. Do not combine
+detached mode with a separately written process supervisor.
+
+## Check operating health
+
+Use both command-line and web status:
+
+1. Run `chorus daemon status`.
+2. Review recent output with `chorus daemon logs`.
+3. In **Settings → Agents**, confirm each expected working directory is **Online**.
+4. Start a small test session and confirm it targets the intended directory.
+
+Logs can contain paths, prompts, and command output. Remove sensitive values before
+sharing them. For failures, continue with
+[Troubleshoot agent connections](/guides/troubleshooting/).

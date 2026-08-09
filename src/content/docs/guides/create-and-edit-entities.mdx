@@ -1,0 +1,107 @@
+---
+title: Create and edit entities by hand
+description: The manual entry points for ideas, tasks, and proposals — create, edit, move, reparent, and delete — that complement the agent-driven "agent proposes, human verifies" flow.
+docsLocale: en
+route: /guides/create-and-edit-entities/
+---
+
+import Screenshot from '../../../components/Screenshot.astro';
+
+Chorus normally runs on the [Reversed Conversation](/guides/ai-dlc-workflow/): an agent
+proposes and you verify. But every entity also has a **manual entry point** — you can author
+an idea, a task, or a whole proposal by hand, and edit, move, reparent, or delete what already
+exists. This guide covers those human-authoring surfaces; for the lifecycle each entity then
+follows, it links out to the stage guides rather than repeating them.
+
+## Create an idea by hand
+
+Ideas live in the tracker on the project **Overview**. Select **New Idea** to open a dialog
+with two ways to capture one:
+
+- **Fill a form** — give the idea a title and an optional description. A **Make this a theme**
+  option turns it into a grouping theme (which moves forward by deriving child ideas) instead
+  of a single deliverable.
+- **Describe to an agent** — talk the idea through in a chat composer and let an online agent
+  shape it with you. This needs an agent online, so it is unavailable when none is. You can
+  also ask the agent to break a large request into child ideas as you describe it.
+
+<Screenshot
+  src="/images/workspace/new-idea-dialog.webp"
+  alt="New Idea dialog on a project Overview, showing the Fill a form and Describe to an agent tabs and the Make this a theme option"
+  width={1440}
+  height={900}
+  caption="The New Idea dialog lets you fill a form or describe the idea to an agent, and mark it a theme."
+/>
+
+:::note[What the agent does]
+A hand-created idea enters the same pipeline as any other. Once you assign it to an agent, the
+agent runs elaboration and drafts a proposal for your review. See
+[Capture an idea](/guides/capture-an-idea/) for the full flow.
+:::
+
+## Edit, move, or reparent an idea
+
+Open an idea to see its detail panel. From there you can **Edit Idea** (title and description),
+**Delete Idea**, or **Move to project…** to relocate it — the move dialog previews what travels
+with the idea before you confirm.
+
+The panel also manages **lineage** — how ideas relate as parents and children:
+
+- **Set parent** / **Change parent** — attach this idea under another, or move it to a
+  different parent.
+- **Derive new idea** — create a child idea from this one (a full idea with its own
+  elaboration, proposal, and tasks).
+- **Detach (make top-level)** — remove the parent link and return the idea to the top level.
+
+**Make this a theme** switches an idea between a single deliverable and a grouping theme. A
+theme only groups its children and cannot become a proposal on its own — see the
+theme-versus-derived section in [Capture an idea](/guides/capture-an-idea/).
+
+## Create a task by hand (Quick Task)
+
+Most tasks are materialized when you approve a proposal, but you can add one directly — a
+**Quick Task** — when a piece of work does not need the full idea-to-proposal cycle. On the
+**Tasks** board, select **New Task** and give it a title and description, a **Priority**, an
+effort estimate, **Acceptance Criteria** (the checklist a reviewer verifies against), and any
+**Dependencies** (use **Add Dependency** to require other tasks be done first). A hand-created
+task starts open and unassigned, ready to be claimed or assigned like a materialized one.
+
+:::note[What the agent does]
+A Quick Task is a normal task once created — assign it to an agent and, when its dependencies
+are met, the agent claims it, works it, and submits it for your verification. See
+[Run tasks](/guides/run-tasks/) for claiming, assigning, and the status path.
+:::
+
+## Edit a task and its dependencies
+
+Open a task to reach the same panel, now titled **Edit Task**. Change any field and **Save
+Changes**, or **Delete Task** to remove it. The panel also drives the status path with **Start
+Work**, **Submit for Review**, **Mark as Verified**, and **Assign**.
+
+Dependencies read in two directions: **Depends on** lists the upstream tasks this one waits on,
+and **Blocked by this** lists the downstream tasks waiting on it. A task can only start once
+everything it depends on is done. On the board, moving a still-blocked card raises a guard; you
+can override it with **Force Move** when you know the order is safe.
+
+## Create a proposal by hand
+
+Proposals are normally written by a PM agent, but you can author one yourself. Select **Create
+Proposal**, give it a title, and pick the source idea(s) it delivers — only ideas you have
+claimed or been assigned are selectable, so claim one first if the list is empty. Creating the
+proposal opens it for editing, where you assemble the plan: **Add Document** for each PRD,
+design, or spec, and **Add Task** for each unit of work (with its acceptance criteria and
+dependencies). When the plan is complete, **Submit for Review** sends it into the same approval
+gate as an agent-authored proposal.
+
+:::note[What the agent does]
+Whether an agent or you authored a proposal, approval is the decision gate: reviewing and
+approving the document and task drafts materializes them into real Documents and open Tasks.
+See [Review a proposal](/guides/review-a-proposal/) for what approval creates.
+:::
+
+## Next
+
+These are the manual entry points; the entities they create follow the standard lifecycle.
+Continue with [Capture an idea](/guides/capture-an-idea/),
+[Review a proposal](/guides/review-a-proposal/), or [Run tasks](/guides/run-tasks/). For the
+full state model, see the [lifecycle reference](/reference/lifecycle/).

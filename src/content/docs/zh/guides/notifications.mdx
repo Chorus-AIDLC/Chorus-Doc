@@ -1,0 +1,45 @@
+---
+title: 通知
+description: 使用通知铃铛与弹窗，并在“通知偏好”卡片里调整哪些事件会通知你。
+docsLocale: zh
+route: /zh/guides/notifications/
+sidebar:
+  order: 3
+---
+
+import Screenshot from '../../../../components/Screenshot.astro';
+
+通知会在你关心的事情发生时告诉你，一个任务分配给了你、一份提案获批、有人 @ 了你。本页讲的是你如何*使用*通知界面：铃铛和它的弹窗，以及决定哪些事件会通知到你的偏好设置。至于每条通知*代表什么*、由哪个动作触发，请参阅[协作参考](/zh/reference/collaboration/)，完整的分类表在那里，本页不再重复。
+
+## 通知铃铛
+
+**通知铃铛**位于侧边栏顶部（移动端在页头），带一个显示未读计数的徽标。点击它会打开通知弹窗，你可以在其中：
+
+- 用 **Mark all as read**（全部标为已读）一次清空所有未读。
+- 在 **Unread**（未读）和 **All**（全部）两个标签页之间切换。
+- 浏览列表，每一行显示所属项目、相关实体、是谁在何时做的。
+
+点击某一行会把它标为已读，并打开相关的想法、提案、任务或文档，让你直接落到需要你处理的工作上。**Notification
+Preferences**（通知偏好）链接会带你到设置页去调整你接收的内容。
+
+:::note[智能体在做什么]
+许多通知都来自智能体的活动，智能体认领了一个想法、把任务提交验证，或抛出一轮需求细化。从通知里打开相关实体，往往就是你接上话头并回应的方式。关于哪些动作会唤醒智能体、哪些只是通知你，请参阅[协作参考](/zh/reference/collaboration/)和[智能体平台参考](/zh/reference/agents/)。
+:::
+
+## 通知偏好
+
+你在 **Settings**（设置）页面的 **Notification Preferences**（通知偏好）卡片里控制哪些事件会通知你。开关按事件类型分组，包括 **Task**（任务）、**Proposal**（提案）、**Idea**（想法）、**Elaboration**（细化）、**Comment**（评论）、**Mention**（提及），你可以关掉一整类，也可以只关其中的单个事件。
+
+<Screenshot
+  src="/images/workspace/notification-preferences.webp"
+  alt="设置页的 Notification Preferences 卡片，开关按 Task、Proposal、Idea、Elaboration、Comment、Mention 事件分组"
+  width={1440}
+  height={900}
+  caption="通知偏好按事件类型分组；每一类默认开启，改动自动保存。"
+/>
+
+所有开关默认开启，改动会自动保存。关掉某一类，Chorus 就不再就此通知你，活动照常发生，只是不再告诉你。你只会看到来自你自己工作区的通知。
+
+## 下一步
+
+要弄清每个类别代表什么、由哪个动作触发（评论、@提及，以及想法、提案、任务和文档上的各类活动），请阅读[协作参考](/zh/reference/collaboration/)。

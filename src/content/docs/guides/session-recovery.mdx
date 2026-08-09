@@ -1,0 +1,90 @@
+---
+title: Interrupt and resume a session
+description: Stop an active agent safely, inspect partial work, and continue the same session.
+docsLocale: en
+route: /guides/session-recovery/
+sidebar:
+  order: 12
+---
+
+import Screenshot from '../../../components/Screenshot.astro';
+
+Use these controls when an agent is taking the wrong approach, waiting indefinitely, or
+needs additional direction. They act on an existing conversation; use
+[Start work on a remote agent](/guides/remote-control/) to create a new one.
+
+## Interrupt active work
+
+1. Open the running conversation.
+2. Review the latest output to confirm an interrupt is necessary.
+3. Select **Interrupt**.
+4. Wait for the conversation to report that execution has stopped.
+
+<Screenshot
+  src="/images/agent-operations/session-control.webp"
+  alt="Running agent conversation showing the active turn, elapsed time, and Interrupt control"
+  width={1440}
+  height={900}
+  caption="A running conversation shows its active turn, elapsed time, and Interrupt control."
+/>
+
+Interrupt first asks the agent process to stop gracefully. If it does not stop within the
+configured timeout, the daemon ends the process.
+
+:::caution[An interrupt does not undo work]
+Files, commands, comments, and external actions completed before the interrupt remain in
+place. Review the partial result before starting another execution.
+:::
+
+## Inspect the partial result
+
+Before resuming:
+
+- read the final agent output and error details;
+- inspect changed files and any running processes;
+- decide whether to continue, provide a corrected instruction, or discard the partial
+  changes using your normal version-control workflow.
+
+Avoid starting a second session against the same directory until you understand what the
+first session changed.
+
+## Resume the conversation
+
+When the conversation is interrupted or recoverable after a crash:
+
+1. Restore the original daemon connection if it is offline.
+2. Open the same conversation.
+3. Add any correction or missing context.
+4. Select **Resume**.
+
+Resume uses the original agent connection and working directory. It does not migrate the
+session to another machine or directory. If the original runtime cannot return, start a
+new session deliberately and include the relevant context from the previous attempt.
+
+For repeated failures, use [Troubleshoot agent connections](/guides/troubleshooting/).
+
+## Take over from a terminal
+
+You can continue a conversation from your own terminal instead of the in-UI **Resume**
+button. Open the conversation and select **Copy session ID** in the transcript header. This
+copies the backend-owned resume id — the exact id the daemon hands to the agent CLI when it
+resumes — so a manual resume rejoins the same conversation rather than starting a fresh one.
+
+{/* Screenshot surface: transcript header with the Copy session ID control. */}
+
+From the working directory the conversation ran in, pass the copied id to your backend's
+resume command:
+
+- **Claude Code** — `claude --resume <sessionId>`
+- **Codex** — `codex exec resume <thread_id>`
+- **Kiro** — `kiro-cli chat --resume-id <sessionId>`
+
+Each backend owns its own id format, so the copied value is whatever that backend accepts.
+See your platform's reference page for the exact command: [Claude Code](/reference/agents/claude-code/),
+[Codex](/reference/agents/codex/), and [Kiro](/reference/agents/kiro/).
+
+Chorus keeps one canonical session per idea. When an idea is worked on directly, its session
+id is the idea's own UUID (`sessionId === directIdeaUuid`), and a wake that moves to a
+different working directory re-points that single session instead of forking a new one — so
+there is always exactly one conversation to take over, wherever it last ran. See the
+[Online agents overview](/guides/online-agents-overview/) for the full model.

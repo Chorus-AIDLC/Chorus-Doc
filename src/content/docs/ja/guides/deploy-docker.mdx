@@ -1,0 +1,246 @@
+---
+title: Docker でデプロイ
+description: 公開されている chorusaidlc/chorus-app イメージから Chorus を実行する。スタンドアロンまたは本番の Compose、docker run、そして環境変数リファレンス。
+docsLocale: ja
+route: /ja/guides/deploy-docker/
+sidebar:
+  order: 21
+---
+
+Chorus は公式 Docker イメージ **`chorusaidlc/chorus-app`** を提供しています。このガイドでは、二つの Compose 形態（スタンドアロン（組み込みデータベース）と本番（外部 PostgreSQL + Redis））、既存のデータベースに対する素の `docker run`、完全な環境変数リファレンス、そしてコンテナが起動時に何をするかを示します。
+
+まずイメージをプルします。
+
+```bash
+docker pull chorusaidlc/chorus-app:latest
+```
+
+スタンドアロン形態と本番形態のどちらを選ぶかについては、[デプロイ概要](/ja/guides/deployment-overview/)を参照してください。
+
+## スタンドアロン（組み込みデータベース）
+
+外部データベースは不要です。イメージは [PGlite](https://pglite.dev)（組み込み PostgreSQL）を同梱しており、すべてを自動的に起動します。データは Docker ボリュームに保存され、コンテナの再起動をまたいで永続します。
+
+`docker-compose.local.yml` を作成します。
+
+```yaml
+# Standalone Chorus — embedded PGlite, no external PostgreSQL or Redis
+services:
+  app:
+    image: chorusaidlc/chorus-app:latest
+    ports:
+      - "8637:8637"
+    environment:
+      # No DATABASE_URL — entrypoint auto-starts embedded PGlite
+      - REDIS_URL=
+      - NEXTAUTH_SECRET=${NEXTAUTH_SECRET:-chorus-local-secret}
+      - COOKIE_SECURE=false
+      - DEFAULT_USER=${DEFAULT_USER:-admin@example.com}
+      - DEFAULT_PASSWORD=${DEFAULT_PASSWORD:-changeme}
+    volumes:
+      - chorus-local-data:/app/data
+
+volumes:
+  chorus-local-data:
+```
+
+そして実行します。
+
+```bash
+docker compose -f docker-compose.local.yml up -d
+```
+
+`http://localhost:8637` を開き、`admin@example.com` / `changeme` でログインします（または `DEFAULT_USER` / `DEFAULT_PASSWORD` 環境変数で上書きします）。
+
+スタンドアロンモードでは、コンテナは次のことを行います。
+
+- PGlite を内部ポート（`5433`）で起動し、外部には公開しません。
+- データを `chorus-local-data` Docker ボリュームに保存するため、再起動をまたいで永続します。
+- Redis を無効化します（メモリ内 EventBus にフォールバック。単一インスタンスのみ）。
+- 起動時に Prisma マイグレーションを自動的に実行します。
+
+## 本番（外部 PostgreSQL + Redis）
+
+本番環境向け、特に複数レプリカを伴う場合は、アプリを外部の PostgreSQL と Redis に接続します。`docker-compose.yml` を作成します。
+
+```yaml
+services:
+  app:
+    image: chorusaidlc/chorus-app:latest
+    ports:
+      - "8637:8637"
+    environment:
+      - DATABASE_URL=postgresql://chorus:chorus@db:5432/chorus
+      - REDIS_URL=redis://default:chorus-redis@redis:6379
+      - NEXTAUTH_SECRET=change-me-to-a-random-secret
+      - DEFAULT_USER=admin@example.com
+      - DEFAULT_PASSWORD=your-password
+    depends_on:
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+
+  redis:
+    image: redis:7-alpine
+    command: redis-server --requirepass chorus-redis
+    volumes:
+      - redis-data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "-a", "chorus-redis", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+
+  db:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: chorus
+      POSTGRES_PASSWORD: chorus
+      POSTGRES_DB: chorus
+    volumes:
+      - chorus-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U chorus -d chorus"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+volumes:
+  chorus-data:
+  redis-data:
+```
+
+そして実行します。
+
+```bash
+docker compose up -d
+```
+
+`http://localhost:8637` を開き、`DEFAULT_USER` / `DEFAULT_PASSWORD` に設定した資格情報でログインします。
+
+:::caution[HTTPS とセキュア Cookie]
+上記の Compose ファイルは、HTTP のみのデプロイ（例：内部ネットワークでのテスト）をサポートするために `COOKIE_SECURE=false` を設定しています。`COOKIE_SECURE=false` は信頼できる内部ネットワークでのみ使用してください。この場合、Cookie は暗号化されていない HTTP で送信されます。本番で HTTPS の背後にデプロイするときは、セキュア Cookie を有効にするために `COOKIE_SECURE=true` を設定してください。
+:::
+
+## 既存の PostgreSQL に対して実行する
+
+すでに PostgreSQL と Redis が動作しているなら、コンテナを直接起動します。
+
+```bash
+docker run -d \
+  -p 8637:8637 \
+  -e DATABASE_URL=postgresql://user:pass@your-db-host:5432/chorus \
+  -e REDIS_URL=redis://default:password@your-redis-host:6379 \
+  -e NEXTAUTH_SECRET=change-me-to-a-random-secret \
+  -e COOKIE_SECURE=false \
+  -e DEFAULT_USER=admin@example.com \
+  -e DEFAULT_PASSWORD=your-password \
+  chorusaidlc/chorus-app:latest
+```
+
+## 環境変数
+
+### 必須
+
+<div class="table-scroll" role="region" aria-label="必須の環境変数" tabindex="0">
+
+  | 変数 | 説明 |
+  | --- | --- |
+  | `DATABASE_URL` | PostgreSQL 接続文字列。形式：`postgresql://user:password@host:port/dbname`。代わりに個別の `DB_*` 変数を設定することもできます（下記参照）。**省略した場合**、エントリーポイントは組み込みの PGlite インスタンスを自動的に起動します。 |
+  | `NEXTAUTH_SECRET` | JWT セッショントークンに署名するための秘密鍵。ランダムな文字列を使用してください（例：`openssl rand -base64 32`）。 |
+
+</div>
+
+### データベース（`DATABASE_URL` の代替）
+
+`DATABASE_URL` が設定されていない場合、エントリーポイントは以下の個別変数からそれを組み立てます。
+
+<div class="table-scroll" role="region" aria-label="データベースの環境変数" tabindex="0">
+
+  | 変数 | 説明 |
+  | --- | --- |
+  | `DB_HOST` | PostgreSQL ホスト |
+  | `DB_PORT` | PostgreSQL ポート（デフォルト：`5432`） |
+  | `DB_USERNAME` | PostgreSQL ユーザー名 |
+  | `DB_PASSWORD` | PostgreSQL パスワード |
+  | `DB_NAME` | データベース名 |
+
+</div>
+
+### Redis
+
+<div class="table-scroll" role="region" aria-label="Redis の環境変数" tabindex="0">
+
+  | 変数 | 説明 |
+  | --- | --- |
+  | `REDIS_URL` | 完全な Redis 接続文字列。形式：`redis://username:password@host:port`。個別変数より優先されます。 |
+  | `REDIS_HOST` | Redis ホスト（`REDIS_URL` が設定されていない場合に使用） |
+  | `REDIS_PORT` | Redis ポート（デフォルト：`6379`） |
+  | `REDIS_USERNAME` | Redis ユーザー名（デフォルト：`default`） |
+  | `REDIS_PASSWORD` | Redis パスワード |
+
+</div>
+
+### 身分認証
+
+<div class="table-scroll" role="region" aria-label="身分認証の環境変数" tabindex="0">
+
+  | 変数 | 説明 |
+  | --- | --- |
+  | `DEFAULT_USER` | 組み込みログイン用のメールアドレス（OIDC をバイパスします）。初回ログイン時にユーザーと会社を自動プロビジョニングします。 |
+  | `DEFAULT_PASSWORD` | デフォルトユーザーのパスワード（平文で、実行時に bcrypt で照合します）。 |
+  | `NEXTAUTH_URL` | アプリの対外的なベース URL（デフォルト：`http://localhost:8637`）。リバースプロキシの背後で実行するときに設定します。 |
+  | `COOKIE_SECURE` | HTTP のみのデプロイでセキュア Cookie を無効にするには `"false"` に設定します（docker-compose ではデフォルトで `"false"`）。本番で HTTPS でデプロイするときは `"true"` に設定します。 |
+
+</div>
+
+### ログ
+
+<div class="table-scroll" role="region" aria-label="ログの環境変数" tabindex="0">
+
+  | 変数 | デフォルト | 説明 |
+  | --- | --- | --- |
+  | `LOG_LEVEL` | `info`（本番）/ `debug`（開発） | サーバーの最低ログレベル。受け付ける値：`trace`、`debug`、`info`、`warn`、`error`、`fatal`、`silent`。Prisma のクエリログを抑制するには `info` に設定します。 |
+  | `NEXT_PUBLIC_LOG_LEVEL` | `warn`（本番）/ `debug`（開発） | ブラウザの最低ログレベル。受け付ける値：`debug`、`info`、`warn`、`error`。 |
+
+</div>
+
+本番 Docker イメージは常に JSON を stdout に出力します（CloudWatch / ELK にそのまま対応）。色付きの整形出力はローカル開発時のみ利用できます。
+
+### スーパー管理者
+
+<div class="table-scroll" role="region" aria-label="スーパー管理者の環境変数" tabindex="0">
+
+  | 変数 | 説明 |
+  | --- | --- |
+  | `SUPER_ADMIN_EMAIL` | スーパー管理者アカウントのメール（`/admin` パネルにアクセスできます）。 |
+  | `SUPER_ADMIN_PASSWORD_HASH` | スーパー管理者パスワードの bcrypt ハッシュ。生成方法：`node -e "console.log(require('bcryptjs').hashSync('your-password', 10))"` |
+
+</div>
+
+## 起動時の挙動
+
+コンテナのエントリーポイントは、起動するたびに同じ流れを実行します。
+
+1. `DATABASE_URL` が設定されておらず、`DB_*` 変数も一つも与えられていない場合、エントリーポイントは内部ポート（`5433`）で組み込みの PGlite インスタンスを起動します。外部データベースが**設定されている**ときは、PGlite は起動しません。
+2. `prisma migrate deploy` を実行し、保留中のデータベースマイグレーションを適用します。
+3. データベースがまだ準備できていない場合は、10 秒ごとにリトライします（最大 30 回、およそ 5 分）。
+4. マイグレーションが成功すると、Next.js サーバーが `8637` ポートで起動します。
+
+:::note[マイグレーションは自動的に実行される]
+マイグレーションを自分で実行する必要はありません。保留中のマイグレーションを起動時に適用することはエントリーポイントの一部なので、アップグレードは同じデータベースに対して新しいイメージを起動するだけです。新しいイメージは初回起動時にスキーマをマイグレートしうるため、アップグレード前にはデータベースまたはデータボリュームをバックアップしてください。[運用](/ja/guides/deploy-operations/)を参照してください。
+:::
+
+## イメージの詳細
+
+- **ベースイメージ：** `node:22-alpine`
+- **内部ポート：** `8637`
+- **アーキテクチャ：** `linux/amd64`、`linux/arm64`
+
+## 次のステップ
+
+- **[本番デプロイ](/ja/guides/deploy-production/)**：グローバル npm パッケージから実行する方法と、
+  完全な AWS CDK の手順。
+- **[運用](/ja/guides/deploy-operations/)**：初回ログインのブートストラップ、デプロイ側の身分
+  認証、そしてアップグレード前のバックアップ。

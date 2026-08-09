@@ -1,0 +1,70 @@
+---
+title: Deployment overview
+description: The supported ways to deploy and self-host Chorus, their prerequisites, and how to choose one.
+docsLocale: en
+route: /guides/deployment-overview/
+sidebar:
+  order: 20
+---
+
+This page introduces the supported ways to run and self-host Chorus, lists what each form
+needs, and helps you pick one. Once you have chosen, the [Docker](/guides/deploy-docker/),
+[production](/guides/deploy-production/), and [operations](/guides/deploy-operations/) guides
+take you the rest of the way.
+
+## Deployment forms
+
+Chorus runs the same application in two shapes. The difference is where its data lives and how
+many people use it.
+
+### Local single-machine
+
+One process on one machine for a single user. Chorus bundles an embedded PostgreSQL database
+([PGlite](https://pglite.dev)), so there is nothing external to install: the command creates
+its own database, applies migrations, and serves the web app on port `8637`. This is the
+fastest way to try Chorus and the right choice for individual, local use.
+
+This is the path the [Get started guide](/guides/getting-started/) walks end to end — install
+the global package, set an administrator account, and sign in. That guide is the canonical
+install walkthrough for the single-user local form, so this page does not repeat its steps.
+
+### Production
+
+A shared installation for a team, backed by an **external PostgreSQL 16** database that you
+manage and back up, and served by one or more application instances. **Redis 7** is optional
+for a single instance and **required** when you run more than one, because instances propagate
+live updates (Server-Sent Events) to each other through Redis. Without Redis, Chorus falls back
+to in-memory eventing, which only works for a single instance.
+
+You can run the production form as a container (see [Deploy with Docker](/guides/deploy-docker/)),
+from the global npm package against your own PostgreSQL and Redis, or on the bundled AWS CDK
+stack (see [Production deployment](/guides/deploy-production/)).
+
+## Prerequisites
+
+- **Node.js 22 or later** — Chorus targets the Node.js 22 runtime (the Docker image is built on
+  `node:22-alpine`).
+- **Port `8637`** — the application listens here. Publish or proxy this port to reach the UI and
+  the MCP endpoint.
+- **Database** — nothing to provision for the local form (embedded PGlite). For production, an
+  external **PostgreSQL 16** database reachable over a connection string.
+- **Cache** — none required for a single instance. For multi-instance production, a **Redis 7**
+  endpoint for cross-instance event propagation.
+
+## How to choose
+
+| If you want to… | Use | Database | Cache |
+| --- | --- | --- | --- |
+| Try Chorus or work solo on one machine | Local single-machine | Embedded PGlite | None |
+| Run a shared instance with the least moving parts | Standalone container | Embedded PGlite (in a volume) | None |
+| Run a shared, resilient, or multi-instance install | Production (Docker, npm, or AWS CDK) | External PostgreSQL 16 | Redis 7 (required for 2+ instances) |
+
+## Continue
+
+- **[Deploy with Docker](/guides/deploy-docker/)** — the published `chorusaidlc/chorus-app`
+  image: standalone and production Compose files, a `docker run` example, the full
+  environment-variable reference, and startup behaviour.
+- **[Production deployment](/guides/deploy-production/)** — running against your own PostgreSQL
+  and Redis, multi-instance requirements, and the full AWS CDK walkthrough.
+- **[Operations](/guides/deploy-operations/)** — first-login bootstrap, deployment-side
+  authentication, automatic migrations, and backing up before you upgrade.

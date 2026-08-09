@@ -1,0 +1,63 @@
+---
+title: Pi
+description: Evaluate the advanced, source-only Chorus integration for Pi.
+docsLocale: en
+route: /reference/agents/pi/
+---
+
+# Pi
+
+The Pi integration is first-party but currently intended for advanced evaluation. It is
+not distributed as a standalone package: installation requires a local checkout of the
+Chorus repository. Most end users should choose another
+[supported platform](/reference/agents/).
+
+Before installation, create an agent key by following
+[Prepare agent access](/guides/administrator-setup/).
+
+## Install from a source checkout
+
+From the root of a Chorus checkout:
+
+```bash
+pi install npm:pi-mcp-adapter
+pi install npm:@narumitw/pi-subagents
+pi install ./packages/chorus-pi
+mkdir -p ~/.pi/agent/agents
+cp packages/chorus-pi/agents/*.md ~/.pi/agent/agents/
+```
+
+Pi cannot select a package subdirectory from a monorepo Git URL, so installing the Chorus
+repository URL directly does not install this integration.
+
+Configure the project `.mcp.json` with:
+
+```text
+URL: https://chorus.example.com/api/mcp
+Authorization: Bearer cho_REDACTED
+```
+
+Keep `.mcp.json` out of version control because it contains the agent key.
+
+## Verify the connection
+
+Restart Pi, inspect `/mcp`, and ask Pi to call `chorus_checkin`. Confirm that the response
+shows the expected agent identity and permissions. The first turn should also report that
+the Chorus plugin is active.
+
+## Capabilities and limits
+
+- The package provides Chorus MCP tools, workflow skills, reviewer agents, and Pi hooks.
+- Pi is not a Chorus daemon backend.
+- Chorus cannot remotely start, interrupt, or resume a Pi session.
+- Local conversation recovery uses Pi's own session facilities.
+
+## Common issues
+
+- **MCP server is missing:** place `.mcp.json` in the project root or run `/mcp setup`.
+- **Skills are missing:** run `/reload` after installation.
+- **Reviewer agents are missing:** confirm that `pi-subagents` is installed and that the
+  bundled agent files were copied.
+- **Connection is unauthorized:** replace the agent key in `.mcp.json`, then restart Pi.
+
+For general connection problems, see [Troubleshooting](/guides/troubleshooting/).

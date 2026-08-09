@@ -1,0 +1,6 @@
+{
+  "https://github.com/Chorus-AIDLC/Chorus": "GitHub intermittently rejects automated HEAD requests; this canonical repository URL is maintained by the project.",
+  "https://www.postgresql.org/docs/current/backup.html": "Authoritative PostgreSQL backup documentation linked from the operations guide's back-up-before-upgrade reminder instead of re-teaching per-engine restore recipes.",
+  "https://aws.amazon.com/certificate-manager/": "AWS Certificate Manager product page linked from the production guide's AWS CDK prerequisites for obtaining the ACM certificate the load balancer requires.",
+  "https://github.com/Fission-AI/OpenSpec": "OpenSpec upstream repository linked from the OpenSpec mode guide as the canonical home of the openspec CLI that the mode depends on; GitHub intermittently rejects automated HEAD requests."
+}

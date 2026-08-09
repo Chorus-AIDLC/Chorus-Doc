@@ -1,0 +1,44 @@
+---
+title: 通用 MCP 客户端
+description: 在兼容 Streamable HTTP 的 MCP 客户端中直接调用 Chorus 工具。
+docsLocale: zh
+route: /zh/reference/agents/generic-mcp/
+---
+
+# 通用 MCP 客户端
+
+任何支持 Streamable HTTP 和自定义 HTTP 请求头的 MCP 客户端，都可以直接连接 Chorus。此方式只提供工具调用，不会安装 Chorus 技能、钩子或工作流自动化。
+
+## 配置连接
+
+在客户端中添加名为 `chorus` 的 MCP 服务器：
+
+```text
+URL: https://chorus.example.com/api/mcp
+Authorization: Bearer cho_REDACTED
+```
+
+连接类型选择 Streamable HTTP。请为该客户端创建独立 API 密钥，并按实际用途授予最小权限。具体配置文件格式由客户端决定。
+
+## 验证连接
+
+1. 在客户端中刷新 MCP 服务器或重新启动客户端。
+2. 确认工具列表中出现 `chorus_checkin`。
+3. 调用 `chorus_checkin`，核对返回的智能体身份和权限。
+
+成功签入只表示 MCP 工具连接正常，不表示客户端能够自动执行 Chorus 工作流。
+
+## 能力与限制
+
+- 可以直接调用该 API 密钥有权访问的 Chorus MCP 工具。
+- 客户端需要自行决定工具调用顺序，并处理确认、审查和错误恢复。
+- 不会安装 Chorus 技能或生命周期钩子。
+- 不支持从 Chorus 远程启动、追加指令、中断或恢复客户端会话。
+- 客户端会话的保存和恢复由客户端自身负责。
+
+## 常见问题
+
+- **返回 `401`**：确认 API 密钥有效，并检查 `Authorization` 请求头是否使用 `Bearer` 格式。
+- **返回 `404`**：确认地址以 `/api/mcp` 结尾。
+- **工具可用但流程没有自动推进**：通用 MCP 连接只提供工具，工作流编排需要由客户端或用户完成。
+- **客户端不支持自定义请求头**：该客户端无法直接使用 Chorus 的 MCP 接口。

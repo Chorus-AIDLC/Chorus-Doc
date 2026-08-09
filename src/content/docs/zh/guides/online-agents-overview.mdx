@@ -1,0 +1,58 @@
+---
+title: 在线智能体总览
+description: 理解在线智能体模型，包括常驻的后台连接、目录固定、每个想法一条会话，以及中断/恢复/接管的生命周期，并了解每项能力对应的页面。
+docsLocale: zh
+route: /zh/guides/online-agents-overview/
+sidebar:
+  order: 13
+---
+
+import Screenshot from '../../../../components/Screenshot.astro';
+
+Chorus 可以在你保持在线的机器上启动并操控智能体工作。本页讲清这个模型：什么是在线智能体、项目如何把工作固定到某个连接、一条会话如何跟随一个想法，以及你如何中断、恢复或接管，然后指向真正执行每件事的页面。想了解这些智能体运行的协作流程，请参阅 [AI-DLC 工作流](/zh/guides/ai-dlc-workflow/)；想了解它们提供的插件命令，请参阅[命令与技能路由](/zh/guides/plugin-commands/)。
+
+## 什么是在线智能体
+
+**在线智能体**是一个 `chorus daemon` 进程，它用智能体 API 密钥完成认证，并与 Chorus 保持一条常驻连接。只要它在运行，Chorus 就能触达它来启动工作、追加指令、中断正在运行的轮次或恢复已停止的轮次，而无需你登上那台机器。
+
+每条连接由三项信息定位：**智能体**身份（API 密钥）、它所在的**主机**，以及它服务的**工作目录**（`cwd`）。一个后台服务可以服务多个目录，每个注册的目录都成为一个可独立寻址的目标。Chorus 会在**设置 → 智能体**（Settings → Agents）面板中展示每条连接的在线状态，在线或离线，以及它的运行后端、主机和目录。
+
+<Screenshot
+  src="/images/agent-operations/presence-online-agents.webp"
+  alt="在线智能体状态面板，按智能体、运行后端、主机和工作目录列出一条连接，并显示空闲状态"
+  width={400}
+  height={278}
+  caption="在线状态面板按智能体、运行后端、主机和工作目录列出每条在线连接。"
+/>
+
+## 项目如何固定到目录
+
+项目可以**固定**到某个特定的在线智能体和工作目录。固定之后，从该项目界面发起的智能体工作会路由到同一条连接和同一个目录，并且工作目录选择器会被隐藏，你无需每次重新选择目标。设置、更换或清除该偏好的方法，请参阅[创建项目](/zh/guides/create-a-project/)。
+
+## 每个想法一条会话
+
+一个直接想法只有一条规范会话，而它的会话标识**就是**该想法自身的标识，因此针对该想法的每一次唤起都会触达同一条会话。如果你从另一个工作目录唤起同一个想法，Chorus 会把这条会话**重新指向**新目录，而不是再派生出第二条会话，从而让该想法保持一条连续的历史。
+
+## 中断、恢复与接管
+
+在智能体工作期间，你可以**中断**当前轮次、带上补充上下文**恢复**一条已停止的会话，或用复制得到的会话标识从终端**接管**这条会话。这些操作作用于已有的会话，而不是新建一条。请参阅[中断与恢复会话](/zh/guides/session-recovery/)。
+
+OpenClaw 通过 OpenClaw 网关接入，而不是 `chorus daemon`，因此它是一种网关模式的连接，参见 [OpenClaw](/zh/reference/agents/openclaw/)。
+
+## 每件事在哪里做
+
+在线智能体模型的每项能力，都有一个执行它的位置和一篇完整记录它的页面。
+
+<div class="table-scroll" role="region" aria-label="在线智能体能力路由" tabindex="0">
+
+  | 能力 | 在哪里做 | 详见 |
+  | --- | --- | --- |
+  | 反向控制（中断、恢复） | 会话上的**中断**（Interrupt）与**恢复**（Resume）按钮；后台服务通过 `POST /api/daemon/control` 接收 | [中断与恢复会话](/zh/guides/session-recovery/) |
+  | 唤起与唤起队列 | 从项目条目启动或继续智能体工作；针对繁忙目录的唤起会排队，直到该目录空闲 | [从 Chorus 发起远程工作](/zh/guides/remote-control/) |
+  | `(智能体, 主机, cwd)` 寻址 | 启动后台服务时注册每个工作目录（可重复的 `--cwd`） | [管理后台服务](/zh/guides/daemon-operations/) |
+  | 在线状态 | **设置 → 智能体**展示每条连接的在线状态、运行后端、主机和目录 | [连接智能体运行环境](/zh/guides/operator-onboarding/) |
+  | 远程启动 | 选择一个在线目录，输入指令，然后点击**开始会话（Start session）** | [从 Chorus 发起远程工作](/zh/guides/remote-control/) |
+  | 临时“在某个在线目录中继续” | 在新建想法对话框的对话模式中，把新想法交给一个在线智能体 | [记录想法](/zh/guides/capture-an-idea/) |
+  | 多运行后端（Claude Code、Codex、Kiro） | 用 `--agent` 为每条连接选择运行后端 | [智能体平台](/zh/reference/agents/) |
+
+</div>

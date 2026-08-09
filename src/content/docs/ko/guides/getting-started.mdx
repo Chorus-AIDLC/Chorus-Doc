@@ -1,0 +1,63 @@
+---
+title: 시작하기
+description: Chorus를 설치하고 로그인한 뒤 첫 AI 에이전트를 연결합니다.
+docsLocale: ko
+route: /ko/guides/getting-started/
+sidebar:
+  order: 1
+---
+
+이 가이드는 새 컴퓨터에서 시작해 로컬에서 동작하는 Chorus 설치까지 안내합니다. [Node.js 22 이상](https://nodejs.org/)과 npm이 필요합니다.
+
+## Chorus 설치하고 실행하기
+
+Chorus 명령을 전역으로 설치합니다.
+
+```sh
+npm install --global \
+  @chorus-aidlc/chorus
+```
+
+관리자 계정을 설정하고 Chorus를 실행합니다.
+
+```sh
+DEFAULT_USER=you@example.com \
+DEFAULT_PASSWORD='choose-a-strong-password' \
+chorus
+```
+
+Chorus는 로컬 데이터베이스를 만들고 필요한 마이그레이션을 적용한 뒤 웹 애플리케이션을 시작합니다. Chorus를 사용하는 동안에는 이 터미널을 열어 두세요.
+
+## 로그인하기
+
+`http://localhost:8637`을 열고 위에서 설정한 이메일과 비밀번호로 로그인합니다. 공용 컴퓨터에서는 이 값들이 셸 기록에 남지 않도록 하세요. 내장 데이터베이스는 로컬 단일 사용자 용도를 위한 것입니다. 공용 설치에서는 외부 PostgreSQL 데이터베이스나 지원되는 Docker 배포를 사용하고, 인증 정보는 배포 환경에서 관리하세요.
+
+## 에이전트 연결하기
+
+1. **설정**(Settings)을 엽니다.
+2. **Setup Guide**를 찾아 **Open Setup Guide**를 선택합니다.
+3. 에이전트 플랫폼을 선택합니다.
+4. 표시되는 설치와 연결 단계를 따릅니다.
+5. 가이드의 연결 확인을 완료합니다.
+
+Setup Guide는 필요한 에이전트 인증 정보를 만들고, 선택한 플랫폼에 맞는 명령을 제공합니다. 다른 플랫폼의 명령을 재사용하지 마세요.
+
+에이전트 구성의 전체 그림, 즉 플랫폼을 비교하는 방법, Chorus 플러그인에 무엇이 담겨 있는지, 그리고 업그레이드하거나 제거하는 방법은 [에이전트 플랫폼](/ko/reference/agents/)을 참고하고, 액세스 키, 원격 시작, 런타임을 온라인으로 유지하는 방법 등은 [에이전트 설정](/ko/guides/administrator-setup/)의 나머지 가이드를 참고하세요.
+
+다음에 할 일을 선택하세요.
+
+- **에이전트 터미널에서 Chorus 사용:** 플랫폼 페이지의 체크인 단계를 완료합니다. OpenCode, Pi, 그리고 범용 MCP 클라이언트는 여기까지입니다. 이들은 원격으로 사용할 수 있는 런타임으로 표시되지 않습니다.
+- **Chorus에서 원격으로 작업 시작:** Claude Code, Codex, Kiro, 또는 OpenClaw를 사용합니다. Claude Code, Codex, Kiro는 [런타임을 연결](/ko/guides/operator-onboarding/)하고, [온라인으로 유지](/ko/guides/daemon-operations/)한 다음, [첫 세션을 시작](/ko/guides/remote-control/)합니다. OpenClaw는 자체 게이트웨이를 통해 온라인 상태를 유지합니다.
+
+컴퓨터나 인증 정보를 다른 사람이 관리한다면 [에이전트 액세스 준비](/ko/guides/administrator-setup/)부터 시작하세요.
+
+## 첫 아이디어 돌려보기
+
+Chorus가 실행되고 에이전트가 연결되었다면 실제로 일을 시켜 봅시다. 전체 흐름을 가장 빠르게 확인하는 방법은 작은 아이디어 하나를 처음부터 끝까지 돌려 보는 것입니다.
+
+1. 작업을 담을 [프로젝트를 생성](/ko/guides/create-a-project/)합니다.
+2. [아이디어를 기록](/ko/guides/capture-an-idea/)합니다. *"이 리포지토리에 README를 추가한다"* 처럼 작고 실제적인 것이면 됩니다. 그리고 에이전트의 요구사항 구체화 질문에 답합니다.
+3. 에이전트가 초안을 작성한 [제안을 검토](/ko/guides/review-a-proposal/)하고 승인합니다.
+4. 에이전트에게 [작업을 실행](/ko/guides/run-tasks/)하게 한 뒤 결과를 [검증하고 완료](/ko/guides/verify-and-complete/)합니다.
+
+요청이 아이디어에서 완료까지 어떻게 흘러가고 어디에서 당신이 결정을 내리는지 전체 그림을 보려면 [AI-DLC 워크플로](/ko/guides/ai-dlc-workflow/)를 읽으세요. 각 단계의 단계별 가이드로 안내해 줍니다.

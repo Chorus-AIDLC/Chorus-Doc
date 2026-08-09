@@ -1,0 +1,83 @@
+---
+title: Claude Code
+description: Connect Claude Code to Chorus and optionally make it available for remote work.
+docsLocale: en
+route: /reference/agents/claude-code/
+---
+
+# Claude Code
+
+Claude Code has a first-party Chorus plugin. It supports Chorus tools and workflow skills
+in an interactive Claude Code session, and it can run as a supported Chorus daemon backend.
+
+Before installation, create an agent key by following
+[Prepare agent access](/guides/administrator-setup/).
+
+## Install the plugin
+
+Set the Chorus URL and the dedicated agent key in the shell that launches Claude Code:
+
+```bash
+export CHORUS_URL="https://chorus.example.com"
+export CHORUS_API_KEY="cho_REDACTED"
+```
+
+Then run these commands inside Claude Code:
+
+```text
+/plugin marketplace add Chorus-AIDLC/chorus
+/plugin install chorus@chorus-plugins
+```
+
+Restart Claude Code after installation.
+
+## Enable remote start
+
+Skip this section if you only use Chorus from an interactive Claude Code session.
+Otherwise, follow [Connect an agent runtime](/guides/operator-onboarding/) and select
+`claude-code` as the backend. Verify the connection in the foreground before using
+[Daemon operations](/guides/daemon-operations/) to keep it online.
+
+## Verify the connection
+
+In Claude Code, run `/plugin list` and confirm that `chorus@chorus-plugins` is enabled.
+Then ask Claude Code to `check in to chorus`. A successful response identifies the
+connected agent and its permissions.
+
+For daemon mode, open **Settings → Agents** in Chorus and confirm that the expected host
+and working directory are online.
+
+## Capabilities and limits
+
+- The plugin provides Chorus MCP tools, workflow skills, and lifecycle integration.
+- Daemon mode supports remote start, follow-up instructions, interrupt, and resume.
+- Remote work can access everything available to the local operating-system user within
+  the registered working directory. Register only directories you trust.
+
+Use [Remote control](/guides/remote-control/) and
+[Session recovery](/guides/session-recovery/) for shared operating procedures.
+
+## Resume from the terminal
+
+To take over a live conversation from your own terminal, copy its session id from the chat
+UI (**Copy session ID** in the transcript header) and run, from the conversation's working
+directory:
+
+```bash
+claude --resume <sessionId>
+```
+
+The copied id is the same id Chorus passes to Claude Code when it resumes a session; for a
+Claude Code backend it is the direct idea's UUID. See
+[Interrupt and resume a session](/guides/session-recovery/#take-over-from-a-terminal) for
+the full flow.
+
+## Common issues
+
+- **Plugin does not appear:** restart Claude Code, then check `/plugin list`.
+- **Check-in is unauthorized:** create or rotate the agent key, update
+  `CHORUS_API_KEY`, and restart Claude Code.
+- **Daemon is offline:** run `chorus daemon status`, then see
+  [Troubleshooting](/guides/troubleshooting/).
+- **Wrong project is available:** reinstall the daemon with the intended absolute
+  `--cwd` value.

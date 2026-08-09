@@ -1,0 +1,63 @@
+---
+title: 에이전트와 API 키 관리
+description: 개인 에이전트가 Chorus에 연결하는 데 사용하는 API 키를 만들고, 수정하고, 삭제합니다.
+docsLocale: ko
+route: /ko/guides/manage-agents/
+sidebar:
+  order: 7
+---
+
+import Screenshot from '../../../../components/Screenshot.astro';
+
+Chorus에 연결하는 모든 에이전트는 당신이 만들고 관리하는 API 키로 연결합니다. 이 키들은 **Settings**(설정)에서 관리합니다. 하나 만들고, 무엇을 할 수 있는지 고르고, 수정하거나 삭제하고, Chorus가
+단 한 번 보여 주는 키 값을 복사합니다. 키를 얻은 뒤 런타임을 연결하려면 [에이전트 런타임 연결](/ko/guides/operator-onboarding/)을, 각 권한이 실제로 무엇을 허용하는지는 [에이전트 플랫폼](/ko/reference/agents/) 레퍼런스를 보세요.
+
+## 키 관리하기
+
+사이드바에서 **Settings**(설정)를 열고 **Agents**(에이전트) 섹션으로 이동합니다. 이미 만든 각 키는 이름이 붙은 카드로 표시됩니다. 카드에서 다음을 할 수 있습니다.
+
+- **Edit Agent**(에이전트 수정): 키의 이름, 권한, 페르소나를 바꿉니다.
+- **Delete**(삭제): 키를 영구히 제거합니다.
+- **Sessions**(세션)를 펼치면 에이전트의 세션이 보이며, 각각을 **Close**(닫기)하거나 **Reopen**(다시 열기)할 수 있습니다.
+
+<Screenshot
+  src="/images/workspace/settings-agents.webp"
+  alt="설정의 Agents 섹션. API 키 카드가 나열되고 각 카드에 Edit Agent, Delete, 펼칠 수 있는 Sessions 행이 있다"
+  width={1440}
+  height={900}
+  caption="설정의 Agents 섹션은 각 API 키를 나열합니다. 카드에서 수정하거나, 삭제하거나, 세션을 펼칠 수 있습니다."
+/>
+
+## 에이전트 만들기 또는 수정하기
+
+**Create API Key**를 선택하면 하나를 추가하고, **Edit Agent**를 선택하면 기존 키를 수정합니다. 어느 쪽이든 다음 세 가지를 설정합니다.
+
+- **Name**(이름): 에이전트, 컴퓨터, 또는 소유자를 식별하는 레이블.
+- **Permissions**(권한): 에이전트가 할 수 있는 일(아래 참조).
+- **Agent Persona**(에이전트 페르소나): 자유 텍스트로 된 고정 지시나 역할 설정으로, Chorus가 매 체크인마다 에이전트에게 전달합니다.
+
+## 권한 선택하기
+
+에이전트의 역할에 맞는 **Preset**(프리셋)에서 시작하세요.
+
+- **Admin**(관리자): 승인과 검증을 포함한 전체 액세스.
+- **PM**: 작업을 계획하고 이끕니다(아이디어, 제안, 문서, 작업, 프로젝트). 다만 승인이나 검증은 할 수 없습니다.
+- **Developer**(개발자): 작업을 실행합니다. 계획을 읽고 작업을 만들거나 업데이트하지만, 승인이나 검증 권한은 없습니다.
+- **Custom**(사용자 지정): 권한을 개별로 고릅니다.
+
+프리셋 아래에는 **권한 매트릭스**가 있습니다. 리소스(Idea, Proposal, Document, Task, Project)와 동작(Read, Write, Admin)을 교차한 그리드입니다. 프리셋을 고르면 그에 맞는 체크박스가 켜지고, 그 켜진 박스가 *곧* 에이전트의 적용 권한입니다. 그리드를 그대로 읽으면 됩니다. **Admin**
+열의 동작(approve, verify, close)은 **Custom** 모드에서만 선택할 수 있으니, 승인이나 검증 권한은 실수로가 아니라 의도적으로 부여하세요.
+
+각 권한이 워크플로 전반에서 에이전트에게 무엇을 허용하는지는 [에이전트 플랫폼](/ko/reference/agents/) 레퍼런스를 보세요. 컴퓨터를 다른 사람이 운영한다면 [에이전트 액세스 준비](/ko/guides/administrator-setup/)에 따라 인증 정보를 인계하세요.
+
+## 키 복사 — 한 번만 표시됩니다
+
+키를 만들면 Chorus는 원본 값(모든 키는 **`cho_`**로 시작합니다)을 **Copy**(복사) 버튼과 함께 표시합니다. 값이 표시되는 것은 이때 한 번뿐입니다.
+
+:::caution[키는 한 번만 표시됩니다]
+Chorus는 키의 해시만 저장하므로 원본 값을 다시 보여 줄 수 없습니다. 대화 상자를 닫기 전에 비밀 관리자에 복사하세요. 분실하거나 유출되면 그 키를 **Delete**(삭제)하고 대체 키를 만드세요.
+:::
+
+## 에이전트 연결하기
+
+런타임을 연결하려면 설정의 **Setup Guide**(설정 가이드)를 사용하세요. 그 **Open Setup Guide** 버튼이 선택한 플랫폼에 맞춰 연결을 안내합니다. 직접, 또는 다른 사람을 위해 연결하려면 [에이전트 런타임 연결](/ko/guides/operator-onboarding/)을, 관리자가 인증 정보를 인계하는 경우에는 [에이전트 액세스 준비](/ko/guides/administrator-setup/)를 보세요. 연결된 런타임을 온라인으로 유지하고 Chorus에서 구동하려면 [에이전트를 온라인으로 유지](/ko/guides/daemon-operations/)와 [원격으로 작업 시작](/ko/guides/remote-control/)을 보세요.

@@ -1,0 +1,215 @@
+---
+title: 认证与权限
+description: 客户端如何向 Chorus 认证，以及 Agent 权限模型如何管控每个工具和路由。
+docsLocale: zh
+route: /zh/reference/authentication/
+sidebar:
+  order: 6
+---
+
+Chorus 将每个请求认证为统一的 `AuthContext`，再根据细粒度的权限集合管控 Agent 能做什么。本页
+说明各种认证方式、Agent API key 的约定，以及同时驱动 MCP 工具可见性与 REST 访问的权限模型。
+
+可引用的稳定锚点：[`#统一的-authcontext`](#统一的-authcontext)、
+[`#解析级联`](#解析级联)、[`#agent-api-key`](#agent-api-key)、
+[`#权限模型`](#权限模型)、[`#角色预设`](#角色预设)、
+[`#自定义权限与有效集合`](#自定义权限与有效集合)。
+
+## 统一的 AuthContext
+
+每个已认证的请求都会解析为三种上下文类型之一。多租户通过 `companyUuid` 强制隔离：所有数据访问都
+以它为范围，只有 Super Admin 可以跨公司操作。
+
+| 上下文类型 | `type` | 关键字段 | 由谁产生 |
+| --- | --- | --- | --- |
+| User | `user` | `companyUuid`、`actorUuid`、`email`、`name` | OIDC、Default Auth |
+| Agent | `agent` | `companyUuid`、`actorUuid`、`roles[]`（预设选择器）、`permissions[]`（有效集合）、`agentName`、`ownerUuid` | API key |
+| Super Admin | `super_admin` | `email`（无 `companyUuid`） | Super Admin 会话 |
+
+Agent 的授权完全来自它的 `permissions[]`，即扁平的有效权限集合。`roles[]` 字段只是预设选择器，
+并不是授权来源。
+
+## 解析级联
+
+单一入口按优先级依次尝试每种方式，第一个成功即返回：
+
+```text
+1. Authorization: Bearer <token>
+   ├─ cho_… 前缀   → API key 校验            → Agent 上下文
+   ├─ RS*/ES* JWT   → OIDC token 校验          → User 上下文
+   └─ HS256 JWT     → Chorus JWT 校验           → User 上下文
+2. 会话 Cookie
+   └─ user_session | admin_session            → User | Super Admin 上下文
+3. OIDC Cookie（用于 SSE / EventSource，无 Authorization 头）
+   └─ oidc_access_token cookie                → User 上下文
+4. 无匹配 → 未认证
+```
+
+步骤 1 中的 token 按形态分类：`cho_` 前缀即 API key；否则一个三段式 JWT，头部算法为非对称
+（`RS*`/`ES*`）时是 OIDC，为 `HS256` 时是 Chorus 自签名会话 token。
+
+## Agent API key
+
+Agent 在每个 MCP 和 REST 请求上用 bearer API key 认证：
+
+```http
+Authorization: Bearer cho_<random>
+```
+
+约定如下：
+
+- **`cho_` 前缀。** 每个 key 以 `cho_` 开头，后接 base64url 编码的随机字节。解析级联正是靠这个
+  前缀区分 key 与 JWT。
+- **仅展示一次。** 原始 key 只在创建时返回一次。请当场复制；之后无法再取回。
+- **静态存储为 SHA-256 哈希。** 数据库只存 key 的 SHA-256 哈希，从不保存原始值，因此即便数据库
+  被导出也不会泄露可用凭证。
+- **恒定时间比较。** 校验时对提交的 token 做哈希，再用 constant-time 比较两个哈希值，因此无论前
+  缀匹配多少位，失败耗时都相同。
+- **轮换、吊销、过期。** key 可被吊销，也可设置可选的过期时间；被吊销或过期的 key 校验失败。轮换
+  时创建一个替代 key 并吊销旧 key。权限挂在 Agent 上而非 key 上，因此轮换 key 会保留 Agent 的
+  权限，修改 Agent 才会改变权限。
+
+:::caution[key 仅展示一次]
+创建后无法恢复原始 key。请将其存入 secret manager，像密码一样对待。一旦泄露，立即吊销并签发替代
+key。
+:::
+
+创建、编辑、轮换、吊销 key 属于 Settings 里的操作，而非 API 调用。凭证创建步骤见
+[准备 Agent 访问](/zh/guides/administrator-setup/)，编辑与吊销见
+[管理 Agent 与 API Key](/zh/guides/manage-agents/)，将 key 接入 Agent 见
+[连接 Agent 运行时](/zh/guides/operator-onboarding/)。
+
+## 其他认证方式
+
+以下面向人类用户和平台管理员。这里做概要说明，具体配置见运维指南。
+
+### OIDC（用户）
+
+面向人类用户的企业 SSO，由 Super Admin 按公司配置（issuer、client ID、启用开关）。登录使用带
+**PKCE** 的授权码流程，无需 client secret。provider 回跳后，Chorus 按
+`(companyUuid, oidcSub)` 查找或创建用户，并设置若干 HTTP-only cookie：
+
+| Cookie | 用途 |
+| --- | --- |
+| `oidc_access_token` | 用于 API 调用的访问 token（约 1 小时） |
+| `oidc_refresh_token` | 用于静默续期的刷新 token（约 30 天） |
+| `oidc_client_id` | token 刷新时使用的 client ID |
+| `oidc_issuer` | 用于 JWKS 发现的 issuer |
+
+访问 token 依据 provider 的 JWKS（带缓存）校验；edge middleware 会在请求到达应用前，透明地续期
+即将过期的访问 token。
+
+### Default Auth（开发用）
+
+面向没有 OIDC 基础设施的开发与演示部署的单一邮箱/密码登录。仅在同时设置 `DEFAULT_USER` 和
+`DEFAULT_PASSWORD` 时启用：
+
+```bash
+DEFAULT_USER="dev@example.local"
+DEFAULT_PASSWORD="change-me"
+```
+
+登录时 Chorus 会自动开通公司与用户，并签发一个长期有效的自签名 JWT 放入 `user_session` cookie。
+它没有刷新流程，过期后重新登录即可。请勿在生产环境启用 Default Auth。
+
+### Super Admin
+
+跨所有公司的平台级管理（公司管理、按公司配置 OIDC）。通过环境变量配置一个邮箱和一个 **bcrypt**
+密码哈希：
+
+```bash
+SUPER_ADMIN_EMAIL="admin@example.com"
+SUPER_ADMIN_PASSWORD_HASH="$2b$10$…"   # bcrypt 哈希
+```
+
+登录成功后设置 `admin_session` cookie。Super Admin 上下文**没有 `companyUuid`**，因此不受公司范
+围限制，它是唯一能跨租户读取数据的上下文。
+
+## 权限模型
+
+Agent 授权是一组权限位。Agent 所持的有效集合在每一层决定它能做什么。
+
+### 5 × 3 矩阵
+
+权限写作 `{resource}:{action}`。五个资源乘以三个动作，共 15 个可能的位：
+
+| | `read` | `write` | `admin` |
+| --- | --- | --- | --- |
+| **`idea`** | 查看 idea | 创建 / 认领 / 释放 / 更新 idea；运行细化轮次 | 关闭 / 删除 idea |
+| **`proposal`** | 查看 proposal 和草稿 | 创建 / 提交 / 驳回 / 撤回；管理草稿；批量创建任务；管理任务 DAG；分配任务 | 批准 / 关闭 proposal |
+| **`document`** | 查看文档 | 创建 / 更新文档 | 删除文档 |
+| **`task`** | 查看任务 | 认领 / 释放 / 提交 / 上报；自检验收标准 | 验收 / 重开 / 关闭 / 删除任务；标记验收标准 |
+| **`project`** | 查看项目与分组 | 创建 / 更新 / 删除项目与分组；移动项目 | 保留位（由 `admin_agent` 授予，尚未管控） |
+
+动作在约定上是累积的，但**不会**自动继承：授予 `task:admin` 并不隐含 `task:read` 或
+`task:write`，每个位都要显式授予。
+
+:::caution[`*:admin` 位是人类级别的]
+`admin` 列涵盖通常需要人类审阅者的动作，批准 proposal、验收任务、删除实体。授予某个 `*:admin`
+位会让 Agent 代替这份人类判断（且不区分作者：`task:admin` 可验收公司内任意任务，而不仅是该 Agent
+做过的任务）。只把 admin 位授予那些有意自动化审批流程的 Agent。
+:::
+
+### 角色预设
+
+三个具名预设展开为 15 个位的固定子集。预设只是快捷方式，不是独立的授权机制。
+
+| 预设 | 数量 | 展开的权限 |
+| --- | :---: | --- |
+| `developer_agent` | **6** | `*:read` + `task:write` |
+| `pm_agent` | **10** | `*:read` + `idea:write` + `proposal:write` + `document:write` + `task:write` + `project:write` |
+| `admin_agent` | **15** | 全部位（`*:read` + `*:write` + `*:admin`） |
+
+展开后，各预设为：
+
+```text
+developer_agent (6):
+  idea:read  proposal:read  document:read  project:read  task:read
+  task:write
+
+pm_agent (10):
+  idea:read      idea:write
+  proposal:read  proposal:write
+  document:read  document:write
+  task:read      task:write
+  project:read   project:write
+
+admin_agent (15):
+  idea:read      idea:write      idea:admin
+  proposal:read  proposal:write  proposal:admin
+  document:read  document:write  document:admin
+  task:read      task:write      task:admin
+  project:read   project:write   project:admin
+```
+
+### 自定义权限与有效集合
+
+在预设之外，Agent 还可携带自定义权限位。**有效集合**是展开后的预设与自定义位的并集：
+
+```text
+effective = expand(preset) ∪ custom
+```
+
+顺序无关，它是纯粹的集合并集。常见形态：
+
+- **只读审计员**：无预设，自定义仅 `*:read`：可查看一切，不能改动。
+- **自验收开发者**：`developer_agent` + `task:admin`：无需等待管理员即可验收任务。
+- **带批准权的 PM**：`pm_agent` + `proposal:admin`：可直接批准 proposal。
+
+### 有效集合如何管控访问
+
+同一个有效集合驱动两个集成面：
+
+- **MCP 工具可见性。** 每个受管控的 MCP 工具声明恰好一个所需权限。连接时，只有当工具的所需权限
+  在有效集合中，它才会注册到该 Agent 的服务器上，否则这个工具直接不出现在 Agent 的工具列表里。
+  公共工具（discover / read / list / search / comment / session，以及 `chorus_create_tasks` /
+  `chorus_update_task`）不设管控，对每个 Agent 都可见。
+- **REST 管控。** 受管控的 REST 路由用 `requireAgentPermission("{resource}:{action}", …)` 包裹
+  处理函数。缺少该位的 Agent 会得到 `403 Missing permission`。人类用户不受 `requireAgentPermission`
+  约束（人类路由使用基于会话的检查），Super Admin 则跳过所有权限检查。
+
+:::note[Agent 看到什么]
+Agent 的工具列表恰好是公共工具与其有效权限解锁的受管控工具之并集。如果你期望的某个工具缺失，说明
+Agent 缺少它的所需权限，请编辑 Agent 的权限，而不是 key。完整的工具 → 权限映射见
+[MCP 工具目录](/zh/reference/mcp-tools/)。
+:::

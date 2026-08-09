@@ -1,0 +1,142 @@
+---
+title: Chorus デーモンを運用する
+description: 認証済みのエージェントランタイムを使える状態に保ち、その作業ディレクトリを管理します。
+docsLocale: ja
+route: /ja/guides/daemon-operations/
+sidebar:
+  order: 10
+---
+
+フォアグラウンドのデーモン接続を確認した後に、このガイドを使ってください。コマンドは対応する常駐バックエンド、つまり Claude Code、Codex、Kiro に適用されます。
+
+## デーモンがアクセスできる範囲を選ぶ
+
+各 `--cwd` は、一つの作業ディレクトリを Chorus 上の別々のターゲットとして登録します。
+
+```sh
+chorus daemon \
+  --agent claude-code \
+  --cwd ~/work/project-a \
+  --cwd ~/work/project-b \
+  --chorus-only
+```
+
+`--cwd` がないと、Chorus はコマンドを起動したディレクトリを使います。繰り返し指定できる `--browse-root` オプションは、ユーザーがより広いルートの下でディレクトリを選ぶ必要があるときにだけ使ってください。browse root は探索を許可するだけで、すべてのディレクトリをオンライン接続として登録するわけではありません。
+
+プロジェクトのエージェントの[作業ディレクトリを固定する](/ja/guides/create-a-project/)とき、そのパスはこのデーモンが提供するものでなければなりません。このデーモンの `cwds` の集合に含めて、固定したディレクトリがオンライン接続に解決されるようにしてください。
+
+:::caution[ファイルシステムのアクセスを制限する]
+エージェントが読み書きを許されたディレクトリだけを登録してください。リモートから起こされたエージェントは、デーモンを実行しているユーザーのファイルシステムとツールの権限を受け継ぎます。
+:::
+
+## `daemon.json` を構成する
+
+デーモンは設定を `~/.chorus/daemon.json` から読み込みます。これは、エージェントの認証情報とランタイムのオプションの両方を保持する、単一のフラットな JSON ファイルです。`0600`（所有者のみ読み書き可）で、一時ファイルを書いてからリネームする原子的な方式で書き込まれるため、書き込み途中でクラッシュしても切り詰められたファイルが残ることはありません。パスは `~/.chorus/daemon.json`（ホームディレクトリから解決）に固定されており、ファイル自体を移動させる環境変数はありません。
+
+### フィールド
+
+| フィールド | 型 | 意味 |
+| --- | --- | --- |
+| `url` | string | Chorus サーバーの URL。 |
+| `apiKey` | string | エージェントの API キー（`cho_…`）。 |
+| `agentUuid` | string | 認証済みエージェントの UUID（参考情報）。 |
+| `agentName` | string | 認証済みエージェントの名前（参考情報）。 |
+| `cwds` | string[] | このデーモンが提供する作業ディレクトリ。各パスは一つの独立したオンライン接続です。 |
+| `browseRoots` | string[] | リモートの作業ディレクトリ探索に公開するルート。browse root は接続を作りません。 |
+| `agent` | string | 起こすローカルバックエンド：`"claude-code"`、`"codex"`、`"kiro"`。 |
+| `sigintTimeoutMs` | number | `SIGINT` の後、起こされたエージェントが強制終了されるまでの猶予時間（ミリ秒）。既定値は `10000`。 |
+
+`chorus login` と `chorus daemon install` の後の最小限のファイル。
+
+```json
+{
+  "url": "https://chorus.example.com",
+  "apiKey": "cho_REDACTED",
+  "agentUuid": "8a1c…",
+  "agentName": "Build Agent",
+  "cwds": ["/home/demo/work/project-a"],
+  "browseRoots": ["/home/demo/work"],
+  "agent": "claude-code",
+  "sigintTimeoutMs": 10000
+}
+```
+
+### ファイルはどう作られるか
+
+- `chorus login` は URL とキーを検証してから、`url`、`apiKey`、`agentUuid`、`agentName` を書き込みます。
+- `chorus daemon install` はさらに `cwds`、`browseRoots`、`agent` を書き込みます（これらがまだ設定されていない場合は、提供するディレクトリとバックエンドを尋ねます）。
+- 端末で初めて `chorus daemon` を実行すると、欠けている認証情報を対話的に補完して書き込みます。
+
+### ファイルはどう更新されるか
+
+どの書き込み側も**浅いマージ**を行います。新しいフィールドは、ディスク上の既存の内容の上にマージされ、無関係なフィールドは保持されます。`chorus login` を再実行すると、`cwds`、`agent`、`sigintTimeoutMs` を消さずに認証情報だけを更新します。`chorus daemon install` を再実行すると、認証情報を捨てずに提供する集合を更新します。ファイルが欠けているか壊れている場合は空のオブジェクトとして扱われるため、再ログインは失敗せず常に有効なファイルを生成します。
+
+### フィールド、フラグ、環境変数
+
+各オプションは三通りの方法で与えられます。優先順位はフラグ、次に環境変数、最後に `daemon.json` なので、一度きりのフラグや環境変数による上書きをファイルに書く必要はありません。
+
+| 対象 | `daemon.json` のフィールド | CLI フラグ | 環境変数 |
+| --- | --- | --- | --- |
+| サーバー URL | `url` | `--url` | `CHORUS_URL` |
+| API キー | `apiKey` | `--api-key` | `CHORUS_API_KEY` |
+| 作業ディレクトリ | `cwds` | `--cwd`（繰り返し可） | `CHORUS_DAEMON_CWDS` |
+| browse root | `browseRoots` | `--browse-root`（繰り返し可） | `CHORUS_DAEMON_BROWSE_ROOTS` |
+| バックエンド | `agent` | `--agent` | `CHORUS_AGENT` |
+| SIGINT 猶予 | `sigintTimeoutMs` | `--sigint-timeout` | `CHORUS_DAEMON_SIGINT_TIMEOUT` |
+| 権限モード | *(永続化されない)* | `--yolo` / `--chorus-only` | `CHORUS_YOLO` / `CHORUS_CHORUS_ONLY` |
+
+権限モードは意図的に `daemon.json` に保存されません。起動時に `--chorus-only` を渡すか（あるいは `CHORUS_CHORUS_ONLY=1` を設定）してください。インストールされたサービスは `--chorus-only` をファイルではなくそのユニットに取り込みます。
+
+## Linux サービスをインストールする
+
+Linux では、確認済みの構成をユーザーサービスとしてインストールします。
+
+```sh
+chorus daemon install \
+  --agent claude-code \
+  --cwd ~/work/project-a \
+  --chorus-only
+```
+
+インストーラーはサービスを直ちに起動し、ユーザーがログインしたときに開始するよう設定します。サービスが保存済みの認証情報を読めるように、先に `chorus login` を実行してください。
+
+:::note[なぜ認証情報がファイルに置かれるのか]
+`systemd --user` ユニットはクリーンな起動環境で始まり、シェルでエクスポートした `CHORUS_URL` / `CHORUS_API_KEY` を継承**しません**。そのため `chorus daemon install` は、ユニットを書き込む前に、認証情報を解決・検証し、`~/.chorus/daemon.json`（`0600`）に永続化します。ユニットはファイルパスも認証情報も参照せず、`HOME` を設定するだけで、デーモンが起動時に `~/.chorus/daemon.json` を見つけられるようにします。提供する `cwds` と選んだ `agent` は同じファイルにあります。ユニットに取り込まれるのは `--chorus-only` だけです。
+:::
+
+日常の運用には次のコマンドを使います。
+
+```sh
+chorus daemon status
+chorus daemon logs
+chorus daemon restart
+chorus daemon stop
+chorus daemon uninstall
+```
+
+認証情報、作業ディレクトリ、バックエンド、権限モードを変更した後は、サービスを再インストールまたは再起動し、**設定 → エージェント**（Settings → Agents）で接続を確認してください。
+
+:::note[macOS と Windows]
+macOS と Windows では、`chorus daemon install` はサービスのテンプレートと手動セットアップの手順を出力します。接続を試すときの基準として、フォアグラウンドの `chorus daemon` を使ってください。
+:::
+
+## サービスなしで実行する
+
+短命の接続なら、`chorus daemon` をフォアグラウンドのままにします。デタッチモードも使えます。
+
+```sh
+chorus daemon -d --agent codex --cwd ~/work/project-a --chorus-only
+```
+
+同じ `status`、`logs`、`restart`、`stop` のコマンドで管理します。デタッチモードを、別途書いたプロセススーパーバイザーと組み合わせないでください。
+
+## 運用状態を確認する
+
+コマンドラインと Web の両方の状態を使います。
+
+1. `chorus daemon status` を実行します。
+2. `chorus daemon logs` で直近の出力を確認します。
+3. **設定 → エージェント**（Settings → Agents）で、期待する各作業ディレクトリが**オンライン**（Online）であることを確認します。
+4. 小さなテストセッションを開始し、意図したディレクトリを対象にしていることを確認します。
+
+ログにはパス、プロンプト、コマンドの出力が含まれることがあります。共有する前に機微な値を削除してください。失敗した場合は[エージェント接続のトラブルシューティング](/ja/guides/troubleshooting/)へ進んでください。

@@ -1,0 +1,171 @@
+---
+title: Realtime events & notifications
+description: How the browser UI updates live over Server-Sent Events, and how agents receive the same work through the notification REST API.
+docsLocale: en
+route: /reference/realtime/
+sidebar:
+  order: 8
+---
+
+Chorus keeps every open browser in sync with what people and agents are doing. When a
+mutation lands — a task moves, an idea is claimed, a proposal is approved — the change is
+broadcast over Server-Sent Events (SSE) and the affected pages refresh themselves. Agents
+do not consume that stream; they receive the same work through notifications. This page
+documents both paths: the SSE endpoints and their event shape, and the notification REST
+API that agents (and browser clients) call.
+
+## How live updates flow
+
+Every service-layer mutation emits a change event onto a process-level event bus after the
+database write completes. An SSE endpoint subscribes to that bus and streams matching
+events to each connected browser, which debounces them and re-fetches the current page:
+
+```text
+Mutation (MCP tool / API route / server action)
+  → service layer emits a RealtimeEvent on the event bus
+  → GET /api/events subscribes, filters by company + project
+  → browser EventSource receives the event
+  → debounce 500ms → router.refresh() → Server Components re-fetch
+```
+
+The refresh is deliberately coarse: a single event tells the page "something you are
+looking at changed," and Next.js re-runs the Server Component so fresh data flows back into
+the client components as new props. No event carries the changed record itself.
+
+## SSE endpoints
+
+Two endpoints stream events to the browser. Both are `GET`, both authenticate from the
+request's cookies, and both are marked `export const dynamic = "force-dynamic"` so Next.js
+never serves a cached response.
+
+<div class="table-scroll" role="region" aria-label="SSE endpoints" tabindex="0">
+
+  | Endpoint | Streams |
+  | --- | --- |
+  | `GET /api/events?projectUuid=<uuid>` | Entity change events, filtered to your company and — when `projectUuid` is supplied — to that one project. |
+  | `GET /api/events/notifications` | Notification events for the authenticated user, so the in-app notification indicator updates live. |
+
+</div>
+
+Each response is sent with these headers and behaviors:
+
+- **`Content-Type: text/event-stream`**, `Cache-Control: no-cache`, `Connection: keep-alive`.
+- On connect, the stream writes a `: connected` comment, then streams events as
+  `data: <json>` frames.
+- **Heartbeat:** a `: heartbeat` comment is sent every 30 seconds to keep the connection
+  open through idle periods and intermediary timeouts.
+- **Cleanup on disconnect:** when the client aborts the request (tab closed, navigation,
+  network drop), the endpoint removes its event-bus listeners and clears the heartbeat
+  timer.
+- **Multi-tenancy:** the change stream drops any event whose `companyUuid` does not match
+  the caller's, so a client never receives another workspace's activity.
+
+### The `RealtimeEvent` shape
+
+Change events on `GET /api/events` are JSON objects with a fixed shape:
+
+```typescript
+interface RealtimeEvent {
+  companyUuid: string;   // multi-tenant isolation — the stream drops non-matching events
+  projectUuid: string;   // used for the optional projectUuid filter
+  entityType: "task" | "idea" | "proposal" | "document";
+  entityUuid: string;    // the entity that changed
+  action: "created" | "updated" | "deleted";
+}
+```
+
+An event names *which entity changed and how* — it never carries the entity's fields. The
+client uses it only as a signal to refresh.
+
+### Client behavior
+
+The browser opens an `EventSource` to `/api/events?projectUuid=<uuid>` and, on any message,
+waits 500ms before calling `router.refresh()`. The debounce collapses a burst of events
+from one logical action — for example approving a proposal emits a proposal update plus one
+event per created task — into a single refresh. On tab visibility change the connection is
+closed while the tab is hidden and reopened (with a refresh) when it becomes visible again,
+and everything is torn down on unmount.
+
+## Agents do not use SSE
+
+:::caution[SSE is browser-only]
+The SSE endpoints are authenticated by **browser cookies** — `EventSource` cannot send a
+custom `Authorization` header, so it cannot carry an agent API key. **Agents do not consume
+SSE.** An agent receives its work through the [`chorus_get_notifications`](#notification-rest-api)
+MCP tool and the `/api/notifications` REST endpoints below. Agent mutations still emit
+change events, so browser users watching the same project see an agent's work appear live —
+the flow is one-directional: agent acts, humans watch.
+:::
+
+## Notification REST API
+
+Notifications are the durable, poll-and-act path that both agents and browser clients use.
+The recipient is derived from the auth context: a request authenticated as a user reads
+that user's notifications, and a request authenticated with an agent API key reads that
+agent's — the same routes serve both, with no recipient parameter.
+
+<div class="table-scroll" role="region" aria-label="Notification REST endpoints" tabindex="0">
+
+  | Method & path | Purpose | Key parameters |
+  | --- | --- | --- |
+  | `GET /api/notifications` | List notifications for the caller (user or agent). Returns `{ notifications, unreadCount }`. | Query: `limit` (1–100, default 50), `offset` (default 0), `unreadOnly` (`true` to return unread only), `projectUuid` (scope to one project). |
+  | `GET /api/notifications/unread-count` | Return the caller's unread count as `{ count }`. | — |
+  | `POST /api/notifications/read-all` | Mark all of the caller's notifications read. | Optional JSON body `{ projectUuid }` to limit the sweep to one project. |
+  | `PATCH /api/notifications/[uuid]/read` | Mark one notification read. | Path: notification `uuid`. |
+  | `PATCH /api/notifications/[uuid]/archive` | Archive one notification. | Path: notification `uuid`. |
+  | `GET /api/notifications/preferences` | Read the caller's notification preferences. | — |
+  | `PUT /api/notifications/preferences` | Update the caller's notification preferences. | JSON body of preference fields. |
+
+</div>
+
+`limit` is clamped server-side to the 1–100 range, and `offset` is floored at 0. Marking or
+archiving a notification that the caller does not own returns a `404` rather than disclosing
+that it exists.
+
+## Response envelope
+
+Every notification REST route returns the standard Chorus JSON envelope. A success carries
+the payload under `data`:
+
+```json
+{ "success": true, "data": { "notifications": [], "unreadCount": 0 } }
+```
+
+An error carries a structured `error` object instead:
+
+```json
+{ "success": false, "error": { "code": "NOT_FOUND", "message": "Notification not found" } }
+```
+
+Routes build these with the helpers from `src/lib/api-response.ts`: `success(data)` for the
+success case, and `errors.notFound(...)`, `errors.badRequest(...)`, `errors.unauthorized()`,
+and `errors.forbidden(...)` for the common failures — each maps to its matching HTTP status
+(404, 400, 401, 403). A request with no valid session or agent key is rejected by
+`errors.unauthorized()`:
+
+```json
+{ "success": false, "error": { "code": "UNAUTHORIZED", "message": "Authentication required" } }
+```
+
+with HTTP `401`. (The SSE endpoints predate this envelope and reply to an unauthenticated
+request with a plain-text `Unauthorized` and status `401`.)
+
+## Single-instance and multi-instance delivery
+
+The event bus is an in-memory singleton, which is all a single-instance deployment needs:
+the process that handles the mutation is the same process holding every SSE connection, so
+emitting an event locally reaches every connected browser.
+
+Running more than one instance breaks that assumption — a mutation on instance A must still
+reach a browser connected to instance B. For multi-instance deployments, back the event bus
+with **Redis pub/sub**: each instance subscribes to a shared channel, mutations publish to
+Redis instead of emitting only locally, and every instance's SSE endpoint forwards what it
+receives to its own connected browsers. The SSE endpoints and the client hook are unchanged
+when you swap the backing — only the event-bus implementation differs.
+
+## Notification concepts
+
+This page covers the delivery mechanics only. For what generates a notification — the
+categories, @mentions, and who is notified for each kind of activity — and the preferences
+that let each recipient opt in or out, see the
+[collaboration reference](/reference/collaboration/).

@@ -1,0 +1,125 @@
+---
+title: 生产环境部署
+description: 使用全局 npm 包连接外部 PostgreSQL 与 Redis 运行 Chorus，或使用内置的 AWS CDK 栈进行部署。
+docsLocale: zh
+route: /zh/guides/deploy-production/
+sidebar:
+  order: 22
+---
+
+本指南介绍两条生产部署路径：使用全局 npm 包连接自有的 PostgreSQL 与 Redis 运行，以及使用仓库自带的安装脚本部署 AWS 栈。如果只是在单机上试用，请改用[快速开始](/zh/guides/getting-started/)；如果要用容器部署，请参阅[使用 Docker 部署](/zh/guides/deploy-docker/)。启动凭据、单点登录与安全升级等内容，请参阅[运维自托管的 Chorus](/zh/guides/deploy-operations/)。
+
+## 使用全局包连接外部 PostgreSQL
+
+在运行 Web 应用的主机上全局安装 Chorus 命令：
+
+```sh
+npm install --global @chorus-aidlc/chorus
+```
+
+通过 `DATABASE_URL` 指向现有的 PostgreSQL 数据库，并提供必需的认证与密钥环境变量，然后启动：
+
+```sh
+DATABASE_URL='postgresql://chorus:password@db.internal:5432/chorus' \
+NEXTAUTH_SECRET='a-long-random-string' \
+SUPER_ADMIN_EMAIL='admin@example.com' \
+SUPER_ADMIN_PASSWORD_HASH='$2b$10$...' \
+chorus
+```
+
+启动时，Chorus 会自动应用所有待执行的数据库迁移（`prisma migrate deploy`，对应 `db:migrate` 脚本），随后在 `8637` 端口提供 Web 应用。数据库必须已经存在且可访问；在这条路径上，Chorus 不会为你创建数据库服务器。
+
+Chorus 在生产运行中读取的环境变量：
+
+<div class="table-scroll" role="region" aria-label="生产环境变量" tabindex="0">
+
+| 环境变量 | 是否必需 | 说明 |
+| --- | --- | --- |
+| `DATABASE_URL` | 是 | PostgreSQL 连接串，格式为 `postgresql://user:password@host:port/dbname`。 |
+| `NEXTAUTH_SECRET` | 是 | 用于签名会话令牌的密钥。请使用随机值，例如 `openssl rand -base64 32`。 |
+| `SUPER_ADMIN_EMAIL` | 是 | 用于引导 `/admin` 超级管理员面板的邮箱。 |
+| `SUPER_ADMIN_PASSWORD_HASH` | 是 | 超级管理员密码的 bcrypt 哈希值。 |
+| `DEFAULT_USER` | 可选 | 启用内置的邮箱／密码登录，用于首次访问。 |
+| `DEFAULT_PASSWORD` | 可选 | 内置登录使用的密码。 |
+| `REDIS_URL` | 可选 | Redis 连接串。运行多个实例时必需（见下文）。 |
+
+</div>
+
+这些启动凭据的工作方式、bcrypt 哈希的生成方法，以及如何关闭内置登录，请参阅[运维自托管的 Chorus](/zh/guides/deploy-operations/)。
+
+:::caution[妥善处理密钥]
+`NEXTAUTH_SECRET` 与超级管理员凭据拥有完全访问权限。不要让它们进入命令历史或代码仓库，应通过进程管理器、systemd 单元或密钥管理服务提供，而不要在共享主机上直接内联输入。
+:::
+
+## 运行多个实例
+
+Chorus 通过 Redis 在多个实例之间传播实时更新（SSE 事件流）。请把 `REDIS_URL` 设为共享的 Redis，让每个实例都发布并接收相同的事件：
+
+```sh
+REDIS_URL='redis://default:password@redis.internal:6379'
+```
+
+**跨实例的事件传播必须依赖 Redis。** 未设置 `REDIS_URL` 时，Chorus 会退回到进程内的内存事件总线，其作用范围仅限单个进程，在一个实例上产生的更新不会到达其他实例。单实例部署可以不配置 Redis，依靠这种内存回退运行；但只要部署多于一个实例，就必须配置共享 Redis。
+
+## 部署 AWS CDK 栈
+
+Chorus 在 `packages/chorus-cdk` 下自带一个 AWS CDK 栈，并提供仓库根目录的 `install.sh` 以交互方式驱动它。该栈会搭建一套完整的、经 HTTPS 前置的部署，并附带托管的 PostgreSQL 与 Redis。
+
+### 前置条件
+
+`install.sh` 会先检查 `aws`、`node`、`pnpm` 命令是否可用，以及 AWS 凭据是否有效（它会调用 `aws sts get-caller-identity`）。运行之前，请先用 `aws configure` 或 `AWS_PROFILE` 配置凭据，并在部署所在区域准备好一张 [AWS Certificate Manager](https://aws.amazon.com/certificate-manager/) 证书。
+
+### 运行安装脚本
+
+在仓库根目录执行：
+
+```sh
+./install.sh
+```
+
+安装脚本会依次询问部署配置：
+
+<div class="table-scroll" role="region" aria-label="install.sh 交互提示" tabindex="0">
+
+| 提示 | 是否必需 | 说明 |
+| --- | --- | --- |
+| Stack name | 否 | 默认为 `Chorus`。 |
+| ACM Certificate ARN | 是 | 必须以 `arn:aws:acm:` 开头。负载均衡器用它来终止 HTTPS。 |
+| Custom domain | 否 | 例如 `chorus.example.com`。设置后会为该域名添加一条主机路由规则。 |
+| Super admin email | 是 | 用于引导 `/admin` 超级管理员账号。 |
+| Super admin password | 是 | 至少 8 个字符。在 synth 阶段用 bcrypt 哈希，明文不会写入模板。 |
+| NextAuth secret | 否 | 留空则自动生成。 |
+
+</div>
+
+收集完这些答案后，`install.sh` 会安装并构建 CDK 包，引导（bootstrap）CDK 环境，然后部署该栈。它还会把你的答案写入可重复执行的 `default_deploy.sh`，这样后续部署无需重新询问。
+
+### 该栈会创建哪些组件
+
+该栈（`packages/chorus-cdk/lib/{chorus-stack,service,database,cache}.ts`）会创建：
+
+<div class="table-scroll" role="region" aria-label="CDK 栈组件" tabindex="0">
+
+| 组件 | 是什么 | 关键配置 |
+| --- | --- | --- |
+| Application Load Balancer | 面向公网的入口，使用你的 ACM 证书在 443 端口终止 HTTPS。 | 转发到服务；设置自定义域名时，会有一条主机规则路由该域名；空闲超时 60 分钟。 |
+| ECS Fargate 服务 | 在私有子网中运行 Chorus 容器。 | 期望副本数 2，1024 CPU 单位／2048 MiB，部署断路器可自动回滚。 |
+| Aurora Serverless v2（PostgreSQL） | 托管的 PostgreSQL 集群。 | 存储加密；凭据自动生成并存入 Secrets Manager；备份保留 1 天。 |
+| ElastiCache Serverless（Redis） | 用于跨实例事件的托管 Redis。 | 使用 RBAC 用户；密码存入 Secrets Manager。 |
+| Secrets Manager | 保存生成的数据库、Redis 凭据以及应用密钥。 | 在运行时注入到 ECS 任务中。 |
+
+</div>
+
+### 部署、更新与销毁
+
+<div class="table-scroll" role="region" aria-label="部署命令" tabindex="0">
+
+| 操作 | 命令 |
+| --- | --- |
+| 首次部署 | `./install.sh` |
+| 重新部署或更新 | `./default_deploy.sh`（或 `pnpm cdk:deploy`） |
+| 销毁 | `pnpm cdk:destroy` |
+
+</div>
+
+`packages/chorus-cdk` 是该栈的权威来源。当你需要精确的资源定义，或想调整容量、保留策略或网络时，请以那里的代码为准。

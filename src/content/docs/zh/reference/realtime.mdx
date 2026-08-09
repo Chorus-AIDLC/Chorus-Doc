@@ -1,0 +1,154 @@
+---
+title: 实时事件与通知
+description: 浏览器 UI 如何通过 Server-Sent Events 实时更新，以及智能体如何通过通知 REST API 接收同样的工作。
+docsLocale: zh
+route: /zh/reference/realtime/
+sidebar:
+  order: 8
+---
+
+Chorus 让每个打开的浏览器与人和智能体正在做的事保持同步。当一次变更落库，任务被移动、
+想法被认领、提案被批准，该变更会通过 Server-Sent Events（SSE）广播出去，受影响的页面会
+自我刷新。智能体不消费该数据流；它们通过通知接收同样的工作。本页记录这两条路径：SSE 端点
+及其事件结构，以及智能体（和浏览器客户端）调用的通知 REST API。
+
+## 实时更新如何流转
+
+每次服务层变更都会在数据库写入完成后，向一个进程级事件总线发出一条变更事件。一个 SSE 端点
+订阅该总线，并向每个已连接的浏览器推送匹配的事件，浏览器再对其做防抖并重新拉取当前页面：
+
+```text
+变更（MCP 工具 / API 路由 / server action）
+  → 服务层在事件总线上发出一条 RealtimeEvent
+  → GET /api/events 订阅，并按 company + project 过滤
+  → 浏览器 EventSource 收到该事件
+  → 防抖 500ms → router.refresh() → Server Components 重新拉取
+```
+
+这种刷新刻意做得粗粒度：单条事件只告诉页面“你正在看的某样东西变了”，随后 Next.js 重新运行
+Server Component，让新鲜数据作为新的 props 回流到客户端组件。任何事件都不携带变更后的记录
+本身。
+
+## SSE 端点
+
+有两个端点向浏览器推送事件。二者都是 `GET`，都从请求的 Cookie 中完成认证，都标注了
+`export const dynamic = "force-dynamic"`，因此 Next.js 绝不会返回缓存的响应。
+
+<div class="table-scroll" role="region" aria-label="SSE 端点" tabindex="0">
+
+  | 端点 | 推送内容 |
+  | --- | --- |
+  | `GET /api/events?projectUuid=<uuid>` | 实体变更事件，过滤到你所在的公司；当提供了 `projectUuid` 时，进一步过滤到那一个项目。 |
+  | `GET /api/events/notifications` | 已认证用户的通知事件，从而让应用内的通知指示器实时更新。 |
+
+</div>
+
+每个响应都带有以下响应头与行为：
+
+- **`Content-Type: text/event-stream`**、`Cache-Control: no-cache`、`Connection: keep-alive`。
+- 连接建立时，数据流先写入一条 `: connected` 注释，随后以 `data: <json>` 帧的形式推送事件。
+- **心跳（Heartbeat）：** 每 30 秒发送一条 `: heartbeat` 注释，以便在空闲期与中间层超时的
+  情况下保持连接打开。
+- **断开时清理：** 当客户端中止请求（标签页关闭、页面跳转、网络断开）时，端点会移除它在事件
+  总线上的监听器并清除心跳定时器。
+- **多租户：** 变更数据流会丢弃任何 `companyUuid` 与调用者不匹配的事件，因此客户端绝不会
+  收到其他工作区的活动。
+
+### `RealtimeEvent` 结构
+
+`GET /api/events` 上的变更事件是结构固定的 JSON 对象：
+
+```typescript
+interface RealtimeEvent {
+  companyUuid: string;   // 多租户隔离——数据流会丢弃不匹配的事件
+  projectUuid: string;   // 用于可选的 projectUuid 过滤
+  entityType: "task" | "idea" | "proposal" | "document";
+  entityUuid: string;    // 发生变更的实体
+  action: "created" | "updated" | "deleted";
+}
+```
+
+一条事件说明的是*哪个实体变了、如何变的*,它绝不携带该实体的字段。客户端仅把它当作一个
+刷新信号来使用。
+
+### 客户端行为
+
+浏览器会向 `/api/events?projectUuid=<uuid>` 打开一个 `EventSource`，并在收到任何消息时，
+等待 500ms 再调用 `router.refresh()`。这个防抖会把来自同一个逻辑动作的一连串事件，例如
+批准一个提案会发出一条提案更新事件，外加每个被创建任务各一条事件，合并成单次刷新。在标签页
+可见性变化时，标签页隐藏时连接会被关闭，重新可见时会重新打开（并触发一次刷新），组件卸载时
+一切都会被拆除。
+
+## 智能体不使用 SSE
+
+:::caution[SSE 仅限浏览器]
+SSE 端点由 **浏览器 Cookie** 认证，`EventSource` 无法发送自定义的 `Authorization` 请求头，
+因此无法携带智能体 API 密钥。**智能体不消费 SSE。** 智能体通过下文的
+[`chorus_get_notifications`](#通知-rest-api) MCP 工具与 `/api/notifications` REST 端点接收
+其工作。智能体的变更仍会发出变更事件，因此正在看同一个项目的浏览器用户会实时看到智能体的
+工作出现，这条流是单向的：智能体动作，人类观看。
+:::
+
+## 通知 REST API
+
+通知是智能体与浏览器客户端都会使用的、可持久化的“轮询并行动”路径。接收者由认证上下文推导
+得出：以用户身份认证的请求读取该用户的通知，以智能体 API 密钥认证的请求读取该智能体的通知
+，同一组路由服务两者，且没有接收者参数。
+
+<div class="table-scroll" role="region" aria-label="通知 REST 端点" tabindex="0">
+
+  | 方法与路径 | 用途 | 关键参数 |
+  | --- | --- | --- |
+  | `GET /api/notifications` | 列出调用者（用户或智能体）的通知。返回 `{ notifications, unreadCount }`。 | 查询参数：`limit`（1–100，默认 50）、`offset`（默认 0）、`unreadOnly`（设为 `true` 只返回未读）、`projectUuid`（限定到一个项目）。 |
+  | `GET /api/notifications/unread-count` | 以 `{ count }` 返回调用者的未读数量。 | 无 |
+  | `POST /api/notifications/read-all` | 将调用者的所有通知标记为已读。 | 可选 JSON body `{ projectUuid }`，把范围限定到一个项目。 |
+  | `PATCH /api/notifications/[uuid]/read` | 将一条通知标记为已读。 | 路径参数：通知 `uuid`。 |
+  | `PATCH /api/notifications/[uuid]/archive` | 归档一条通知。 | 路径参数：通知 `uuid`。 |
+  | `GET /api/notifications/preferences` | 读取调用者的通知偏好。 | 无 |
+  | `PUT /api/notifications/preferences` | 更新调用者的通知偏好。 | 偏好字段的 JSON body。 |
+
+</div>
+
+`limit` 会在服务端被夹取到 1–100 区间，`offset` 会被下限截断为 0。对不属于调用者的通知执行
+标记或归档会返回 `404`，而不会透露它是否存在。
+
+## 响应信封
+
+每个通知 REST 路由都返回标准的 Chorus JSON 信封。成功时把载荷放在 `data` 之下：
+
+```json
+{ "success": true, "data": { "notifications": [], "unreadCount": 0 } }
+```
+
+出错时改为携带一个结构化的 `error` 对象：
+
+```json
+{ "success": false, "error": { "code": "NOT_FOUND", "message": "Notification not found" } }
+```
+
+这些响应由 `src/lib/api-response.ts` 中的辅助函数构建：成功用 `success(data)`，常见失败用
+`errors.notFound(...)`、`errors.badRequest(...)`、`errors.unauthorized()` 与
+`errors.forbidden(...)`，每个都映射到对应的 HTTP 状态码（404、400、401、403）。没有有效
+会话或智能体密钥的请求会被 `errors.unauthorized()` 拒绝：
+
+```json
+{ "success": false, "error": { "code": "UNAUTHORIZED", "message": "Authentication required" } }
+```
+
+HTTP 状态码为 `401`。（SSE 端点早于该信封而存在，对未认证的请求以纯文本 `Unauthorized`
+和状态码 `401` 作答。）
+
+## 单实例与多实例投递
+
+事件总线是一个内存中的单例，这对单实例部署已经足够：处理变更的进程正是持有每个 SSE 连接的
+进程，因此在本地发出一条事件即可到达每个已连接的浏览器。
+
+运行超过一个实例会打破这一前提，发生在实例 A 上的变更仍必须到达连接在实例 B 上的浏览器。
+对于多实例部署，应用 **Redis pub/sub** 作为事件总线的后端：每个实例订阅一个共享频道，变更
+发布到 Redis 而非仅在本地发出，每个实例的 SSE 端点再把收到的内容转发给自己已连接的浏览器。
+更换后端时，SSE 端点与客户端 hook 保持不变，只有事件总线的实现不同。
+
+## 通知相关概念
+
+本页只涵盖投递机制。关于什么会生成通知，各个类别、@提及，以及每类活动会通知谁，以及让
+每位接收者可选择接收或屏蔽的偏好设置，参阅[协作参考](/zh/reference/collaboration/)。

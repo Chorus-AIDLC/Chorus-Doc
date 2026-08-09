@@ -1,0 +1,260 @@
+---
+title: MCP tools catalog
+description: How agents connect to the Chorus MCP endpoint, how tool visibility is gated by permissions, and the tools grouped by category.
+docsLocale: en
+route: /reference/mcp-tools/
+sidebar:
+  order: 7
+---
+
+Agents act on Chorus through its MCP (Model Context Protocol) tools. This page is the
+categorized guide to that surface: how a client connects, how project scoping works, how
+each tool becomes visible, and the high-frequency tools an agent uses at each stage. For
+the states entities move through and how the stages hand off, see the
+[lifecycle reference](/reference/lifecycle/); for comments, mentions, and notifications,
+see the [collaboration reference](/reference/collaboration/).
+
+## Endpoint and transport
+
+Chorus exposes a single MCP endpoint over **Streamable HTTP**:
+
+```text
+POST https://chorus.example.com/api/mcp
+Authorization: Bearer cho_REDACTED
+```
+
+The endpoint is **stateless**. Each request authenticates with the agent key and is served
+by a fresh per-request server instance — there is no server-side session, no
+`initialize` → keep-alive → expire flow, and no inactivity timeout. A client never has to
+recover a "session not found" state; it simply sends its key on every request. Two
+consequences follow:
+
+- **Permissions are recomputed per request.** Rotating an agent's permissions in the UI
+  takes effect on the very next call, with no reconnect.
+- **The agent key alone determines the tool list.** The set of tools returned by
+  `tools/list` is derived from the key's effective permissions on each request.
+
+Configure it in a client's MCP config as an `http` server. A minimal `.mcp.json` block:
+
+```json
+{
+  "mcpServers": {
+    "chorus": {
+      "type": "http",
+      "url": "https://chorus.example.com/api/mcp",
+      "headers": {
+        "Authorization": "Bearer cho_REDACTED"
+      }
+    }
+  }
+}
+```
+
+:::note
+The MCP transport session is unrelated to a Chorus **AgentSession**. AgentSessions are a
+separate observability construct for swarm-mode sub-agents, created and tracked through the
+session tools below.
+:::
+
+## Scoping by project
+
+An agent that works across many projects can narrow every scope-aware result to a subset by
+sending scoping headers on the MCP connection:
+
+<div class="table-scroll" role="region" aria-label="Project scoping headers" tabindex="0">
+
+  | Header | Value | Effect |
+  | --- | --- | --- |
+  | `X-Chorus-Project` | A single project UUID, or several comma-separated | Restrict results to those project(s). |
+  | `X-Chorus-Project-Group` | A project group UUID | Restrict results to every project in the group. |
+
+</div>
+
+With no header, results span all projects (the default). When **both** headers are present,
+`X-Chorus-Project-Group` wins. Scoping affects `chorus_get_my_assignments`, which returns a
+per-project tracker filtered to the scoped project(s). `chorus_checkin`'s `ideaTracker` is
+**not** header-filtered — it always returns the agent's most recent ideas across every
+project (capped at ten). Every other tool takes an explicit `projectUuid` argument and is
+not header-scoped.
+
+```json
+{
+  "mcpServers": {
+    "chorus": {
+      "type": "http",
+      "url": "https://chorus.example.com/api/mcp",
+      "headers": {
+        "Authorization": "Bearer cho_REDACTED",
+        "X-Chorus-Project": "uuid-a,uuid-b"
+      }
+    }
+  }
+}
+```
+
+## Permissions and tool visibility
+
+Tool visibility is driven by a fine-grained permission model: **5 resources**
+(`idea`, `proposal`, `document`, `task`, `project`) × **3 actions**
+(`read`, `write`, `admin`) = **15 permission bits**. Each gated tool declares **exactly one**
+required permission. A gated tool appears in an agent's `tools/list` **only if** the agent's
+effective permission set contains that bit. **Public tools carry no gate and always appear.**
+
+An agent's effective set is the union of a **role preset** and any **custom permissions**
+added on top:
+
+<div class="table-scroll" role="region" aria-label="Role preset permission sets" tabindex="0">
+
+  | Preset | Effective permission set |
+  | --- | --- |
+  | `developer_agent` | `*:read` + `task:write` (6 bits) |
+  | `pm_agent` | `*:read` + `idea:write`, `proposal:write`, `document:write`, `task:write`, `project:write` (10 bits) |
+  | `admin_agent` | all 15 bits (`*:read` + `*:write` + `*:admin`) |
+
+</div>
+
+Visibility is not the same as authorization. A tool can be visible yet still refuse an
+operation at the handler level — for example, the operational status transitions on a task
+require the caller to be that task's assignee, regardless of who can see the tool.
+
+## Tool categories
+
+<div class="table-scroll" role="region" aria-label="Tool categories" tabindex="0">
+
+  | Category | Gate | What it covers |
+  | --- | --- | --- |
+  | **Public** | None — always visible | Discovery and reads (`chorus_get_*`, `chorus_list_*`, `chorus_search*`), `chorus_checkin`, `chorus_get_my_assignments`, comments, elaboration answers, notifications, plus `chorus_create_tasks` and `chorus_update_task`. |
+  | **Session** | None — always visible | AgentSession lifecycle for swarm-mode workers: `chorus_create_session`, `chorus_session_checkin_task` / `chorus_session_checkout_task`, `chorus_session_heartbeat`, `chorus_close_session`, `chorus_reopen_session`, `chorus_list_sessions`, `chorus_get_session`. |
+  | **Developer** | `task:write` | Claim, release, report on, and submit tasks for verification. |
+  | **PM** | `idea:write`, `proposal:write`, `document:write`, `project:write` | Author and run ideas, elaboration, proposals, documents, and references. |
+  | **Admin** | `*:admin` (and `project:write` for project/group creation) | Approve proposals, verify/reopen/close tasks, mark acceptance criteria, delete entities, manage projects and groups. |
+
+</div>
+
+:::caution
+`chorus_create_report` looks public — it has no `pm_` prefix and lives in the public-namespaced
+module — but it **is gated on `document:write`**. It appears only for agents that hold that
+bit (the `pm_agent` / `admin_agent` presets, or a developer agent with `document:write` added
+as a custom permission). Do not treat it as an ungated public tool.
+:::
+
+`chorus_create_tasks` and `chorus_update_task` are genuinely public: field, dependency, and
+acceptance-criteria edits are open to any agent because handler-level assignee guards enforce
+who can actually mutate operational state. A task's `in_progress` / `to_verify` status
+transitions still require the caller to be the assignee.
+
+## High-frequency tools
+
+A representative subset, with input, return shape, and the required permission. The complete
+per-tool contract for every tool lives in the source of truth described at the end of this
+page.
+
+### chorus_checkin — public
+
+Recommended at the start of a run. Returns the agent's identity and owner, its effective
+permission set, an idea tracker grouped by project, and a notification summary. The
+`ideaTracker` is capped at the ten most recently updated ideas and spans every project — it
+is **not** narrowed by the scoping headers above (use `chorus_get_my_assignments` for a
+scoped, uncapped tracker).
+
+```text
+Input:  (none)
+Return: { agent: { uuid, name, permissions, owner },
+          ideaTracker: { <projectUuid>: { name, ideas[] } },
+          notifications: { unread, recent[] } }
+```
+
+### chorus_get_my_assignments — public
+
+The agent's full idea/task tracker, grouped by project. Same shape as `chorus_checkin`'s
+`ideaTracker`, without the recent-idea cap, plus a `taskTracker` of open tasks. Honors the
+scoping headers.
+
+```text
+Input:  (none)
+Return: { ideaTracker: { <projectUuid>: { name, ideas[] } },
+          taskTracker: { <projectUuid>: { name, tasks[] } } }
+```
+
+### chorus_claim_task — `task:write`
+
+Claim an open task, moving it to `assigned` and setting the caller as assignee.
+
+```text
+Input:  { taskUuid }
+Return: updated Task
+```
+
+### chorus_submit_for_verify — `task:write` (assignee only)
+
+Submit a task for human verification, moving it `in_progress → to_verify`.
+
+```text
+Input:  { taskUuid, summary? }
+Return: updated Task
+```
+
+### chorus_pm_create_proposal — `proposal:write`
+
+Create an **empty** proposal container, then populate it with `chorus_pm_add_document_draft`
+and `chorus_pm_add_task_draft`. When `inputType` is `idea`, every input idea must be a
+deliverable — a theme (container) idea is rejected; derive a child idea and propose on that
+instead.
+
+```text
+Input:  { projectUuid, title, description?, inputType: "idea" | "document",
+          inputUuids[], references?[] }
+Return: created Proposal (status: draft)
+```
+
+### chorus_pm_add_task_draft — `proposal:write`
+
+Append one task draft to a draft proposal. Acceptance criteria are required — at least one
+item with a non-blank description, or the call is rejected.
+
+```text
+Input:  { proposalUuid, title, description?, priority?, storyPoints?,
+          acceptanceCriteriaItems: [{ description, required? }],  // required, non-empty
+          dependsOnDraftUuids?[] }
+Return: updated Proposal
+```
+
+### chorus_admin_verify_task — `task:admin`
+
+Verify a submitted task, moving it `to_verify → done`. If the task has structured
+acceptance criteria, all **required** criteria must already be marked `passed` (via
+`chorus_mark_acceptance_criteria`) or verification is blocked.
+
+```text
+Input:  { taskUuid }
+Return: updated Task (or an error when the acceptance-criteria gate blocks it)
+```
+
+## Gated-tool → required-permission matrix
+
+Every permission-gated tool and its single required bit. Possessing the bit — via preset or
+custom permission — is the necessary condition for the tool to appear; handler-level guards
+(ownership, assignee, status) may still apply on top.
+
+<div class="table-scroll" role="region" aria-label="Gated tool to required permission" tabindex="0">
+
+  | Required permission | Tools |
+  | --- | --- |
+  | `idea:write` | `chorus_claim_idea`, `chorus_release_idea`, `chorus_move_idea`, `chorus_pm_create_idea`, `chorus_edit_idea`, `chorus_pm_start_elaboration`, `chorus_pm_skip_elaboration` |
+  | `idea:admin` | `chorus_pm_validate_elaboration`, `chorus_admin_delete_idea` |
+  | `proposal:write` | `chorus_pm_create_proposal`, `chorus_pm_validate_proposal`, `chorus_pm_submit_proposal`, `chorus_pm_add_document_draft`, `chorus_pm_add_task_draft`, `chorus_pm_update_document_draft`, `chorus_pm_update_task_draft`, `chorus_pm_remove_document_draft`, `chorus_pm_remove_task_draft`, `chorus_pm_reject_proposal`, `chorus_pm_revoke_proposal`, `chorus_pm_assign_task` |
+  | `proposal:admin` | `chorus_admin_approve_proposal`, `chorus_admin_close_proposal` |
+  | `document:write` | `chorus_pm_create_document`, `chorus_pm_update_document`, `chorus_create_report`, `chorus_add_reference`, `chorus_update_reference`, `chorus_remove_reference` |
+  | `document:admin` | `chorus_admin_delete_document` |
+  | `task:write` | `chorus_claim_task`, `chorus_release_task`, `chorus_submit_for_verify`, `chorus_report_criteria_self_check`, `chorus_report_work` |
+  | `task:admin` | `chorus_admin_verify_task`, `chorus_admin_reopen_task`, `chorus_admin_close_task`, `chorus_mark_acceptance_criteria`, `chorus_admin_delete_task` |
+  | `project:write` | `chorus_admin_create_project`, `chorus_admin_create_project_group`, `chorus_admin_update_project_group`, `chorus_admin_delete_project_group`, `chorus_admin_move_project_to_group` |
+
+</div>
+
+:::note
+The **authoritative, complete** tool list is the running server's own `tools/list` response
+— each tool's live self-description — together with `docs/MCP_TOOLS.md` in the repository.
+This page is a categorized guide to that surface, not a byte-for-byte transcription of every
+tool. When a self-description and this page disagree, the server is correct.
+:::

@@ -1,0 +1,78 @@
+---
+title: Connect an agent runtime
+description: Authenticate a machine, start a supported agent runtime, and verify its connection.
+docsLocale: en
+route: /guides/operator-onboarding/
+sidebar:
+  order: 9
+---
+
+import Screenshot from '../../../components/Screenshot.astro';
+
+Use this guide after a Chorus administrator gives you an agent API key. It connects
+Claude Code, Codex, or Kiro as a resident runtime that Chorus can wake remotely.
+
+## Before you start
+
+You need:
+
+- the Chorus URL and agent API key;
+- Node.js 22 or later;
+- the selected agent CLI installed and authenticated;
+- at least one approved working directory.
+
+Install the Chorus command:
+
+```sh
+npm install --global @chorus-aidlc/chorus
+```
+
+## Save the connection
+
+Run:
+
+```sh
+chorus login
+```
+
+Enter the Chorus URL and API key when prompted. Chorus validates the credential and saves
+the connection in `~/.chorus/daemon.json` with file mode `0600`.
+
+:::caution[Protect the API key]
+Enter the key only at the prompt. Do not add it to a shell command, shell history,
+committed environment file, or support message.
+:::
+
+## Start the runtime
+
+Start with one approved working directory:
+
+```sh
+chorus daemon --agent claude-code --cwd /path/to/your/project --chorus-only
+```
+
+Replace `claude-code` with `codex` or `kiro` when needed. `--chorus-only` restricts the
+woken agent to Chorus tools. Omit it only when you intentionally want the agent to use
+its full local toolset and have reviewed the security implications.
+
+Keep the command running while you verify the connection.
+
+## Verify the connection
+
+In Chorus, open **Settings → Agents** and inspect the agent connection. Confirm that:
+
+- the status is **Online**;
+- the backend matches the CLI you selected;
+- the host is the machine you are operating;
+- the working directory is the directory you approved.
+
+<Screenshot
+  src="/images/agent-operations/connection-online.webp"
+  alt="Online agent connection showing its Codex backend, host, and working directory"
+  width={1440}
+  height={900}
+  caption="An online runtime lists its backend, host, and registered working directory."
+/>
+
+Stop the foreground runtime with `Ctrl+C` after verification. To keep it available across
+logins or restarts, continue with [Operate the Chorus daemon](/guides/daemon-operations/).

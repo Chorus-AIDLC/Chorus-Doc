@@ -1,0 +1,100 @@
+---
+import config from 'virtual:starlight/user-config';
+
+import Search from '@astrojs/starlight/components/Search.astro';
+import SiteTitle from '@astrojs/starlight/components/SiteTitle.astro';
+import SocialIcons from '@astrojs/starlight/components/SocialIcons.astro';
+import ThemeSelect from '@astrojs/starlight/components/ThemeSelect.astro';
+import LanguageSelect from './LanguageSelect.astro';
+
+const shouldRenderSearch =
+  config.pagefind || config.components.Search !== '@astrojs/starlight/components/Search.astro';
+---
+
+<div class="chorus-header">
+  <div class="chorus-header__brand">
+    <SiteTitle />
+  </div>
+  {shouldRenderSearch && (
+    <div class="chorus-header__search print:hidden">
+      <Search />
+    </div>
+  )}
+  <div class="chorus-header__actions sl-hidden md:sl-flex print:hidden">
+    <div class="chorus-header__social">
+      <SocialIcons />
+    </div>
+    <div class="chorus-header__preference">
+      <ThemeSelect />
+    </div>
+    <div class="chorus-header__preference">
+      <LanguageSelect />
+    </div>
+  </div>
+</div>
+
+<style>
+  @layer starlight.core {
+    .chorus-header {
+      width: min(100%, 75rem);
+      height: 100%;
+      margin-inline: auto;
+      padding-inline: clamp(1rem, 3vw, 2rem);
+      display: grid;
+      grid-template-columns: minmax(8.5rem, 1fr) minmax(12rem, 18rem) minmax(8.5rem, 1fr);
+      align-items: center;
+      gap: clamp(1rem, 2vw, 2rem);
+    }
+
+    .chorus-header__brand {
+      min-width: 0;
+      justify-self: start;
+    }
+
+    .chorus-header__search {
+      width: 100%;
+      min-width: 0;
+    }
+
+    .chorus-header__actions {
+      justify-self: end;
+      align-items: center;
+      gap: 0.5rem;
+      white-space: nowrap;
+    }
+
+    .chorus-header__social {
+      display: flex;
+      align-items: center;
+      margin-inline-end: 0.25rem;
+      padding-inline-end: 0.75rem;
+      border-inline-end: 1px solid var(--chorus-border);
+    }
+
+    .chorus-header__preference {
+      display: flex;
+      align-items: center;
+      min-width: max-content;
+      padding-inline: 0.5rem;
+    }
+
+    @media (max-width: 64rem) {
+      .chorus-header {
+        grid-template-columns: minmax(8rem, 1fr) minmax(10rem, 15rem) auto;
+        gap: 1rem;
+      }
+    }
+
+    @media (max-width: 50rem) {
+      .chorus-header {
+        grid-template-columns: minmax(0, 1fr) auto;
+        padding-inline: 1rem 4rem;
+        gap: 0.75rem;
+      }
+
+      .chorus-header__search {
+        width: 2.5rem;
+      }
+    }
+  }
+</style>

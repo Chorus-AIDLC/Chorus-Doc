@@ -1,0 +1,63 @@
+---
+title: はじめに
+description: Chorus をインストールしてサインインし、最初の AI エージェントを接続します。
+docsLocale: ja
+route: /ja/guides/getting-started/
+sidebar:
+  order: 1
+---
+
+このガイドは、まっさらなマシンから、ローカルで動く Chorus のインストールまでを案内します。[Node.js 22 以降](https://nodejs.org/)と npm が必要です。
+
+## Chorus をインストールして起動する
+
+Chorus コマンドをグローバルにインストールします。
+
+```sh
+npm install --global \
+  @chorus-aidlc/chorus
+```
+
+管理者アカウントを設定して Chorus を起動します。
+
+```sh
+DEFAULT_USER=you@example.com \
+DEFAULT_PASSWORD='choose-a-strong-password' \
+chorus
+```
+
+Chorus はローカルデータベースを作成し、必要なマイグレーションを適用して、Web アプリケーションを起動します。Chorus を使っている間は、このターミナルを開いたままにしてください。
+
+## サインインする
+
+`http://localhost:8637` を開き、上で設定したメールアドレスとパスワードでサインインします。共有マシンではこれらの値をシェル履歴に残さないでください。組み込みデータベースはローカルの単一ユーザー用途を想定しています。共有インストールでは、外部の PostgreSQL データベースまたは対応済みの Docker デプロイを使い、認証情報はデプロイ環境で管理してください。
+
+## エージェントを接続する
+
+1. **設定**（Settings）を開きます。
+2. **Setup Guide** を見つけ、**Open Setup Guide** を選びます。
+3. エージェントプラットフォームを選びます。
+4. 表示されたインストールと接続の手順に従います。
+5. ガイドの接続チェックを完了します。
+
+Setup Guide は必要なエージェントの認証情報を作成し、選んだプラットフォーム向けのコマンドを提供します。別のプラットフォームのコマンドを流用しないでください。
+
+エージェント設定の全体像、つまりプラットフォームの比較方法、Chorus プラグインに何が同梱されているか、そしてアップグレードやアンインストールの方法については、[エージェントプラットフォーム](/ja/reference/agents/)を、そしてアクセスキー、リモート起動、ランタイムをオンラインに保つ方法については、[エージェントを設定](/ja/guides/administrator-setup/)のその他のガイドをご覧ください。
+
+次にやりたいことを選びます。
+
+- **エージェントのターミナルから Chorus を使う:** プラットフォームページのチェックイン手順を完了します。OpenCode、Pi、そして汎用 MCP クライアントはここまでです。これらはリモートで利用可能なランタイムとしては表示されません。
+- **Chorus からリモートで作業を始める:** Claude Code、Codex、Kiro、または OpenClaw を使います。Claude Code、Codex、Kiro については、[ランタイムを接続](/ja/guides/operator-onboarding/)し、[オンラインに保ち](/ja/guides/daemon-operations/)、それから[最初のセッションを開始](/ja/guides/remote-control/)します。OpenClaw は自前のゲートウェイを通じてオンラインを維持します。
+
+マシンや認証情報を別の担当者が管理している場合は、[エージェントのアクセスを準備する](/ja/guides/administrator-setup/)から始めてください。
+
+## 最初の着想を動かす
+
+Chorus が動き、エージェントが接続できたら、実際に働かせてみましょう。ループ全体を最も早く体験する方法は、小さな着想を一つ、端から端まで走らせることです。
+
+1. 作業を収める[プロジェクトを作成](/ja/guides/create-a-project/)します。
+2. [着想を記録](/ja/guides/capture-an-idea/)します。*「このリポジトリに README を追加する」* のような、小さくて実在するもので構いません。そしてエージェントの要件詳細化の質問に答えます。
+3. エージェントが起草した[提案を審査](/ja/guides/review-a-proposal/)し、承認します。
+4. エージェントに[課題を実行](/ja/guides/run-tasks/)させ、結果を[検証して完了](/ja/guides/verify-and-complete/)します。
+
+リクエストが着想から完了までどう進み、どこであなたが判断するのか、その全体像を知るには [AI-DLC ワークフロー](/ja/guides/ai-dlc-workflow/)をお読みください。各段階の手順ガイドへ案内してくれます。

@@ -1,0 +1,73 @@
+---
+import { getCollection } from 'astro:content';
+import DefaultLanguageSelect from '@astrojs/starlight/components/LanguageSelect.astro';
+
+// Locale registry — `root` is the unprefixed English locale; every other entry
+// is a URL path prefix. Keep in sync with `astro.config.mjs` `locales`.
+const PREFIX_LOCALES = ['zh', 'ja', 'ko'] as const;
+
+const docs = await getCollection('docs');
+const contentIds = new Set(docs.map(({ id }) => id.replace(/\.mdx?$/, '')));
+const pathname = Astro.url.pathname.replace(/^\/|\/$/g, '');
+const relativePath = pathname.replace(
+  new RegExp(`^(?:${PREFIX_LOCALES.join('|')})(?:\\/|$)`),
+  '',
+);
+const targetIds: Record<string, string> = {
+  root: relativePath || 'index',
+  ...Object.fromEntries(
+    PREFIX_LOCALES.map((locale) => [
+      locale,
+      relativePath ? `${locale}/${relativePath}` : `${locale}/index`,
+    ]),
+  ),
+};
+const localeHomes: Record<string, string> = {
+  root: '/',
+  ...Object.fromEntries(PREFIX_LOCALES.map((locale) => [locale, `/${locale}/`])),
+};
+
+const missingLocaleHomes = Object.fromEntries(
+  Object.entries(targetIds)
+    .filter(([, id]) => !contentIds.has(id))
+    .map(([locale]) => [locale, localeHomes[locale]]),
+);
+---
+
+<div data-locale-fallbacks={JSON.stringify(missingLocaleHomes)}>
+  <DefaultLanguageSelect />
+</div>
+
+<script>
+  const PREFIX_LOCALES = ['zh', 'ja', 'ko'];
+  const localeOf = (value: string) =>
+    PREFIX_LOCALES.find((locale) => value.startsWith(`/${locale}/`)) ?? 'root';
+  // Map the language-control locale key onto the shared `chorus-lang` value.
+  const langKeyOf = (value: string) => {
+    const locale = localeOf(value);
+    return locale === 'root' ? 'en' : locale;
+  };
+
+  for (const wrapper of document.querySelectorAll<HTMLElement>('[data-locale-fallbacks]')) {
+    const fallbacks = JSON.parse(wrapper.dataset.localeFallbacks || '{}') as Record<string, string>;
+    const options = wrapper.querySelectorAll<HTMLOptionElement>('option');
+
+    for (const option of options) {
+      const locale = localeOf(option.value);
+      if (fallbacks[locale]) option.value = fallbacks[locale];
+    }
+
+    // Remember an explicit language switch so the choice survives future visits (shared
+    // `chorus-lang` key with the landing site; read back by the locale-home redirect in the head).
+    const select = wrapper.querySelector('select');
+    select?.addEventListener('change', (event) => {
+      const target = event.currentTarget;
+      if (!(target instanceof HTMLSelectElement)) return;
+      try {
+        localStorage.setItem('chorus-lang', langKeyOf(target.value));
+      } catch {
+        /* storage unavailable (private mode) — non-fatal, navigation still proceeds */
+      }
+    });
+  }
+</script>

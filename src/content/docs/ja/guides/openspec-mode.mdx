@@ -1,0 +1,135 @@
+---
+title: OpenSpec モード
+description: 仕様駆動の提案編集を有効にし、Chorus のドラフトをディスク上の OpenSpec ファイルからミラーします。
+docsLocale: ja
+route: /ja/guides/openspec-mode/
+---
+
+OpenSpec モードは、Claude Code と Codex 上の Chorus プラグインにおける任意の編集スタイルです。有効な間も
+[AI-DLC ワークフロー](/ja/guides/ai-dlc-workflow/)はいつも通りに動きますが、提案の編集の形が変わります。
+自由形式の Markdown を Chorus に直接打ち込むのではなく、エージェントが
+[`openspec`](https://github.com/Fission-AI/OpenSpec) CLI でディスク上に構造化ファイルを書き、それらを
+提案の文書ドラフトへミラーします。ディスク上のファイルが作業コピーで、Chorus のドラフトはレビュー担当が
+提案ページで読む忠実なミラーです。
+
+OpenSpec が存在しないときは何も変わりません — プラグインは従来どおり自由形式のドラフトを編集します。
+OpenSpec モードは Claude Code と Codex のプラグインにのみ同梱され、スタンドアロンのスキル配布物では
+サポートされません。
+
+## いつ有効になるか
+
+検出はセッション開始時に一度だけ走ります。OpenSpec モードがオンになるには、以下の**3 つ**の信号がすべて
+成立する必要があります。
+
+1. `CHORUS_OPENSPEC_MODE` が `off` に設定されて**いない** — 明示的なオプトアウトは常に優先されます。
+2. リポジトリのルートに `openspec/` ディレクトリが存在する — 「このリポジトリは OpenSpec を使う」という
+   信号で、`openspec init` によって作成されます。
+3. `openspec` CLI が `PATH` にある — このモードは変更のスキャフォールド・検証・アーカイブに CLI を必要と
+   するため、ディレクトリだけでは足りません。
+
+3 つとも成立すると、接続トーストがモードのオンを報告します。
+
+```text
+Chorus connected at <your Chorus URL> (OpenSpec Enabled)
+```
+
+`openspec/` ディレクトリは存在するが CLI が見つからない場合、トーストは代わりにインストールのヒントを
+表示し、エージェントは自由形式の経路にとどまります。
+
+```text
+Chorus connected at <your Chorus URL> (OpenSpec repo detected — install with: npm i -g @fission-ai/openspec)
+```
+
+## インストールと初期化
+
+OpenSpec は Fission AI 製の Node CLI です。まずグローバルにインストールし、次にエージェントが提案を編集する
+リポジトリで初期化します。
+
+```bash
+npm install -g @fission-ai/openspec
+openspec init
+```
+
+`openspec init` は `openspec/` 作業ディレクトリ（`changes/`、`specs/`、設定と説明ファイル）を作成します。
+その後、検出が新しい 2 つの信号 — `openspec/` ディレクトリと CLI — を拾えるよう、エージェントの
+セッションを再起動してください。
+
+プラグイン自体のインストールは、実行時ごとに [Claude Code](/ja/reference/agents/claude-code/) と
+[Codex](/ja/reference/agents/codex/) のページで扱っています。
+
+## proposal、develop、yolo での変化
+
+モードが有効な間、proposal、develop、yolo の各スキルは kebab-case のスラッグでディスク上に変更を編集し、
+3 種類のファイルを Chorus 提案の文書ドラフトへミラーします。
+
+| ディスク上のファイル | ミラー先の文書 |
+| --- | --- |
+| `openspec/changes/<slug>/proposal.md` | PRD |
+| `openspec/changes/<slug>/design.md` | 技術設計 |
+| `openspec/changes/<slug>/specs/<capability>/spec.md` | 仕様（能力ごとに 1 つ） |
+
+`openspec/changes/<slug>/tasks.md` は**ミラーされません**。Chorus の課題ドラフトが課題の唯一の真実の
+源であるため、OpenSpec の課題リストはディスク上に残されます。
+
+後の実行が変更を復元できるよう、提案の説明には正確な 1 行が付きます。
+
+```text
+OpenSpec change slug: <slug>
+```
+
+ミラーはバイト単位で忠実です — プラグインは各ファイルのバイト列をドラフトへ流し込み、モデルに内容を
+打ち直させないため、ローカルファイルと Chorus ドラフトは同一に保たれます。これを自分で実行することは
+ありません。プラグインのスキルが処理します。厳密なラッパーの契約（`chorus-api.sh` の文書ミラーフロー、
+そのエラー時停止ルール、承認後の再同期）は、ここで再掲するのではなく権威ある情報源に記載されています。
+`docs/OPENSPEC_MODE.md` とプラグインスキル
+`public/chorus-plugin/skills/openspec-aware/SKILL.md` を参照してください。
+
+## `openspec archive` はいつ走るか
+
+`openspec archive` は変更の一番最後まで先送りされます。変更の**最後の**課題が検証された後、プラグインは
+エージェントに次の実行を促します。
+
+```bash
+openspec archive <slug>
+```
+
+アーカイブは変更を `openspec/changes/` から移し、その仕様デルタを `openspec/specs/` 下の長期仕様へ
+マージします。その後プラグインは、更新された `openspec/specs/<capability>/spec.md` ファイルを、対応する
+Chorus 文書へ逆方向にミラーします。それまでは変更は進行中のままで、Chorus はデルタ仕様しか目にしないため、
+半端にマージされた状態を考える必要はありません。
+
+## オプトアウト
+
+2 つのスイッチ、優先順位の順に。
+
+1. **`enableOpenSpec` userConfig トグル**（Claude Code プラグインのみ、既定でオン）。プラグインの
+   インストール設定でこれをオフにすると、アーカイブのリマインダーを含め、プラグイン全体でモードを無効に
+   できます。これは OpenSpec が未インストールなのと同等です。
+2. **`CHORUS_OPENSPEC_MODE=off` 環境変数**（両方のプラグイン）。シェル単位で効く、CI にやさしい
+   オプトアウトです。`openspec/` ディレクトリと CLI の両方が存在しても、自由形式モードを強制します。
+
+   ```bash
+   export CHORUS_OPENSPEC_MODE=off
+   ```
+
+Codex プラグインには userConfig の面がないため、そこでは環境変数だけが効きます。どちらの方法でオプト
+アウトしても、ディスク上の既存の `openspec/` ディレクトリはそのまま残され、新しい提案にスラッグ行が
+加わることもありません。挙動は OpenSpec が未インストールのホストと完全に同じです。
+
+## エージェント向け
+
+- **トリガー。** proposal、develop、yolo の各スキルは、SessionStart コンテキストの `## OpenSpec Mode`
+  セクションから `CHORUS_OPENSPEC_ACTIVE` を読み、それに応じて分岐します — 再検出はしません。
+  `CHORUS_OPENSPEC_ACTIVE=1` のときはディスク上で編集してミラーし、`0` のときは自由形式の経路をたどります。
+  変更の最後の課題が検証された後、PostToolUse フックが `openspec archive <slug>` のリマインダーを
+  注入します。
+- **制約。** 文書ドラフトのミラー呼び出しはすべて、プラグインのラッパー（Claude Code では
+  `chorus-api.sh mcp-tool`、Codex では `chorus-mcp-call.sh`）を通し、ファイルのバイト列をそのまま
+  エンコードする必要があります。文書の内容をインラインで打ち直しては決してならず、ラッパーのエラーが
+  あれば停止します。`tasks.md` はミラーしないでください。提案の説明には正確な
+  `OpenSpec change slug: <slug>` の 1 行を付ける必要があります。モードがオフのときは、
+  `openspec/changes/` をスキャフォールドせず、スラッグ行も加えないでください。スタンドアロンの
+  `public/skill/` 配布物は OpenSpec モードをサポートしません。
+- **出典。** `docs/OPENSPEC_MODE.md`（ユーザー向けの概要と検出の契約）、
+  `public/chorus-plugin/skills/openspec-aware/SKILL.md`（Claude Code の権威あるスキル）、および
+  `plugins/chorus/skills/openspec-aware/SKILL.md`（Codex の権威あるスキル）。

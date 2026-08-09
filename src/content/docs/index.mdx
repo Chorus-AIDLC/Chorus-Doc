@@ -1,0 +1,92 @@
+---
+title: Chorus overview
+description: What Chorus is, the problem it solves, and how a team of AI agents and humans ships work together.
+docsLocale: en
+route: /
+---
+
+import Screenshot from '../../components/Screenshot.astro';
+
+Coding agents are brilliant at the keystroke and lost at the project. Ask one to write a
+function and it shines; ask it to carry a whole feature — pin down the requirement, plan it,
+split the work, build it, check it — and you are back to babysitting prompts and re-explaining
+context every session. The model keeps getting smarter, but the work around the model stays
+manual.
+
+Chorus is the layer that closes that gap. It is an **agent harness**: the structure around the
+model that takes a team of agents and humans from a rough idea all the way to shipped work. The
+model is the brain; Chorus is everything else. You don't drive the agents keystroke by
+keystroke — they propose, and you verify.
+
+<div class="brand-figure">
+  <Screenshot
+    src="/images/chorus-slug.webp"
+    alt="A robot arm and a human hand together forming two musical notes — the Chorus mark for AI and humans working in harmony."
+    width={1200}
+    height={800}
+  />
+</div>
+
+## The reversed conversation
+
+Most tools work one way: you prompt, the AI responds, and you keep prompting until the output
+is right. Chorus reverses that.
+
+You drop in a rough idea — say, *"the auth module needs refactoring."* Instead of guessing, the
+agent comes back with questions: which providers, OAuth or SAML? Once the requirement is pinned
+down it hands you a plan — a short spec and a handful of tasks — and waits for your yes. Only
+then does it write code, and when it's done it shows you the tests passing rather than a wall of
+diffs to trust on faith.
+
+Your job shifts from *writing prompts* to *reviewing proposals*. You approve the plan while it
+is still cheap to change, and you catch a wrong turn at the proposal instead of after the code
+is written. That is the whole idea: **AI proposes, humans verify.**
+
+## How the work flows
+
+Every idea travels the same path, and nothing moves to the next stage without a clear handoff:
+
+**Idea → Proposal → Document + Task → Execute → Verify → Done**
+
+You write down an idea. An agent asks a few clarifying questions, then turns the answers into a
+proposal — a short spec plus the tasks needed to build it, with their dependencies worked out.
+You review and approve. Agents then pick up the tasks, working in parallel wherever the plan
+allows, and report as they go. Before anything is called done, the work is checked against what
+the proposal asked for. You stay in the loop at each handoff without having to drive every step.
+
+The [AI-DLC workflow guide](/guides/ai-dlc-workflow/) walks this path end to end.
+
+## Who does the work
+
+You are the reviewer. The doing is split across agents with different jobs and permissions, so
+each one only touches what its role allows:
+
+- The **PM agent** turns ideas into proposals — clarifying requirements, writing the spec, and
+  breaking the work into tasks.
+- **Developer agents** pick up those tasks, write the code, report progress, and submit the
+  result for review. Several can work at once on independent tasks.
+- The **admin agent** governs the project — creating it, approving proposals, and verifying
+  finished work.
+
+You can run these on Claude Code, Codex, OpenClaw, or any MCP-compatible agent — see the
+[agent platforms](/reference/agents/) reference for what's supported.
+
+## What you get
+
+Chorus is the connective tissue that makes this collaboration hold together:
+
+- **You can see what's happening.** Every agent's activity is visible in real time — which
+  agent, and which sub-agent, is working on which task.
+- **You bring your own agent.** There is no lock-in to one vendor or model; any MCP-compatible
+  agent can join.
+- **You own the whole thing.** Chorus is open source under AGPL-3.0 and runs on your own
+  infrastructure.
+
+## Where to go next
+
+New here? [Get started](/guides/getting-started/) installs Chorus and connects your first
+agent. From there, [the AI-DLC workflow](/guides/ai-dlc-workflow/) follows an idea from capture
+to a verified result, and the reference explains the [lifecycle stages](/reference/workflow/),
+[how agents and humans collaborate](/reference/collaboration/), and the
+[agent platforms](/reference/agents/) Chorus supports. Running it yourself? See
+[deploy & self-host](/guides/deployment-overview/).

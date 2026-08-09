@@ -1,0 +1,225 @@
+---
+title: 인증과 권한
+description: 클라이언트가 Chorus에 어떻게 인증하고, 에이전트 권한 모델이 모든 도구와 라우트를 어떻게 통제하는지.
+docsLocale: ko
+route: /ko/reference/authentication/
+sidebar:
+  order: 6
+---
+
+Chorus는 모든 요청을 하나의 통합된 `AuthContext`로 인증하고, 그다음 세분화된 권한 집합에 비추어
+에이전트가 무엇을 할 수 있는지 통제합니다. 이 페이지는 인증 방식, 에이전트 API key 규약, 그리고 MCP
+도구 가시성과 REST 접근을 모두 구동하는 권한 모델을 설명합니다.
+
+인용할 수 있는 안정적인 앵커: [`#통합된-authcontext`](#통합된-authcontext),
+[`#해석-캐스케이드`](#해석-캐스케이드), [`#agent-api-key`](#agent-api-key),
+[`#권한-모델`](#권한-모델), [`#역할-프리셋`](#역할-프리셋),
+[`#사용자-지정-권한과-유효-권한-집합`](#사용자-지정-권한과-유효-권한-집합).
+
+## 통합된 AuthContext
+
+인증된 모든 요청은 세 가지 컨텍스트 유형 중 하나로 해석됩니다. 멀티테넌시는 `companyUuid`를 통해
+강제됩니다. 모든 데이터 접근은 그것으로 범위 지정되며, 여러 회사에 걸쳐 동작할 수 있는 것은 Super
+Admin뿐입니다.
+
+| 컨텍스트 유형 | `type` | 주요 필드 | 생성 주체 |
+| --- | --- | --- | --- |
+| User | `user` | `companyUuid`, `actorUuid`, `email`, `name` | OIDC, Default Auth |
+| Agent | `agent` | `companyUuid`, `actorUuid`, `roles[]`(프리셋 선택자), `permissions[]`(유효 집합), `agentName`, `ownerUuid` | API key |
+| Super Admin | `super_admin` | `email`(`companyUuid` 없음) | Super Admin 세션 |
+
+에이전트의 인가는 전적으로 그 `permissions[]`, 즉 평면적인 유효 집합에서 나옵니다. `roles[]` 필드는
+프리셋 선택자일 뿐 인가의 출처가 아닙니다.
+
+## 해석 캐스케이드
+
+단일 진입점이 우선순위 순서로 각 방식을 차례로 시도하고, 첫 성공에서 반환합니다.
+
+```text
+1. Authorization: Bearer <token>
+   ├─ cho_… 접두사 → API key 검증              → Agent 컨텍스트
+   ├─ RS*/ES* JWT   → OIDC 토큰 검증             → User 컨텍스트
+   └─ HS256 JWT     → Chorus JWT 검증             → User 컨텍스트
+2. 세션 Cookie
+   └─ user_session | admin_session            → User | Super Admin 컨텍스트
+3. OIDC Cookie(SSE / EventSource용, Authorization 헤더 없음)
+   └─ oidc_access_token cookie                → User 컨텍스트
+4. 일치 없음 → 미인증
+```
+
+1단계의 토큰은 형태로 분류됩니다. `cho_` 접두사는 API key입니다. 그 외의 세 부분 JWT는 헤더 알고리즘이
+비대칭(`RS*`/`ES*`)이면 OIDC, `HS256`이면 Chorus 자체 서명 세션 토큰입니다.
+
+## Agent API key
+
+에이전트는 모든 MCP와 REST 요청에서 bearer API key로 인증합니다.
+
+```http
+Authorization: Bearer cho_<random>
+```
+
+규약은 다음과 같습니다.
+
+- **`cho_` 접두사.** 모든 key는 `cho_`로 시작하고 그 뒤에 base64url로 인코딩된 무작위 바이트가 이어집니다.
+  해석 캐스케이드는 이 접두사로 key와 JWT를 구분합니다.
+- **한 번만 표시.** 원시 key는 생성 시점에만 반환됩니다. 그때 복사하세요. 이후에는 다시 가져올 수 없습니다.
+- **정지 상태에서는 SHA-256 해시.** 저장되는 것은 key의 SHA-256 해시뿐입니다. 데이터베이스는 원시 값을
+  결코 보관하지 않으므로, 데이터베이스 덤프가 사용 가능한 자격 증명을 노출하지 않습니다.
+- **타이밍 안전 비교.** 검증은 제시된 토큰을 해시하고 두 해시를 상수 시간으로 비교합니다. 그래서 앞부분이
+  몇 글자 일치하든 실패에 걸리는 시간은 같습니다.
+- **회전, 폐기, 만료.** key는 폐기하거나 선택적 만료를 부여할 수 있습니다. 폐기되거나 만료된 key는 검증에
+  실패합니다. 회전은 대체 key를 만들고 옛것을 폐기해 수행합니다. 권한은 key가 아니라 에이전트에 붙어
+  있으므로, key를 회전해도 에이전트의 권한은 유지됩니다. 권한을 바꾸는 것은 에이전트의 편집입니다.
+
+:::caution[key는 한 번만 표시됩니다]
+생성 후 원시 key를 복구할 방법은 없습니다. secret manager에 보관하고 비밀번호처럼 다루세요. 유출되면
+폐기하고 대체본을 발급하세요.
+:::
+
+key의 생성, 편집, 회전, 폐기는 API 호출이 아니라 Settings 안의 작업입니다. 자격 증명 생성 단계는
+[에이전트 액세스 준비](/ko/guides/administrator-setup/), 편집과 폐기는
+[에이전트와 API Key 관리](/ko/guides/manage-agents/), key를 에이전트에 연결하는 방법은
+[에이전트 런타임 연결](/ko/guides/operator-onboarding/)을 보세요.
+
+## 그 밖의 인증 방식
+
+다음은 사람 사용자와 플랫폼 관리자를 위한 것입니다. 여기서는 요약하며, 설정은 운영 가이드가 다룹니다.
+
+### OIDC(사용자)
+
+사람 사용자를 위한 엔터프라이즈 SSO로, Super Admin이 회사별로 설정합니다(issuer, client ID, 활성화
+토글). 로그인은 **PKCE**를 사용하는 인가 코드 흐름을 쓰며 client secret이 필요 없습니다. 제공자가
+리디렉션으로 되돌아온 뒤, Chorus는 `(companyUuid, oidcSub)`로 사용자를 찾거나 만들고, HTTP-only
+Cookie를 설정합니다.
+
+| Cookie | 용도 |
+| --- | --- |
+| `oidc_access_token` | API 호출용 액세스 토큰(약 1시간) |
+| `oidc_refresh_token` | 조용한 갱신용 리프레시 토큰(약 30일) |
+| `oidc_client_id` | 토큰 갱신 시 사용하는 client ID |
+| `oidc_issuer` | JWKS 발견에 사용하는 issuer |
+
+액세스 토큰은 제공자의 JWKS(캐시됨)에 비추어 검증되며, edge middleware가 요청이 앱에 닿기 전에 만료가
+임박한 액세스 토큰을 투명하게 갱신합니다.
+
+### Default Auth(개발용)
+
+OIDC 없이 개발과 데모 배포를 위한 단일 이메일/비밀번호 로그인입니다. `DEFAULT_USER`와 `DEFAULT_PASSWORD`가
+모두 설정된 경우에만 활성화됩니다.
+
+```bash
+DEFAULT_USER="dev@example.local"
+DEFAULT_PASSWORD="change-me"
+```
+
+로그인 시 Chorus는 회사와 사용자를 자동 프로비저닝하고, 오래 사는 자체 서명 JWT 하나를 `user_session`
+Cookie에 발급합니다. 갱신 흐름은 없으며, 만료되면 사용자가 다시 로그인합니다. 프로덕션에서는 Default
+Auth를 켜지 마세요.
+
+### Super Admin
+
+모든 회사에 걸친 플랫폼 수준 관리(회사 관리, 회사별 OIDC 설정)입니다. 환경 변수에 이메일과 **bcrypt**
+비밀번호 해시를 설정합니다.
+
+```bash
+SUPER_ADMIN_EMAIL="admin@example.com"
+SUPER_ADMIN_PASSWORD_HASH="$2b$10$…"   # bcrypt 해시
+```
+
+로그인에 성공하면 `admin_session` Cookie가 설정됩니다. Super Admin 컨텍스트는 **`companyUuid`가 없어서**
+회사 범위 지정을 받지 않습니다. 테넌트를 가로질러 읽을 수 있는 유일한 컨텍스트입니다.
+
+## 권한 모델
+
+에이전트 인가는 권한 비트의 집합입니다. 에이전트가 지닌 유효 집합이 모든 계층에서 그것이 무엇을 할 수
+있는지 결정합니다.
+
+### 5 × 3 행렬
+
+권한은 `{resource}:{action}`으로 씁니다. 다섯 자원에 세 동작을 곱해 15개의 가능한 비트가 나옵니다.
+
+| | `read` | `write` | `admin` |
+| --- | --- | --- | --- |
+| **`idea`** | idea 보기 | idea 생성 / 가져가기 / 놓기 / 업데이트; 요구사항 구체화 실행 | idea 닫기 / 삭제 |
+| **`proposal`** | proposal과 초안 보기 | 생성 / 제출 / 거부 / 철회; 초안 관리; 작업 일괄 생성; 작업 DAG 관리; 작업 배정 | proposal 승인 / 닫기 |
+| **`document`** | 문서 보기 | 문서 생성 / 업데이트 | 문서 삭제 |
+| **`task`** | 작업 보기 | 가져가기 / 놓기 / 제출 / 보고; 수락 기준 자체 확인 | 작업 검증 / 다시 열기 / 닫기 / 삭제; 수락 기준 표시 |
+| **`project`** | 프로젝트와 그룹 보기 | 프로젝트와 그룹 생성 / 업데이트 / 삭제; 프로젝트 이동 | 예약(`admin_agent`가 부여하나 아직 통제되지 않음) |
+
+동작은 관례상 누적이지만 자동으로 **상속되지는 않습니다**. `task:admin`을 부여해도 `task:read`나
+`task:write`가 함의되지 않습니다. 각 비트는 명시적으로 부여합니다.
+
+:::caution[`*:admin` 비트는 사람 수준]
+`admin` 열은 보통 사람 검토자를 필요로 하는 동작, 즉 proposal 승인, 작업 검증, 엔티티 삭제를 다룹니다.
+`*:admin` 비트를 부여하면 에이전트가 그 사람의 판단을 대신할 수 있습니다(작성자 범위가 아닙니다.
+`task:admin`은 에이전트가 작업한 것뿐 아니라 회사 내 임의의 작업을 검증할 수 있습니다). admin 비트는
+승인 워크플로를 의도적으로 자동화하는 에이전트에게만 부여하세요.
+:::
+
+### 역할 프리셋
+
+세 개의 이름 붙은 프리셋은 15개 비트의 고정된 부분집합으로 펼쳐집니다. 프리셋은 지름길일 뿐 독립적인
+인가 메커니즘이 아닙니다.
+
+| 프리셋 | 개수 | 펼쳐진 권한 |
+| --- | :---: | --- |
+| `developer_agent` | **6** | `*:read` + `task:write` |
+| `pm_agent` | **10** | `*:read` + `idea:write` + `proposal:write` + `document:write` + `task:write` + `project:write` |
+| `admin_agent` | **15** | 모든 비트(`*:read` + `*:write` + `*:admin`) |
+
+펼치면 각 프리셋은 다음과 같습니다.
+
+```text
+developer_agent (6):
+  idea:read  proposal:read  document:read  project:read  task:read
+  task:write
+
+pm_agent (10):
+  idea:read      idea:write
+  proposal:read  proposal:write
+  document:read  document:write
+  task:read      task:write
+  project:read   project:write
+
+admin_agent (15):
+  idea:read      idea:write      idea:admin
+  proposal:read  proposal:write  proposal:admin
+  document:read  document:write  document:admin
+  task:read      task:write      task:admin
+  project:read   project:write   project:admin
+```
+
+### 사용자 지정 권한과 유효 권한 집합
+
+프리셋 외에도 에이전트는 사용자 지정 권한 비트를 지닐 수 있습니다. **유효 집합**은 펼쳐진 프리셋과 사용자
+지정 비트의 합집합입니다.
+
+```text
+effective = expand(preset) ∪ custom
+```
+
+순서는 상관없습니다. 순수한 집합의 합집합입니다. 흔한 형태는 다음과 같습니다.
+
+- **읽기 전용 감사자** — 프리셋 없음, 사용자 지정은 `*:read`만: 모든 것을 볼 수 있으나 아무것도 바꾸지 못함.
+- **자체 검증 개발자** — `developer_agent` + `task:admin`: 관리자를 기다리지 않고 작업을 검증할 수 있음.
+- **승인 권한이 있는 PM** — `pm_agent` + `proposal:admin`: proposal을 직접 승인할 수 있음.
+
+### 유효 집합이 접근을 어떻게 통제하는가
+
+같은 유효 집합이 두 통합 표면을 모두 구동합니다.
+
+- **MCP 도구 가시성.** 권한으로 통제되는 각 MCP 도구는 필요한 권한을 정확히 하나 선언합니다. 연결 시,
+  도구의 필요한 권한이 유효 집합에 있는 경우에만 그 도구가 에이전트의 서버에 등록됩니다. 그렇지 않으면
+  그 도구는 그저 에이전트의 도구 목록에 나타나지 않습니다. 공용 도구(discover / read / list / search /
+  comment / session, 그리고 `chorus_create_tasks` / `chorus_update_task`)는 통제되지 않고 모든 에이전트에
+  나타납니다.
+- **REST 통제.** 통제되는 REST 라우트는 그 핸들러를 `requireAgentPermission("{resource}:{action}", …)`으로
+  감쌉니다. 그 비트가 없는 에이전트는 `403 Missing permission`을 받습니다. 사람 사용자는
+  `requireAgentPermission`의 대상이 아니며(사람 라우트는 세션 기반 검사를 사용), Super Admin은 모든 권한
+  검사를 지나칩니다.
+
+:::note[에이전트가 보는 것]
+에이전트의 도구 목록은 정확히 공용 도구와, 그 유효 권한이 잠금 해제하는 통제 대상 도구의 합집합입니다.
+기대하는 도구가 보이지 않는다면 그 에이전트가 필요한 권한을 갖고 있지 않은 것입니다. key가 아니라 에이전트의
+권한을 편집하세요. 완전한 도구 → 권한 대응은 [MCP 도구 카탈로그](/ko/reference/mcp-tools/)를 보세요.
+:::

@@ -1,0 +1,135 @@
+---
+title: Deploy in production
+description: Run Chorus from the global npm package against an external PostgreSQL and Redis, or provision the bundled AWS CDK stack.
+docsLocale: en
+route: /guides/deploy-production/
+sidebar:
+  order: 22
+---
+
+This guide covers two production paths: running the global npm package against your own
+PostgreSQL and Redis, and provisioning the bundled AWS stack with the repository's
+installer. For a single-machine trial, use [Get started](/guides/getting-started/)
+instead; for a container deployment, see [Deploy with Docker](/guides/deploy-docker/).
+Bootstrap credentials, single sign-on, and safe upgrades are covered in
+[Operate a self-hosted Chorus](/guides/deploy-operations/).
+
+## Run the global package against external PostgreSQL
+
+Install the Chorus command globally on the host that will run the web application:
+
+```sh
+npm install --global @chorus-aidlc/chorus
+```
+
+Point Chorus at an existing PostgreSQL database with `DATABASE_URL` and supply the
+required authentication and secret variables, then start it:
+
+```sh
+DATABASE_URL='postgresql://chorus:password@db.internal:5432/chorus' \
+NEXTAUTH_SECRET='a-long-random-string' \
+SUPER_ADMIN_EMAIL='admin@example.com' \
+SUPER_ADMIN_PASSWORD_HASH='$2b$10$...' \
+chorus
+```
+
+On startup Chorus applies any pending database migrations automatically
+(`prisma migrate deploy`, exposed as the `db:migrate` script) and then serves the web
+application on port `8637`. The database must already exist and be reachable; Chorus
+does not create the server for you on this path.
+
+The variables Chorus reads in a production run:
+
+| Variable | Required | Description |
+| --- | --- | --- |
+| `DATABASE_URL` | Yes | PostgreSQL connection string, `postgresql://user:password@host:port/dbname`. |
+| `NEXTAUTH_SECRET` | Yes | Secret used to sign session tokens. Generate a random value, for example with `openssl rand -base64 32`. |
+| `SUPER_ADMIN_EMAIL` | Yes | Email that bootstraps the `/admin` SuperAdmin panel. |
+| `SUPER_ADMIN_PASSWORD_HASH` | Yes | Bcrypt hash of the SuperAdmin password. |
+| `DEFAULT_USER` | Optional | Enables a built-in email/password login for first access. |
+| `DEFAULT_PASSWORD` | Optional | Password for the built-in login. |
+| `REDIS_URL` | Optional | Redis connection string. Required once you run more than one instance (see below). |
+
+See [Operate a self-hosted Chorus](/guides/deploy-operations/) for how these bootstrap
+credentials work, how to generate the bcrypt hash, and how to turn the built-in login off.
+
+:::caution[Handle secrets carefully]
+`NEXTAUTH_SECRET` and the SuperAdmin credentials grant full access. Keep them out of shell
+history and source control — supply them through your process manager, systemd unit, or a
+secret store rather than typing them inline on a shared host.
+:::
+
+## Run more than one instance
+
+Chorus propagates live updates (the SSE event stream) across instances through Redis. Set
+`REDIS_URL` to a shared Redis so every instance publishes and receives the same events:
+
+```sh
+REDIS_URL='redis://default:password@redis.internal:6379'
+```
+
+**Redis is required for cross-instance event propagation.** Without `REDIS_URL`, Chorus
+falls back to an in-memory event bus that is scoped to a single process — updates made on
+one instance never reach the others. A single-instance deployment can run without Redis on
+that in-memory fallback, but any deployment with more than one instance must configure a
+shared Redis.
+
+## Deploy the AWS CDK stack
+
+Chorus bundles an AWS CDK stack under `packages/chorus-cdk` and a repository-root
+`install.sh` that drives it interactively. The stack stands up a complete, HTTPS-fronted
+deployment with managed PostgreSQL and Redis.
+
+### Prerequisites
+
+`install.sh` first checks that the `aws`, `node`, and `pnpm` commands are available and
+that your AWS credentials are valid (it calls `aws sts get-caller-identity`). Configure
+your credentials with `aws configure` or `AWS_PROFILE` before running it, and have an
+[AWS Certificate Manager](https://aws.amazon.com/certificate-manager/) certificate ready
+in the deployment region.
+
+### Run the installer
+
+From the repository root:
+
+```sh
+./install.sh
+```
+
+The installer prompts for the deployment configuration:
+
+| Prompt | Required | Notes |
+| --- | --- | --- |
+| Stack name | No | Defaults to `Chorus`. |
+| ACM Certificate ARN | Yes | Must start with `arn:aws:acm:`. The load balancer uses it to terminate HTTPS. |
+| Custom domain | No | For example `chorus.example.com`. Adds a host rule for that domain when set. |
+| Super admin email | Yes | Bootstraps the `/admin` SuperAdmin account. |
+| Super admin password | Yes | Minimum 8 characters. Hashed with bcrypt at synth time; the plaintext is never stored in the template. |
+| NextAuth secret | No | Auto-generated if left blank. |
+
+After collecting the answers, `install.sh` installs and builds the CDK package, bootstraps
+the CDK environment, and deploys the stack. It also writes a re-runnable
+`default_deploy.sh` with your answers so later deploys do not re-prompt.
+
+### What the stack provisions
+
+The stack (`packages/chorus-cdk/lib/{chorus-stack,service,database,cache}.ts`) creates:
+
+| Component | What it is | Key configuration |
+| --- | --- | --- |
+| Application Load Balancer | Internet-facing entry point terminating HTTPS on port 443 with your ACM certificate. | Forwards to the service; a host rule routes your custom domain when one is set; 60-minute idle timeout. |
+| ECS Fargate service | Runs the Chorus container in private subnets. | Desired count 2, 1024 CPU units / 2048 MiB, deployment circuit breaker with automatic rollback. |
+| Aurora Serverless v2 (PostgreSQL) | Managed PostgreSQL cluster. | Encrypted storage; credentials auto-generated into Secrets Manager; 1-day backup retention. |
+| ElastiCache Serverless (Redis) | Managed Redis for cross-instance events. | RBAC user; password stored in Secrets Manager. |
+| Secrets Manager | Holds the generated database and Redis credentials plus the app secrets. | Injected into the ECS task at runtime. |
+
+### Deploy, update, and destroy
+
+| Action | Command |
+| --- | --- |
+| First deploy | `./install.sh` |
+| Re-deploy or update | `./default_deploy.sh` (or `pnpm cdk:deploy`) |
+| Destroy | `pnpm cdk:destroy` |
+
+`packages/chorus-cdk` is the authoritative source for the stack. Read it there when you
+need exact resource definitions or want to adjust capacity, retention, or networking.

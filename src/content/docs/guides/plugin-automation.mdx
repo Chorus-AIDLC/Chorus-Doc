@@ -1,0 +1,172 @@
+---
+title: Automation behaviors
+description: How the plugin's reviewer sub-agents, session lifecycle hooks, and headless interaction guard work.
+docsLocale: en
+route: /guides/plugin-automation/
+---
+
+Once the Chorus plugin is connected, it adds behavior around the workflow you already know
+from [The AI-DLC workflow](/guides/ai-dlc-workflow/): it prompts for independent review at
+the right moments, keeps agent sessions tracked without manual bookkeeping, and constrains
+what an unattended agent may do. This page explains those behaviors. It does not repeat the
+lifecycle stages or how to install, run, and recover a runtime — see
+[The AI-DLC workflow](/guides/ai-dlc-workflow/),
+[Operate the Chorus daemon](/guides/daemon-operations/),
+[Interrupt and resume a session](/guides/session-recovery/), and the
+[agent platforms reference](/reference/agents/) for those.
+
+## Reviewer sub-agents
+
+The plugin adds an independent quality gate at three points in the pipeline. At each point a
+`PostToolUse` hook fires and injects a reminder that prompts the **main agent** to spawn a
+dedicated **read-only reviewer sub-agent**. The reviewer is **not launched automatically** —
+the main agent spawns it (in the foreground) and waits for the result. Every reviewer ends
+by posting a single comment with a verdict of `PASS`, `PASS WITH NOTES`, or `FAIL`:
+
+- `PASS` / `PASS WITH NOTES` — the work continues; notes are advisory.
+- `FAIL` — the listed blockers must be fixed and the work re-submitted before it moves on.
+
+The reviewers are strictly read-only: they cannot edit, write, or create files (the
+proposal reviewer cannot run shell commands at all; the task and code reviewers may run only
+read-only and test/build commands). Their job is to find what the author missed, not to
+change anything.
+
+| Reviewer | Fires after | Reviews | Verdict posted on |
+| --- | --- | --- | --- |
+| Proposal reviewer | `chorus_pm_submit_proposal` | Document completeness, task granularity, acceptance-criteria alignment, and the dependency graph | The proposal |
+| Task reviewer | `chorus_submit_for_verify` | The task's implementation against its acceptance criteria and the proposal documents | The task |
+| Code reviewer | the last task of an idea-rooted proposal being verified (`chorus_admin_verify_task`) | The idea's **aggregate** change across all its tasks — cross-task integration, architecture drift, security, regressions, feature-level coverage | The idea |
+
+The code reviewer is the final ship-time gate: it runs only when the *last* task of an
+idea-rooted proposal is verified, and reviews the whole feature at once rather than a single
+task. The three matchers that trigger these prompts live in
+`public/chorus-plugin/hooks/hooks.json`.
+
+### Turn reviewers on or off
+
+The reviewers are gated by `userConfig` settings you can adjust when installing or
+configuring the plugin. Each reviewer has an on/off toggle (all default **on**) and a
+maximum-round limit that caps how many review-and-fix rounds run before the agent escalates
+to a human instead of looping:
+
+| Setting | Type | Default | Effect |
+| --- | --- | --- | --- |
+| `enableProposalReviewer` | boolean | `true` | Prompt to spawn the proposal reviewer after a proposal is submitted |
+| `enableTaskReviewer` | boolean | `true` | Prompt to spawn the task reviewer after a task is submitted for verification |
+| `enableCodeReviewer` | boolean | `true` | Prompt to spawn the code reviewer after the last task of an idea is verified |
+| `maxProposalReviewRounds` | number | `3` | Maximum proposal review-and-fix rounds before escalating to a human (`0` = unlimited) |
+| `maxTaskReviewRounds` | number | `3` | Maximum task review rounds before escalating (`0` = unlimited) |
+| `maxCodeReviewRounds` | number | `3` | Maximum code-review rounds before escalating (`0` = unlimited) |
+
+Turning a reviewer off removes its independent quality check but reduces token usage. A
+separate `enableOpenSpec` toggle governs OpenSpec mode, covered on its own page.
+
+:::caution[Only the toggle surface is Claude Code only]
+Both Claude Code and Codex ship all three reviewers and fire the same three review prompts.
+What is Claude Code only is the `userConfig` **toggle surface** — the `enable*` switches and
+the round-limit settings in the table above. Codex has no `userConfig`, so on Codex these
+reviewers are governed by its skills and hooks directly rather than by install-time toggles.
+See [What Codex does differently](#what-codex-does-differently) below. Do not read the
+toggle difference as a difference in which reviewers exist.
+:::
+
+## Session lifecycle hooks
+
+A second group of hooks manages the agent's Chorus **session** automatically, so neither you
+nor the agent has to open, heartbeat, or close sessions by hand. These run on their own — no
+judgment or prompting involved:
+
+- **`SessionStart`** — checks connectivity, checks the agent in, and discovers any session
+  the plugin pre-created for it.
+- **`SubagentStart`** — synchronously creates a Chorus session for a spawned worker before
+  it begins, so its work is attributed correctly.
+- **`SubagentStop`** — checks the worker out of every task it held and closes its session,
+  so no worker leaves a dangling checkin or open session.
+- **Heartbeat and reminders** — an idle worker sends a heartbeat so its session is not
+  marked inactive during long runs, and `PostToolUse` reminders nudge the main agent at the
+  review points described above.
+
+Because these hooks own the session lifecycle, an agent should never create or close a
+session itself. For managing the runtime that these sessions run inside — starting it,
+choosing working directories, interrupting, and resuming — see
+[Operate the Chorus daemon](/guides/daemon-operations/) and
+[Interrupt and resume a session](/guides/session-recovery/).
+
+## Headless daemon sessions: no interactive prompts
+
+When an agent runs unattended as a [daemon](/guides/daemon-operations/) session, there is no
+human at a terminal to answer a pop-up. A headless session **must not** use interactive
+prompts (such as `AskUserQuestion`) to reach a decision — a prompt no one can answer would
+stall the run.
+
+Instead, the agent routes every decision back **through Chorus**, where the responsible
+human can respond asynchronously:
+
+- Post an evidence-rich **comment** on the task or proposal and **@mention** the responsible
+  human with the exact action you need (for example, admin verification).
+- Use **elaboration** to record open questions on an idea rather than blocking on a live
+  answer.
+
+This keeps the audit trail intact and lets the human respond when they are next in Chorus,
+without the session waiting on a prompt it cannot surface. The same handoff applies whether
+the session is interactive or headless; only the headless case makes the interactive prompt
+impossible.
+
+## What Codex does differently
+
+The Codex plugin is a port, not a mirror. It runs the **same three reviewers** as Claude
+Code — proposal, task, and code — each prompted by the same `PostToolUse` / hook nudge after
+a proposal is submitted, a task is submitted for verification, and the last task of an
+idea-rooted proposal is verified. Where it differs is the configuration and spawning
+mechanics, not the set of reviewers:
+
+- **No `userConfig` toggle surface.** Codex exposes no `enable*` reviewer switches and no
+  round-limit settings. The reviewer prompts are driven by Codex's skills and hooks
+  directly, so they cannot be turned off at install time the way they can on Claude Code —
+  the code-review gateway, for instance, defaults on and has no toggle to disable it.
+- **Native spawning.** The main agent invokes a reviewer through Codex's own
+  `spawn_agent` / `wait_agent` rather than Claude Code's Agent Teams, and there are no
+  Codex equivalents for the `TeammateIdle` and `TaskCompleted` hooks.
+
+For the OpenClaw, Kiro, and Pi runtimes, treat automation as a difference-and-pointer: see
+each runtime's page under the [agent platforms reference](/reference/agents/) for what it
+supports rather than assuming the Claude Code behavior.
+
+## For agents
+
+- **Triggers:**
+  - After `chorus_pm_submit_proposal`, a `PostToolUse` hook prompts you to spawn
+    `chorus:proposal-reviewer` (foreground); read its `VERDICT:` comment on the proposal.
+  - After `chorus_submit_for_verify`, spawn `chorus:task-reviewer`; read its `VERDICT:`
+    comment on the task.
+  - After `chorus_admin_verify_task` on the **last** task of an idea-rooted proposal, spawn
+    the code reviewer; read its `VERDICT:` comment on the idea. This runs on both Claude Code
+    (`chorus:code-reviewer`) and Codex (`chorus-code-reviewer`).
+  - Reviewers are **not** auto-launched — you spawn them yourself and wait for the verdict.
+    `PASS` / `PASS WITH NOTES` continue; `FAIL` means fix the blockers and re-submit.
+- **Constraints:**
+  - Reviewers are read-only (no Edit/Write/NotebookEdit; the proposal reviewer has no Bash,
+    the task and code reviewers run only read-only and test/build commands).
+  - All three reviewers (proposal, task, code) ship on **both** Claude Code and Codex. Only
+    the `userConfig` toggle surface is Claude Code only — the `enable*` switches
+    (`enableProposalReviewer`, `enableTaskReviewer`, `enableCodeReviewer`) and the round
+    limits (`maxProposalReviewRounds`, `maxTaskReviewRounds`, `maxCodeReviewRounds`,
+    default 3, `0` = unlimited). Codex has no `userConfig`, so on Codex the reviewers are
+    governed by its skills and hooks directly and cannot be toggled off at install time.
+  - Do **not** call `chorus_create_session` or `chorus_close_session` — the session
+    lifecycle hooks (`SessionStart`, `SubagentStart`, `SubagentStop`) manage it.
+  - A **headless** daemon session must **not** use interactive prompts (`AskUserQuestion`
+    and similar). Route decisions through Chorus comments + `@mention` and elaboration.
+- **Cite:**
+  - Hook events and `PostToolUse` matchers: `public/chorus-plugin/hooks/hooks.json`.
+  - Reviewer roles: `public/chorus-plugin/agents/proposal-reviewer.md`,
+    `public/chorus-plugin/agents/task-reviewer.md`,
+    `public/chorus-plugin/agents/code-reviewer.md`.
+  - `userConfig` toggles and round limits (Claude Code only):
+    `public/chorus-plugin/.claude-plugin/plugin.json`.
+  - Codex ships the same three reviewers with no `userConfig` surface:
+    `plugins/chorus/skills/chorus-code-reviewer/SKILL.md`,
+    `plugins/chorus/hooks/on-post-verify-task.sh` (the code-review gateway nudge), and
+    `plugins/chorus/.codex-plugin/plugin.json`.
+  - Hook-and-skill division: `docs/chorus-plugin.md`.
+  - Headless interaction guard: `docs/DAEMON.md` and the `develop` / `quick-dev` skills.

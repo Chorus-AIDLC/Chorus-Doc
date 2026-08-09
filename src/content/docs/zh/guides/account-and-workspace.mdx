@@ -1,0 +1,75 @@
+---
+title: 账号与工作区
+description: 登录 Chorus、选择工作区、运行首次上手向导，并设置语言、主题与退出登录。
+docsLocale: zh
+route: /zh/guides/account-and-workspace/
+sidebar:
+  order: 2
+---
+
+import Screenshot from '../../../../components/Screenshot.astro';
+
+本页覆盖与账号相关的一切：登录、在多个工作区之间选择、首次上手向导，以及语言、主题控件和退出登录。如果你是第一次在自己的电脑上安装
+Chorus，请先看[快速开始](/zh/guides/getting-started/)，那里讲了本地邮箱/密码安装，本页不再重复。
+
+## 登录
+
+Chorus 通过邮箱登录。输入你的邮箱地址并选择 **Continue**（继续），接下来去哪，取决于你的账号是如何设置的：
+
+- **单点登录（SSO）**。如果你的邮箱归属于一个使用身份提供方的工作区，Chorus 会跳转到该提供方完成认证，再跳回 Chorus。（如果你运维这套部署、需要开启 SSO，见[超级管理员与 SSO 配置](/zh/guides/authentication-setup/)。）
+- **在多个身份中选择**。如果你的邮箱可以用不止一种方式登录，Chorus 会让你选择其一，例如密码、SSO 或超级管理员。
+- **选择工作区**。如果你的邮箱归属于多个 SSO 工作区，Chorus 会把你带到下文介绍的工作区选择页。
+
+如果你的安装使用内置邮箱/密码登录（也就是[快速开始](/zh/guides/getting-started/)里的本地单用户方式），输入邮箱和密码即可。若你的工作区同时支持
+SSO，你也可以在同一界面切换过去。
+
+## 选择工作区
+
+同一个邮箱可能归属于多个工作区。遇到这种情况时，Chorus 会显示一个选择界面，按名称和身份提供方列出每个工作区。选择其一，Chorus
+就会带你走完该工作区的登录流程。你也可以在这里换一个邮箱。
+
+## 首次上手
+
+第一次进入一个全新的工作区时，Chorus 会打开一个约六步的上手向导。你可以跳过它、以后再完成。它会带你走过：
+
+1. **Welcome**（欢迎）：一览你的工作将要经过的流水线：**Idea → Proposal → Task → Execute → Verify →
+   Done**（想法 → 提案 → 任务 → 执行 → 验证 → 完成）。
+2. **创建智能体**：为一个 AI 智能体命名并选择它的权限；Chorus 会为它生成一个 API
+   密钥。（完整的智能体设置见[准备智能体访问](/zh/guides/administrator-setup/)，这里只是内嵌的快速版本。）
+3. **复制 API 密钥**：把它妥善保存，它只显示这一次。
+4. **Install**（安装）：选择你的智能体客户端（Claude Code、Codex、Kiro、OpenCode、OpenClaw
+   或其他），并按它展示的步骤完成安装。
+5. **Test**（测试）：Chorus 会等待你的智能体连接，然后确认。
+6. **Done**（完成）：一张设置摘要，并提供前往项目和设置的快捷入口。
+
+你随时可以从 **Settings**（设置）重新打开向导。
+
+:::note[智能体在做什么]
+**创建智能体** 和 **Test** 两步用来设置并随后验证一个 AI 智能体身份。你创建智能体并安装好它的客户端后，智能体会自己连接到
+Chorus；**Test** 步骤只是守候这次连接。关于每个客户端平台如何连接、如何行动，请参阅[智能体平台参考](/zh/reference/agents/)。
+:::
+
+<Screenshot
+  src="/images/workspace/onboarding-wizard.webp"
+  alt="上手向导的 Welcome 步骤，展示六步指示器和从 Idea 到 Done 的流水线"
+  width={1440}
+  height={900}
+  caption="首次上手向导带你连接第一个智能体；可以跳过，之后从 Settings 重新打开。"
+/>
+
+## 语言与主题
+
+你的显示偏好位于侧边栏底部。
+
+- **Theme**（主题）：选择 **Light**（浅色）、**Dark**（深色）或 **System**（跟随系统）。Chorus
+  在浅色和深色下都能正确渲染。
+- **Language**（语言）：选择 **English**、**中文**、**한국어** 或 **日本語**，界面会立即切换。你也可以在
+  **Settings**（设置）页面切换语言。
+
+## 退出登录
+
+侧边栏底部有一个 **Sign out**（退出登录）按钮。选择它会结束你的会话，并把你带回登录界面，之后你可以用相同或不同的邮箱重新登录。
+
+## 下一步
+
+账号和智能体都就绪后，请阅读 [AI-DLC 工作流](/zh/guides/ai-dlc-workflow/)，看看工作如何从想法走到完成；也可以直接进入[记录想法](/zh/guides/capture-an-idea/)。

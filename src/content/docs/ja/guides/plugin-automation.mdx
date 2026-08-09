@@ -1,0 +1,164 @@
+---
+title: 自動化の挙動
+description: プラグインのレビュー担当サブエージェント、セッションライフサイクルフック、そしてヘッドレス時の対話ガードの仕組み。
+docsLocale: ja
+route: /ja/guides/plugin-automation/
+---
+
+Chorus プラグインを接続すると、[AI-DLC ワークフロー](/ja/guides/ai-dlc-workflow/)で既におなじみの
+ワークフローに、いくつかの挙動が上乗せされます。適切な瞬間に独立したレビューを促し、手作業の記帳なしに
+エージェントのセッションを追跡し、無人のエージェントができることを制約します。本ページはそれらの挙動を
+説明します。ライフサイクルの各段階や、実行時のインストール・起動・復旧の方法は繰り返しません。それらは
+それぞれ [AI-DLC ワークフロー](/ja/guides/ai-dlc-workflow/)、
+[Chorus デーモンを運用する](/ja/guides/daemon-operations/)、
+[セッションを中断・再開する](/ja/guides/session-recovery/)、そして
+[エージェントプラットフォームのリファレンス](/ja/reference/agents/)を参照してください。
+
+## レビュー担当サブエージェント
+
+プラグインは、パイプラインの 3 つの節目に独立した品質ゲートを加えます。各節目で `PostToolUse` フックが
+発火し、**メインエージェント**に専用の**読み取り専用のレビュー担当サブエージェント**の起動を促す
+リマインダーを注入します。レビュー担当は**自動では起動しません** — メインエージェントが（フォアグラウンドで）
+起動し、結果を待ちます。どのレビュー担当も最後に、`PASS`、`PASS WITH NOTES`、または `FAIL` の裁定を
+1 件のコメントとして投稿します。
+
+- `PASS` / `PASS WITH NOTES` — 作業は続行します。メモは参考情報です。
+- `FAIL` — 列挙されたブロッカーを修正し、作業を再提出してからでないと先に進めません。
+
+レビュー担当は厳密に読み取り専用です。ファイルの編集・書き込み・作成はできません（proposal reviewer は
+シェルコマンドを一切実行できず、task reviewer と code reviewer は読み取り専用およびテスト/ビルドの
+コマンドのみ実行できます）。その役割は、作者が見落としたものを見つけることであって、何かを変更することでは
+ありません。
+
+| レビュー担当 | 発火のタイミング | レビュー対象 | 裁定の投稿先 |
+| --- | --- | --- | --- |
+| Proposal reviewer | `chorus_pm_submit_proposal` の後 | 文書の完全性、課題の粒度、受け入れ基準との対応、そして依存グラフ | 提案 |
+| Task reviewer | `chorus_submit_for_verify` の後 | その課題の実装が受け入れ基準と提案文書を満たしているか | 課題 |
+| Code reviewer | 着想を根とする提案の最後の課題が検証されたとき（`chorus_admin_verify_task`） | その着想の全課題にわたる**集約**的な変更 — 課題間の統合、アーキテクチャの逸脱、セキュリティ、リグレッション、機能レベルのカバレッジ | 着想 |
+
+Code reviewer は出荷前の最終ゲートです。着想を根とする提案の*最後の*課題が検証されたときにのみ実行され、
+単一の課題ではなく機能全体を一度にレビューします。これらの提示をトリガーする 3 つのマッチャーは
+`public/chorus-plugin/hooks/hooks.json` に定義されています。
+
+### レビュー担当をオン・オフする
+
+これらのレビュー担当は、プラグインのインストールや設定時に調整できる `userConfig` 設定で制御されます。
+各レビュー担当にはオン/オフのトグル（すべて既定で**オン**）と、人間へエスカレーションする前に「レビュー・
+修正」ループを何回まで走らせるかを制限する最大ラウンド上限があります。
+
+| 設定項目 | 型 | 既定値 | 効果 |
+| --- | --- | --- | --- |
+| `enableProposalReviewer` | boolean | `true` | 提案の提出後に proposal reviewer の起動を促す |
+| `enableTaskReviewer` | boolean | `true` | 課題を検証に提出した後に task reviewer の起動を促す |
+| `enableCodeReviewer` | boolean | `true` | 着想の最後の課題が検証された後に code reviewer の起動を促す |
+| `maxProposalReviewRounds` | number | `3` | 人間へエスカレーションする前の最大提案レビュー・修正ラウンド数（`0` = 無制限） |
+| `maxTaskReviewRounds` | number | `3` | エスカレーション前の最大課題レビューラウンド数（`0` = 無制限） |
+| `maxCodeReviewRounds` | number | `3` | エスカレーション前の最大コードレビューラウンド数（`0` = 無制限） |
+
+あるレビュー担当をオフにすると、その独立した品質チェックは失われますが、トークン消費は減ります。
+別の `enableOpenSpec` トグルが OpenSpec モードを制御しますが、これは専用のページで扱います。
+
+:::caution[「トグルの面」だけが Claude Code 限定]
+Claude Code と Codex はどちらも 3 つのレビュー担当すべてを搭載し、同じ 3 つのレビュー提示を発火します。
+Claude Code 限定なのは `userConfig` の**トグルの面** — 上表の `enable*` スイッチとラウンド上限の設定です。
+Codex には `userConfig` がないため、Codex 上ではこれらのレビュー担当はインストール時のトグルではなく、
+スキルとフックが直接制御します。下記の[Codex の違い](#codex-の違い)を参照してください。トグルの違いを、
+どのレビュー担当が存在するかの違いと読み違えないでください。
+:::
+
+## セッションライフサイクルフック
+
+2 つ目のフック群は、エージェントの Chorus **セッション**を自動的に管理します。そのため、あなたも
+エージェントも、セッションを手作業で開いたり、ハートビートを送ったり、閉じたりする必要はありません。
+これらは判断も提示も伴わず、独りでに動きます。
+
+- **`SessionStart`** — 接続性をチェックし、エージェントをチェックインし、プラグインが事前に作成した
+  セッションがあれば見つけ出します。
+- **`SubagentStart`** — 派生したワーカーが動き出す前に、そのために Chorus セッションを同期的に作成し、
+  作業が正しく帰属されるようにします。
+- **`SubagentStop`** — ワーカーが占有していたすべての課題からそのワーカーをチェックアウトし、
+  セッションを閉じます。これにより、どのワーカーも宙ぶらりんのチェックインや開いたままのセッションを
+  残しません。
+- **ハートビートとリマインダー** — 待機中のワーカーはハートビートを送り、長時間の実行中にセッションが
+  非アクティブと見なされないようにします。`PostToolUse` リマインダーは、上記のレビューの節目で
+  メインエージェントを促します。
+
+これらのフックがセッションのライフサイクルを掌握しているため、エージェントは自分でセッションを作成したり
+閉じたりしてはいけません。これらのセッションが動く実行時そのものの管理（起動、作業ディレクトリの選択、
+中断、再開）については、[Chorus デーモンを運用する](/ja/guides/daemon-operations/)と
+[セッションを中断・再開する](/ja/guides/session-recovery/)を参照してください。
+
+## ヘッドレスなデーモンセッション：対話プロンプト禁止
+
+エージェントが[デーモン](/ja/guides/daemon-operations/)セッションとして無人で動くとき、ポップアップに
+答える人間は端末の前にいません。ヘッドレスなセッションは、判断に到達するために対話プロンプト（`AskUserQuestion`
+など）を使っては**いけません** — 誰も答えられないプロンプトは、実行全体を止めてしまいます。
+
+代わりに、エージェントはあらゆる判断を **Chorus 経由で**差し戻し、責任を持つ人間が非同期に応答できる
+ようにします。
+
+- 課題や提案に証拠の充実した**コメント**を投稿し、必要な正確なアクション（例えば管理者による検証）を
+  添えて責任者を **@mention** します。
+- ライブの回答を待って止まる代わりに、**要件詳細化**を使って着想上の未解決の疑問を記録します。
+
+これにより監査証跡は保たれ、人間は次に Chorus に入ったときに応答できます。セッションが表に出せない
+プロンプトで待たされることもありません。この引き渡しはセッションが対話式でもヘッドレスでも同様に適用され、
+ただヘッドレスの場合にのみ対話プロンプトが不可能になるだけです。
+
+## Codex の違い
+
+Codex プラグインは移植版であり、完全な鏡像ではありません。Codex は Claude Code と**同じ 3 つの
+レビュー担当**（proposal、task、code）を走らせ、それぞれ提案の提出後、課題を検証に提出した後、そして
+着想を根とする提案の最後の課題が検証された後に、同じ `PostToolUse` / フックの促しで起動されます。
+違うのはレビュー担当の顔ぶれではなく、設定と起動の仕組みです。
+
+- **`userConfig` のトグルの面がない。** Codex は `enable*` のレビュースイッチもラウンド上限の設定も
+  公開しません。レビューの提示は Codex のスキルとフックが直接駆動するため、Claude Code のように
+  インストール時にオフにはできません。例えばコードレビューのゲートウェイは既定でオンで、無効化する
+  トグルがありません。
+- **ネイティブな起動。** メインエージェントは Claude Code の Agent Teams ではなく、Codex 自前の
+  `spawn_agent` / `wait_agent` を通じてレビュー担当を呼び出します。また `TeammateIdle` や
+  `TaskCompleted` フックに相当するものは Codex にはありません。
+
+OpenClaw、Kiro、Pi の実行時については、自動化を「違いと案内」として扱ってください。Claude Code の挙動を
+そのまま前提とするのではなく、[エージェントプラットフォームのリファレンス](/ja/reference/agents/)下の
+各実行時のページで、何がサポートされているかを確認してください。
+
+## エージェント向け
+
+- **トリガー:**
+  - `chorus_pm_submit_proposal` の後、`PostToolUse` フックが `chorus:proposal-reviewer`（フォアグラウンド）
+    の起動を促します。提案上の `VERDICT:` コメントを読みます。
+  - `chorus_submit_for_verify` の後、`chorus:task-reviewer` を起動します。課題上の `VERDICT:` コメントを
+    読みます。
+  - 着想を根とする提案の**最後の**課題に対して `chorus_admin_verify_task` を行った後、code reviewer を
+    起動します。着想上の `VERDICT:` コメントを読みます。これは Claude Code（`chorus:code-reviewer`）と
+    Codex（`chorus-code-reviewer`）の両方で動きます。
+  - レビュー担当は**自動では**起動しません。あなた自身が起動し、裁定を待ちます。`PASS` /
+    `PASS WITH NOTES` は続行、`FAIL` はブロッカーを修正して再提出を意味します。
+- **制約:**
+  - レビュー担当は読み取り専用です（Edit/Write/NotebookEdit なし。proposal reviewer は Bash なし、
+    task reviewer と code reviewer は読み取り専用およびテスト/ビルドのコマンドのみ実行）。
+  - 3 つのレビュー担当（proposal、task、code）すべてが Claude Code と Codex の**両方**に搭載されて
+    います。Claude Code 限定なのは `userConfig` のトグルの面 — `enable*` スイッチ
+    （`enableProposalReviewer`、`enableTaskReviewer`、`enableCodeReviewer`）とラウンド上限
+    （`maxProposalReviewRounds`、`maxTaskReviewRounds`、`maxCodeReviewRounds`、既定 3、`0` = 無制限）
+    です。Codex には `userConfig` がないため、Codex 上ではこれらのレビュー担当はスキルとフックが直接
+    制御し、インストール時にオフにはできません。
+  - `chorus_create_session` や `chorus_close_session` を**呼び出さない**でください。セッション
+    ライフサイクルフック（`SessionStart`、`SubagentStart`、`SubagentStop`）が管理します。
+  - **ヘッドレス**なデーモンセッションは対話プロンプト（`AskUserQuestion` など）を使っては**いけません**。
+    判断は Chorus のコメント + `@mention` と要件詳細化を通じて差し戻してください。
+- **出典:**
+  - フックイベントと `PostToolUse` マッチャー: `public/chorus-plugin/hooks/hooks.json`。
+  - レビュー担当の役割: `public/chorus-plugin/agents/proposal-reviewer.md`、
+    `public/chorus-plugin/agents/task-reviewer.md`、
+    `public/chorus-plugin/agents/code-reviewer.md`。
+  - `userConfig` のトグルとラウンド上限（Claude Code 限定）:
+    `public/chorus-plugin/.claude-plugin/plugin.json`。
+  - Codex は同じ 3 つのレビュー担当を `userConfig` の面なしに搭載:
+    `plugins/chorus/skills/chorus-code-reviewer/SKILL.md`、
+    `plugins/chorus/hooks/on-post-verify-task.sh`（コードレビューのゲートウェイの促し）、
+    および `plugins/chorus/.codex-plugin/plugin.json`。
+  - フックとスキルの分担: `docs/chorus-plugin.md`。
+  - ヘッドレスの対話ガード: `docs/DAEMON.md` と `develop` / `quick-dev` スキル。

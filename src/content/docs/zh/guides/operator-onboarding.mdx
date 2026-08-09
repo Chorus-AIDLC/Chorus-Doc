@@ -1,0 +1,62 @@
+---
+title: 连接智能体运行环境
+description: 登录 Chorus，启动受支持的运行后端，并确认智能体已经在线。
+docsLocale: zh
+route: /zh/guides/operator-onboarding/
+sidebar:
+  order: 9
+---
+
+import Screenshot from '../../../../components/Screenshot.astro';
+
+## 准备连接信息
+
+开始前请确认你已经获得：
+
+- Chorus 网址和智能体 API 密钥；
+- 管理员允许使用的工作目录；
+- 已安装的 Claude Code、Codex 或 Kiro 命令行工具；
+- Node.js 22 或更高版本。
+
+其他智能体平台的安装方法和能力不同，请查看[智能体平台参考](/zh/reference/agents/)，不要直接套用本页命令。
+
+## 登录 Chorus
+
+安装 Chorus 命令行工具：
+
+```sh
+npm install --global @chorus-aidlc/chorus
+chorus login
+```
+
+`chorus login` 会依次询问 Chorus 网址和 API 密钥，验证成功后将配置保存到 `~/.chorus/daemon.json`。输入密钥时终端不会显示内容。
+
+:::caution[不要在命令行中直接填写密钥]
+命令参数可能保留在终端历史或进程列表中。请使用 `chorus login` 输入并保存密钥，不要把真实密钥写入脚本、仓库配置或共享日志。
+:::
+
+## 启动智能体
+
+下面以 Claude Code 为例，在获准的工作目录中启动：
+
+```sh
+chorus daemon --agent claude-code --cwd /home/demo/workspace --chorus-only
+```
+
+使用 Codex 或 Kiro 时，把 `claude-code` 分别替换为 `codex` 或 `kiro`。`--chorus-only` 会限制智能体只能使用 Chorus 提供的协作工具，适合首次验证；需要完整命令执行能力时，应先确认主机隔离和团队安全策略。
+
+保持该终端运行。确认连接正常后，再按照[管理后台服务](/zh/guides/daemon-operations/)配置长期运行。
+
+## 确认智能体在线
+
+在 Chorus 打开设置（Settings），展开在线智能体（Online Agents），检查运行后端、主机和工作目录。
+
+<Screenshot
+  src="/images/agent-operations/connection-online.webp"
+  alt="在线智能体面板显示 Codex 运行后端、主机和已注册的工作目录"
+  width={1440}
+  height={900}
+  caption="在线连接会列出智能体使用的运行后端、主机和工作目录。"
+/>
+
+状态为在线且三项信息都正确后，智能体即可接收工作。若状态一直离线，请参阅[排查智能体连接故障](/zh/guides/troubleshooting/)。

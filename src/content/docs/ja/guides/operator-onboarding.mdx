@@ -1,0 +1,72 @@
+---
+title: エージェントランタイムを接続する
+description: マシンを認証し、対応するエージェントランタイムを起動し、その接続を確認します。
+docsLocale: ja
+route: /ja/guides/operator-onboarding/
+sidebar:
+  order: 9
+---
+
+import Screenshot from '../../../../components/Screenshot.astro';
+
+Chorus の管理者からエージェントの API キーを受け取った後に、このガイドを使ってください。Claude Code、Codex、Kiro を、Chorus がリモートから起こせる常駐ランタイムとして接続します。
+
+## 始める前に
+
+必要なもの。
+
+- Chorus の URL とエージェントの API キー。
+- Node.js 22 以降。
+- 選んだエージェント CLI がインストールされ、認証済みであること。
+- 承認された作業ディレクトリが少なくとも一つ。
+
+Chorus コマンドをインストールします。
+
+```sh
+npm install --global @chorus-aidlc/chorus
+```
+
+## 接続を保存する
+
+次を実行します。
+
+```sh
+chorus login
+```
+
+プロンプトが出たら、Chorus の URL と API キーを入力します。Chorus は認証情報を検証し、接続をファイルモード `0600` で `~/.chorus/daemon.json` に保存します。
+
+:::caution[API キーを守る]
+キーはプロンプトでだけ入力してください。シェルコマンド、シェル履歴、コミットされる環境ファイル、サポートへのメッセージには追加しないでください。
+:::
+
+## ランタイムを起動する
+
+承認された作業ディレクトリを一つ指定して起動します。
+
+```sh
+chorus daemon --agent claude-code --cwd /path/to/your/project --chorus-only
+```
+
+必要に応じて `claude-code` を `codex` または `kiro` に置き換えます。`--chorus-only` は、起こされたエージェントを Chorus のツールに制限します。省略するのは、エージェントにローカルのツール一式を意図的に使わせたく、そのセキュリティ上の影響を確認済みのときだけにしてください。
+
+接続を確認する間、このコマンドは実行したままにします。
+
+## 接続を確認する
+
+Chorus で **設定 → エージェント**（Settings → Agents）を開き、エージェントの接続を確認します。次を確かめます。
+
+- ステータスが**オンライン**（Online）であること。
+- バックエンドが、選んだ CLI と一致すること。
+- ホストが、あなたが運用しているマシンであること。
+- 作業ディレクトリが、あなたが承認したディレクトリであること。
+
+<Screenshot
+  src="/images/agent-operations/connection-online.webp"
+  alt="Codex バックエンド、ホスト、作業ディレクトリを表示しているオンラインのエージェント接続"
+  width={1440}
+  height={900}
+  caption="オンラインのランタイムは、そのバックエンド、ホスト、登録済みの作業ディレクトリを一覧します。"
+/>
+
+確認後は `Ctrl+C` でフォアグラウンドのランタイムを停止します。ログインや再起動をまたいで使えるようにするには、[Chorus デーモンを運用する](/ja/guides/daemon-operations/)へ進んでください。

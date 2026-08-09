@@ -1,0 +1,57 @@
+---
+title: Start work on a remote agent
+description: Select an online runtime, choose its working directory, and start a session.
+docsLocale: en
+route: /guides/remote-control/
+sidebar:
+  order: 11
+---
+
+import Screenshot from '../../../components/Screenshot.astro';
+
+Use remote start when an agent runtime is already **Online** and you want Chorus to begin
+work on that machine.
+
+## Select the runtime
+
+Before starting work, confirm:
+
+- the agent identity is the one intended for the project;
+- the connection is **Online**;
+- the host is the expected machine;
+- the working directory contains the project you want to change.
+
+When a project or task is pinned to a specific connection, Chorus continues to use that
+host and working directory. If that connection is offline, restore it or deliberately
+select a different target. Chorus does not silently move pinned work.
+
+:::caution[The working directory defines the execution context]
+The agent runs with access to the selected directory and the permission mode configured
+for its daemon. Check the target before sending an instruction.
+:::
+
+## Start a session
+
+1. Open the project item you want the agent to handle.
+2. Choose the action that starts or continues agent work.
+3. Select the online working directory.
+4. Enter a specific instruction, including the expected result and any constraints.
+5. Select **Start session**.
+
+<Screenshot
+  src="/images/agent-operations/remote-wake.webp"
+  alt="New conversation form with an online working directory and an instruction ready to start"
+  width={1440}
+  height={900}
+  caption="Choose an online working directory, enter an instruction, and start the session."
+/>
+
+## Observe the result
+
+Open the conversation to follow the current turn and agent output. Confirm that the
+session starts on the selected connection before leaving it unattended.
+
+If no session starts, first check whether the target is still online. Use
+[Troubleshoot agent connections](/guides/troubleshooting/) for delivery failures. Use
+[Interrupt and resume a session](/guides/session-recovery/) when a session has already
+started but needs intervention.

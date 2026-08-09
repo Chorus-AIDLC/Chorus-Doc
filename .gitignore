@@ -1,0 +1,29 @@
+# Dependencies
+node_modules/
+.pnpm-store/
+
+# Astro
+.astro/
+dist/
+
+# Cloudflare / Wrangler
+.wrangler/
+
+# Playwright
+.playwright-cli/
+test-results/
+playwright-report/
+
+# Pagefind (generated into dist during build)
+# (covered by dist/ above)
+
+# Environment
+.env
+.env.*
+!.env.example
+
+# Editor / OS
+.DS_Store
+*.log
+.vscode/
+.idea/

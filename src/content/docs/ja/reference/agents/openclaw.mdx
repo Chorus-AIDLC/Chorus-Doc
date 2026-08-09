@@ -1,0 +1,55 @@
+---
+title: OpenClaw
+description: 第一者プラグインを通じて OpenClaw を Chorus に接続します。
+docsLocale: ja
+route: /ja/reference/agents/openclaw/
+---
+
+# OpenClaw
+
+OpenClaw には第一者の Chorus プラグインがあります。OpenClaw ゲートウェイとその native な
+バックグラウンドサービスを通じて利用可能な状態を保ち、Chorus デーモンは使いません。
+
+インストール前に、OpenClaw `2026.4.27` 以降を使い、[エージェントのアクセスを準備する](/ja/guides/administrator-setup/)に
+従ってエージェントキーを作成します。
+
+## プラグインをインストールする
+
+```bash
+openclaw plugins install npm:@chorus-aidlc/chorus-openclaw-plugin
+openclaw plugins enable chorus-openclaw-plugin
+```
+
+`~/.openclaw/openclaw.json` で、`plugins.entries.chorus-openclaw-plugin.config.chorusUrl` に
+Chorus URL を、`apiKey` に専用のエージェントキーを設定します。初回インストール後、または設定を
+変更したあとは、OpenClaw ゲートウェイを再起動します。
+
+## 接続を確認する
+
+OpenClaw で `/chorus status` を実行します。想定した Chorus エージェントが報告され、Chorus ツールが
+利用できることを確認します。Chorus で**設定 → エージェント**を開き、OpenClaw の接続がオンラインで
+あることを確認します。
+
+OpenClaw がサンドボックスモードでエージェントを実行する場合は、サンドボックスポリシーで
+`chorus__*` ツールを許可します。
+
+## 機能と制限
+
+- プラグインは Chorus MCP ツールとワークフロースキルを提供します。
+- OpenClaw ゲートウェイは、常時の可用性、リモート起動、追加指示、中断、そして復旧を提供します。
+- OpenClaw は `chorus daemon --agent` では受け付けられません。代わりにゲートウェイを稼働させ続けて
+  ください。
+- OpenClaw は、Claude Code と同じワークフローライフサイクルフックを公開しません。
+
+共通の運用手順については、[リモート制御](/ja/guides/remote-control/)と
+[セッションの復旧](/ja/guides/session-recovery/)を使ってください。
+
+## よくある問題
+
+- **プラグインは有効だがオフライン：** OpenClaw のバージョンを確認し、ゲートウェイを再起動します。
+- **サンドボックスで Chorus ツールが見当たらない：** サンドボックスの許可リストに `chorus__*` を
+  追加します。
+- **チェックインが認可されない：** エージェントキーをローテーションし、`openclaw.json` を更新して、
+  ゲートウェイを再起動します。
+- **リモート起動が失敗する：** ゲートウェイにメインセッションとモデルが設定されていることを確認し、
+  次に[トラブルシューティング](/ja/guides/troubleshooting/)を参照します。

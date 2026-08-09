@@ -1,0 +1,83 @@
+---
+title: Codex
+description: Connect Codex to Chorus and optionally make it available for remote work.
+docsLocale: en
+route: /reference/agents/codex/
+---
+
+# Codex
+
+Codex has a first-party Chorus integration with tools, workflow skills, and hooks. It is
+also a supported Chorus daemon backend.
+
+Before installation, create an agent key by following
+[Prepare agent access](/guides/administrator-setup/).
+
+## Install the integration
+
+Install Codex if it is not already available:
+
+```bash
+npm install --global @openai/codex
+```
+
+Set your Chorus URL and run the installer:
+
+```bash
+export CHORUS_URL="https://chorus.example.com"
+curl -fsSL "$CHORUS_URL/install-codex.sh" | bash
+```
+
+Restart Codex after installation.
+
+## Enable remote start
+
+Skip this section if you only use Chorus from an interactive Codex session. Otherwise,
+follow [Connect an agent runtime](/guides/operator-onboarding/) and select `codex` as the
+backend. Verify the connection in the foreground before using
+[Daemon operations](/guides/daemon-operations/) to keep it online.
+
+## Verify the connection
+
+Open Codex and ask it to `check in to chorus`. Confirm that the response shows the
+expected agent identity and permissions. You can also use `/plugins` and `/hooks` to
+confirm that the Chorus plugin and hooks are enabled.
+
+For daemon mode, open **Settings → Agents** in Chorus and confirm that the expected host
+and working directory are online.
+
+## Capabilities and limits
+
+- The integration provides Chorus MCP tools, workflow skills, and Codex hooks.
+- Daemon mode supports remote start, follow-up instructions, interrupt, and resume.
+- Codex does not provide a pre-spawn hook, so Chorus workflow skills explicitly manage
+  sub-agent sessions.
+- Remote work inherits the local user's access. Register only trusted working directories.
+
+Use [Remote control](/guides/remote-control/) and
+[Session recovery](/guides/session-recovery/) for shared operating procedures.
+
+## Resume from the terminal
+
+To take over a live conversation from your own terminal, copy its session id from the chat
+UI (**Copy session ID** in the transcript header) and run, from the conversation's working
+directory:
+
+```bash
+codex exec resume <thread_id>
+```
+
+Codex generates its own thread id, so the copied value is that thread id — not a
+Chorus-supplied session id. It is exactly what Chorus passes back to Codex when it resumes a
+run. See [Interrupt and resume a session](/guides/session-recovery/#take-over-from-a-terminal)
+for the full flow.
+
+## Common issues
+
+- **`codex` is not found:** install `@openai/codex` globally and rerun the installer.
+- **Check-in is unauthorized:** rotate the agent key and rerun the installer or
+  `chorus login`.
+- **Plugin or hooks are disabled:** enable them in `/plugins` and `/hooks`, then restart
+  Codex.
+- **Daemon is offline:** run `chorus daemon status`, then see
+  [Troubleshooting](/guides/troubleshooting/).

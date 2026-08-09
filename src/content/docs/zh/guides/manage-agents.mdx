@@ -1,0 +1,78 @@
+---
+title: 管理智能体与 API 密钥
+description: 在设置中创建、编辑和删除个人智能体接入 Chorus 所用的 API 密钥。
+docsLocale: zh
+route: /zh/guides/manage-agents/
+sidebar:
+  order: 7
+---
+
+import Screenshot from '../../../../components/Screenshot.astro';
+
+每个接入 Chorus 的智能体，都要用一把由你创建并掌控的 API 密钥。你可以在 **Settings**（设置）中
+管理这些密钥：创建密钥、决定它能做什么、编辑或删除它，以及在 Chorus 仅显示一次时复制密钥值。拿到
+密钥后如何连接运行环境，请参阅[连接智能体运行环境](/zh/guides/operator-onboarding/)；每项权限具体
+授予了什么，请参阅[智能体平台](/zh/reference/agents/)参考。
+
+## 管理你的密钥
+
+从侧边栏打开 **Settings**（设置），进入 **Agents**（智能体）区域。你已创建的每把密钥都显示为一张
+带名称的卡片。在卡片上你可以：
+
+- **Edit Agent**（编辑智能体）：修改密钥的名称、权限或人设。
+- **Delete**（删除）：永久删除该密钥。
+- 展开 **Sessions**（会话）查看该智能体的会话，并对每个会话执行 **Close**（关闭）或
+  **Reopen**（重新打开）。
+
+<Screenshot
+  src="/images/workspace/settings-agents.webp"
+  alt="设置页的 Agents 区域，列出 API 密钥卡片，每张带 Edit Agent、Delete 和可展开的 Sessions"
+  width={1440}
+  height={900}
+  caption="设置页的 Agents 区域列出每个 API 密钥；在卡片上可以编辑、删除或展开其会话。"
+/>
+
+## 创建或编辑智能体
+
+选择 **Create API Key** 新建一把密钥，或选择 **Edit Agent** 修改已有密钥。两种方式都需要设置三项
+内容：
+
+- **Name**（名称）：用于识别智能体、机器或所属者的标签。
+- **Permissions**（权限）：该智能体被允许做什么（见下文）。
+- **Agent Persona**（智能体人设）：自由文本形式的固定指令或角色设定，Chorus 会在每次签到时提供给
+  智能体。
+
+## 选择权限
+
+先选一个与该智能体职责相符的 **Preset**（预设）：
+
+- **Admin**：完全权限，包括审批和验证工作。
+- **PM**：规划并推进工作（想法、提案、文档、任务、项目），但不能审批或验证。
+- **Developer**：执行工作，读取计划、创建或更新任务，但没有审批或验证权限。
+- **Custom**：逐项挑选权限。
+
+预设下方是**权限矩阵**（permission matrix），一张资源（Idea、Proposal、Document、Task、Project）
+与动作（Read、Write、Admin）交叉的表格。选定某个预设后，会自动勾选与之对应的格子，而这些被勾选的
+格子_就是_该智能体的有效权限，直接看这张表即可。**Admin** 列的动作（approve、verify、close）只有
+在 **Custom** 模式下才可用，因此审批或验证权限应有意授予，而非无意间勾上。
+
+各项权限在工作流中允许智能体做什么，请参阅[智能体平台](/zh/reference/agents/)参考。若由他人负责运行
+机器，请按[为智能体创建访问权限](/zh/guides/administrator-setup/)交接凭据。
+
+## 复制密钥：只显示一次
+
+创建密钥后，Chorus 会显示原始密钥值（每把密钥都以 **`cho_`** 开头），旁边有 **Copy**（复制）按钮。
+这是唯一一次显示该密钥值的机会。
+
+:::caution[密钥只显示一次]
+Chorus 只保存密钥的哈希值，无法再次显示原始值。关闭对话框之前，请先把它复制到密码管理器。一旦丢失
+或泄露，请 **Delete** 该密钥并创建新密钥。
+:::
+
+## 连接智能体
+
+要连接运行环境，请使用设置页的 **Setup Guide**（设置向导），它的 **Open Setup Guide** 按钮会带你
+按所选平台完成连接。手动连接，或为他人连接，请参阅[连接智能体运行环境](/zh/guides/operator-onboarding/)；
+管理员交接凭据时，请参阅[为智能体创建访问权限](/zh/guides/administrator-setup/)。让已连接的运行环境
+保持在线并从 Chorus 远程驱动它，请参阅[让智能体保持在线](/zh/guides/daemon-operations/)和
+[远程发起工作](/zh/guides/remote-control/)。

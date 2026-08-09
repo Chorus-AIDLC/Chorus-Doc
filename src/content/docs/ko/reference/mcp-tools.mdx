@@ -1,0 +1,251 @@
+---
+title: MCP 도구 카탈로그
+description: 에이전트가 Chorus MCP 엔드포인트에 어떻게 연결하고, 도구 가시성이 권한으로 어떻게 통제되며, 범주별로 어떤 도구가 있는지.
+docsLocale: ko
+route: /ko/reference/mcp-tools/
+sidebar:
+  order: 7
+---
+
+에이전트는 Chorus의 MCP(Model Context Protocol) 도구를 통해 Chorus를 조작합니다. 이 페이지는 이 도구
+표면에 대한 범주별 안내입니다. 클라이언트가 어떻게 연결하는지, 프로젝트 범위 지정이 어떻게 작동하는지,
+각 도구가 어떻게 보이게 되는지, 그리고 각 단계에서 에이전트가 쓰는 고빈도 도구를 다룹니다. 엔티티가 거쳐
+가는 상태와 각 단계의 인계는 [라이프사이클 참고](/ko/reference/lifecycle/)를, 댓글, 멘션, 알림은
+[협업 참고](/ko/reference/collaboration/)를 보세요.
+
+## 엔드포인트와 트랜스포트
+
+Chorus는 **Streamable HTTP** 로 하나의 MCP 엔드포인트를 노출합니다.
+
+```text
+POST https://chorus.example.com/api/mcp
+Authorization: Bearer cho_REDACTED
+```
+
+이 엔드포인트는 **무상태** 입니다. 각 요청은 에이전트 key로 인증되고 요청마다 새로운 서버 인스턴스가
+처리합니다. 서버 측 세션이 없고, `initialize` → 킵얼라이브 → 만료 흐름도 없으며, 유휴 타임아웃도 없습니다.
+클라이언트는 "session not found" 상태를 회복할 필요가 전혀 없이, 그저 매 요청에 key를 보내면 됩니다.
+여기서 두 가지 결론이 따라옵니다.
+
+- **권한은 요청마다 다시 계산됩니다.** UI에서 에이전트의 권한을 회전하면 다음 호출부터 즉시 적용되며,
+  재연결이 필요 없습니다.
+- **에이전트 key만으로 도구 목록이 결정됩니다.** `tools/list`가 반환하는 도구 집합은 그 key의 요청마다의
+  유효 권한에서 도출됩니다.
+
+클라이언트의 MCP 설정에서 이것을 `http` 유형의 서버로 설정합니다. 최소한의 `.mcp.json` 블록:
+
+```json
+{
+  "mcpServers": {
+    "chorus": {
+      "type": "http",
+      "url": "https://chorus.example.com/api/mcp",
+      "headers": {
+        "Authorization": "Bearer cho_REDACTED"
+      }
+    }
+  }
+}
+```
+
+:::note
+MCP 트랜스포트 세션은 Chorus의 **AgentSession** 과 무관합니다. AgentSession은 스웜 모드 하위 에이전트를
+위한 별도의 관측 가능성 구조로, 아래의 session 도구로 만들고 추적합니다.
+:::
+
+## 프로젝트로 범위 지정
+
+여러 프로젝트에 걸쳐 일하는 에이전트는 MCP 연결에 범위 지정 헤더를 보내, 범위를 인식하는 모든 결과를
+부분집합으로 좁힐 수 있습니다.
+
+<div class="table-scroll" role="region" aria-label="프로젝트 범위 지정 헤더" tabindex="0">
+
+  | 헤더 | 값 | 효과 |
+  | --- | --- | --- |
+  | `X-Chorus-Project` | 단일 프로젝트 UUID, 또는 쉼표로 구분한 여러 개 | 결과를 그 프로젝트로 제한한다. |
+  | `X-Chorus-Project-Group` | 프로젝트 그룹 UUID | 결과를 그 그룹 내 모든 프로젝트로 제한한다. |
+
+</div>
+
+헤더가 없으면 결과는 모든 프로젝트에 걸칩니다(기본). **두** 헤더가 모두 있으면 `X-Chorus-Project-Group`이
+우선합니다. 범위 지정은 `chorus_get_my_assignments`에 영향을 주어, 범위 지정된 프로젝트로 필터된 프로젝트별
+추적기를 반환합니다. `chorus_checkin`의 `ideaTracker`는 **헤더로 필터되지 않습니다**. 항상 모든 프로젝트에
+걸친, 에이전트의 가장 최근 아이디어(최대 열 개)를 반환합니다. 그 밖의 모든 도구는 명시적인 `projectUuid`
+인수를 받고 헤더로 범위 지정되지 않습니다.
+
+```json
+{
+  "mcpServers": {
+    "chorus": {
+      "type": "http",
+      "url": "https://chorus.example.com/api/mcp",
+      "headers": {
+        "Authorization": "Bearer cho_REDACTED",
+        "X-Chorus-Project": "uuid-a,uuid-b"
+      }
+    }
+  }
+}
+```
+
+## 권한과 도구 가시성
+
+도구 가시성은 세분화된 권한 모델로 구동됩니다. **5개 자원**
+(`idea`, `proposal`, `document`, `task`, `project`) × **3개 동작**
+(`read`, `write`, `admin`) = **15개 권한 비트** 입니다. 통제되는 각 도구는 필요한 권한을 **정확히 하나**
+선언합니다. 통제되는 도구는 에이전트의 유효 권한 집합이 그 비트를 포함하는 **경우에만** 그 `tools/list`에
+나타납니다. **공용 도구는 통제되지 않고 항상 나타납니다.**
+
+에이전트의 유효 집합은 **역할 프리셋** 과 그 위에 추가된 임의의 **사용자 지정 권한** 의 합집합입니다.
+
+<div class="table-scroll" role="region" aria-label="역할 프리셋 권한 집합" tabindex="0">
+
+  | 프리셋 | 유효 권한 집합 |
+  | --- | --- |
+  | `developer_agent` | `*:read` + `task:write`(6비트) |
+  | `pm_agent` | `*:read` + `idea:write`, `proposal:write`, `document:write`, `task:write`, `project:write`(10비트) |
+  | `admin_agent` | 전체 15비트(`*:read` + `*:write` + `*:admin`) |
+
+</div>
+
+보이는 것과 인가된 것은 같지 않습니다. 도구가 보이더라도 핸들러 계층에서 어떤 작업을 거부할 수 있습니다.
+예를 들어 작업의 운영적 상태 전이는, 누가 그 도구를 볼 수 있는지와 무관하게 호출자가 그 작업의 담당자일
+것을 요구합니다.
+
+## 도구 범주
+
+<div class="table-scroll" role="region" aria-label="도구 범주" tabindex="0">
+
+  | 범주 | 통제 | 무엇을 다루는가 |
+  | --- | --- | --- |
+  | **공용(Public)** | 없음, 항상 보임 | 발견과 읽기(`chorus_get_*`, `chorus_list_*`, `chorus_search*`), `chorus_checkin`, `chorus_get_my_assignments`, 댓글, 요구사항 구체화 답변, 알림, 그리고 `chorus_create_tasks`와 `chorus_update_task`. |
+  | **세션(Session)** | 없음, 항상 보임 | 스웜 모드 작업자를 위한 AgentSession 라이프사이클: `chorus_create_session`, `chorus_session_checkin_task` / `chorus_session_checkout_task`, `chorus_session_heartbeat`, `chorus_close_session`, `chorus_reopen_session`, `chorus_list_sessions`, `chorus_get_session`. |
+  | **개발자(Developer)** | `task:write` | 작업 가져가기, 놓기, 보고, 그리고 검증에 제출. |
+  | **PM** | `idea:write`, `proposal:write`, `document:write`, `project:write` | 아이디어, 요구사항 구체화, 제안, 문서, 참고 자료 작성과 진행. |
+  | **관리자(Admin)** | `*:admin`(프로젝트/그룹 생성은 `project:write`) | 제안 승인, 작업 검증/다시 열기/닫기, 수락 기준 표시, 엔티티 삭제, 프로젝트와 그룹 관리. |
+
+</div>
+
+:::caution
+`chorus_create_report`는 공용 도구처럼 보입니다. `pm_` 접두사가 없고 공용 네임스페이스의 모듈에 있기
+때문입니다. 그러나 그것은 **`document:write`로 통제됩니다**. 그 비트를 가진 에이전트(`pm_agent` /
+`admin_agent` 프리셋, 또는 `document:write`를 사용자 지정 권한으로 추가한 개발자 에이전트)에게만
+나타납니다. 통제되지 않는 공용 도구로 취급하지 마세요.
+:::
+
+`chorus_create_tasks`와 `chorus_update_task`는 진정으로 공용입니다. 필드, 의존, 수락 기준 편집은 어떤
+에이전트에게도 열려 있습니다. 핸들러 계층의 담당자 가드가 실제로 누가 운영적 상태를 바꿀 수 있는지
+강제하기 때문입니다. 작업의 `in_progress` / `to_verify` 상태 전이는 여전히 호출자가 담당자일 것을
+요구합니다.
+
+## 고빈도 도구
+
+대표적인 부분집합을 입력, 반환 형태, 필요한 권한과 함께 제시합니다. 모든 도구에 대한 완전한 도구별 계약은
+이 페이지 끝에서 설명하는 진실의 출처에 있습니다.
+
+### chorus_checkin — 공용
+
+한 번의 실행 시작 시에 권장합니다. 에이전트의 신원과 소유자, 그 유효 권한 집합, 프로젝트별로 묶인 아이디어
+추적기, 그리고 알림 요약을 반환합니다. `ideaTracker`는 가장 최근에 업데이트된 열 개의 아이디어를 상한으로
+하며 모든 프로젝트에 걸칩니다. 위의 범위 지정 헤더로는 **좁혀지지 않습니다**(범위 지정되고 상한이 없는
+추적기에는 `chorus_get_my_assignments`를 쓰세요).
+
+```text
+입력:   (없음)
+반환:   { agent: { uuid, name, permissions, owner },
+          ideaTracker: { <projectUuid>: { name, ideas[] } },
+          notifications: { unread, recent[] } }
+```
+
+### chorus_get_my_assignments — 공용
+
+에이전트의 완전한 아이디어/작업 추적기를 프로젝트별로 묶어 반환합니다. `chorus_checkin`의 `ideaTracker`와
+같은 형태이며, 최근 아이디어의 상한이 없고, 여기에 open 작업으로 이루어진 `taskTracker`가 더해집니다.
+범위 지정 헤더를 따릅니다.
+
+```text
+입력:   (없음)
+반환:   { ideaTracker: { <projectUuid>: { name, ideas[] } },
+          taskTracker: { <projectUuid>: { name, tasks[] } } }
+```
+
+### chorus_claim_task — `task:write`
+
+open 작업을 가져가 `assigned`로 옮기고 호출자를 담당자로 설정합니다.
+
+```text
+입력:   { taskUuid }
+반환:   업데이트된 Task
+```
+
+### chorus_submit_for_verify — `task:write`(담당자만)
+
+작업을 사람의 검증에 제출하고 `in_progress → to_verify`로 옮깁니다.
+
+```text
+입력:   { taskUuid, summary? }
+반환:   업데이트된 Task
+```
+
+### chorus_pm_create_proposal — `proposal:write`
+
+**빈** 제안 컨테이너를 만든 뒤 `chorus_pm_add_document_draft`와 `chorus_pm_add_task_draft`로 내용을
+채웁니다. `inputType`이 `idea`일 때 각 입력 아이디어는 전달 가능한 것이어야 합니다. 테마(컨테이너)
+아이디어는 거부되므로, 자식 아이디어를 파생시켜 그것에 대해 제안하세요.
+
+```text
+입력:   { projectUuid, title, description?, inputType: "idea" | "document",
+          inputUuids[], references?[] }
+반환:   생성된 Proposal(status: draft)
+```
+
+### chorus_pm_add_task_draft — `proposal:write`
+
+초안 제안에 작업 초안 하나를 추가합니다. 수락 기준은 필수입니다. 비어 있지 않은 description을 가진 항목이
+최소 하나 있어야 하며, 없으면 호출이 거부됩니다.
+
+```text
+입력:   { proposalUuid, title, description?, priority?, storyPoints?,
+          acceptanceCriteriaItems: [{ description, required? }],  // 필수, 비어 있지 않음
+          dependsOnDraftUuids?[] }
+반환:   업데이트된 Proposal
+```
+
+### chorus_admin_verify_task — `task:admin`
+
+제출된 작업을 검증하고 `to_verify → done`으로 옮깁니다. 작업에 구조화된 수락 기준이 있으면, 모든 **필수**
+기준이 (`chorus_mark_acceptance_criteria`를 통해) 이미 `passed`로 표시되어 있어야 하며, 그렇지 않으면
+검증이 차단됩니다.
+
+```text
+입력:   { taskUuid }
+반환:   업데이트된 Task(수락 기준 게이트가 차단하면 오류)
+```
+
+## 통제 도구 → 필요한 권한 행렬
+
+권한으로 통제되는 모든 도구와 그 단일한 필요 비트입니다. 그 비트를 지니는 것, 즉 프리셋 또는 사용자 지정
+권한을 통해 지니는 것이 도구가 나타나기 위한 필요조건입니다. 그 위에 핸들러 계층의 가드(소유권, 담당자,
+상태)가 여전히 적용될 수 있습니다.
+
+<div class="table-scroll" role="region" aria-label="통제 도구와 필요한 권한" tabindex="0">
+
+  | 필요한 권한 | 도구 |
+  | --- | --- |
+  | `idea:write` | `chorus_claim_idea`, `chorus_release_idea`, `chorus_move_idea`, `chorus_pm_create_idea`, `chorus_edit_idea`, `chorus_pm_start_elaboration`, `chorus_pm_skip_elaboration` |
+  | `idea:admin` | `chorus_pm_validate_elaboration`, `chorus_admin_delete_idea` |
+  | `proposal:write` | `chorus_pm_create_proposal`, `chorus_pm_validate_proposal`, `chorus_pm_submit_proposal`, `chorus_pm_add_document_draft`, `chorus_pm_add_task_draft`, `chorus_pm_update_document_draft`, `chorus_pm_update_task_draft`, `chorus_pm_remove_document_draft`, `chorus_pm_remove_task_draft`, `chorus_pm_reject_proposal`, `chorus_pm_revoke_proposal`, `chorus_pm_assign_task` |
+  | `proposal:admin` | `chorus_admin_approve_proposal`, `chorus_admin_close_proposal` |
+  | `document:write` | `chorus_pm_create_document`, `chorus_pm_update_document`, `chorus_create_report`, `chorus_add_reference`, `chorus_update_reference`, `chorus_remove_reference` |
+  | `document:admin` | `chorus_admin_delete_document` |
+  | `task:write` | `chorus_claim_task`, `chorus_release_task`, `chorus_submit_for_verify`, `chorus_report_criteria_self_check`, `chorus_report_work` |
+  | `task:admin` | `chorus_admin_verify_task`, `chorus_admin_reopen_task`, `chorus_admin_close_task`, `chorus_mark_acceptance_criteria`, `chorus_admin_delete_task` |
+  | `project:write` | `chorus_admin_create_project`, `chorus_admin_create_project_group`, `chorus_admin_update_project_group`, `chorus_admin_delete_project_group`, `chorus_admin_move_project_to_group` |
+
+</div>
+
+:::note
+**권위 있고 완전한** 도구 목록은 실행 중인 서버 자신의 `tools/list` 응답, 즉 각 도구의 실시간 자기 설명,
+그리고 리포지토리의 `docs/MCP_TOOLS.md`입니다. 이 페이지는 이 도구 표면에 대한 범주별 안내이지, 각 도구를
+바이트 단위로 옮겨 적은 것이 아닙니다. 어떤 자기 설명과 이 페이지가 어긋나면 서버가 옳습니다.
+:::
