@@ -7,7 +7,7 @@ const contentRoot = path.join(packageRoot, 'src/content/docs');
 const outputRoot = path.join(packageRoot, 'dist');
 const manifestPath = path.join(packageRoot, '.astro/docs-route-manifest.json');
 const emittedManifestPath = path.join(packageRoot, '.astro/emitted-docs-route-manifest.json');
-const site = new URL(process.env.DOCS_SITE_URL ?? 'https://docs.chorus-ai.dev');
+const site = new URL(process.env.DOCS_SITE_URL ?? 'https://doc.chorus-ai.dev');
 const manifest = JSON.parse(await readFile(manifestPath, 'utf8'));
 
 // Locale registry — single source of truth for the Node tooling. `en` is the

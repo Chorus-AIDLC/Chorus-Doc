@@ -12,7 +12,7 @@ const timeoutMs = Number(option('--timeout-ms', '5000'));
 const allowlistPath = path.resolve(
   option('--allowlist', 'config/external-link-allowlist.json'),
 );
-const siteOrigin = 'https://docs.chorus-ai.dev';
+const siteOrigin = 'https://doc.chorus-ai.dev';
 const allowlist = JSON.parse(await readFile(allowlistPath, 'utf8'));
 
 for (const [url, reason] of Object.entries(allowlist)) {

@@ -4,7 +4,7 @@ import remarkGfm from 'remark-gfm';
 import chorusIcon from './src/assets/chorus-icon.png';
 import { gaHeadTags } from './src/lib/analytics.mjs';
 
-const site = process.env.DOCS_SITE_URL ?? 'https://docs.chorus-ai.dev';
+const site = process.env.DOCS_SITE_URL ?? 'https://doc.chorus-ai.dev';
 
 // Env-gated GA4 (matches the landing site). Unset/blank => no analytics anywhere,
 // so local dev, previews, and internal/demo domains stay analytics-free. Read from

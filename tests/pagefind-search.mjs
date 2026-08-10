@@ -62,7 +62,7 @@ try {
     const search = await index.search(fixture.term);
     const results = await Promise.all(search.results.map((result) => result.data()));
     const match = results.find(
-      (result) => new URL(result.url, 'https://docs.chorus-ai.dev').pathname === fixture.url,
+      (result) => new URL(result.url, 'https://doc.chorus-ai.dev').pathname === fixture.url,
     );
     assert.ok(
       match,

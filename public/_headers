@@ -1,0 +1,29 @@
+# Cloudflare Workers static-assets header rules.
+#
+# Copied verbatim into dist/ by Astro at build time (public/ passthrough) and
+# parsed by Workers — it is not served as an asset itself. Rules here OVERRIDE
+# the Content-Type Cloudflare would otherwise infer.
+#
+# Why this file exists: agent-facing text files (llms.txt and the per-page .md
+# mirrors) were served without a charset, so clients fell back to Latin-1 and
+# UTF-8 CJK bytes rendered as mojibake (部署 -> éƒ¨ç½²). Declaring charset=utf-8
+# on every text-ish response fixes that at the wire level. HTML pages already
+# carry <meta charset>, so their entry is belt-and-braces only.
+#
+# Match by URL path (not MIME type): the more specific /llms.txt rule precedes
+# the /*.txt glob so it wins unambiguously.
+
+/llms.txt
+  Content-Type: text/plain; charset=utf-8
+
+/*.md
+  Content-Type: text/markdown; charset=utf-8
+
+/*.txt
+  Content-Type: text/plain; charset=utf-8
+
+/*.xml
+  Content-Type: application/xml; charset=utf-8
+
+/*.html
+  Content-Type: text/html; charset=utf-8
