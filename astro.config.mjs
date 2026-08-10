@@ -1,5 +1,6 @@
 import { defineConfig } from 'astro/config';
 import starlight from '@astrojs/starlight';
+import remarkGfm from 'remark-gfm';
 import chorusIcon from './src/assets/chorus-icon.png';
 import { gaHeadTags } from './src/lib/analytics.mjs';
 
@@ -13,6 +14,20 @@ const gaId = process.env.PUBLIC_GA_MEASUREMENT_ID;
 export default defineConfig({
   site,
   output: 'static',
+  // All docs content is .mdx. Astro's built-in GitHub-Flavored Markdown (tables,
+  // strikethrough, etc.) is NOT applied to the MDX pipeline unless a remark plugin is
+  // wired in explicitly — without this, GFM tables render as literal `| … |` text on
+  // every page (all four locales). We mount remark-gfm here; MDX inherits it via
+  // extendMarkdownConfig (default true), so this one entry fixes the whole site.
+  //
+  // Note: `markdown.remarkPlugins` is technically deprecated in Astro 6 in favour of
+  // `markdown.processor: unified({...})`, but the processor route requires pinning
+  // @astrojs/markdown-remark to Astro's exact internal version (a version skew makes
+  // its brand-check silently drop the processor → tables break again), so it is more
+  // fragile than this. The build already emits the same remarkPlugins-deprecation
+  // notice from Starlight's own plugins regardless of this line, so we add no new
+  // warning. Revisit when Astro removes the option in a future major.
+  markdown: { remarkPlugins: [remarkGfm] },
   integrations: [
     starlight({
       title: 'Chorus',

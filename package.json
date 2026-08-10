@@ -9,7 +9,7 @@
   "scripts": {
     "dev": "astro dev",
     "content:check": "node scripts/validate-content.mjs --manifest .astro/docs-route-manifest.json && node tests/content-validation.mjs && node tests/route-manifest.mjs && node tests/agent-docs-contract.mjs && node tests/locale-coverage.mjs && node tests/analytics.mjs",
-    "build": "pnpm content:check && astro check && astro build && node scripts/generate-artifacts.mjs && node tests/generated-artifacts.mjs && node tests/pagefind-search.mjs && node tests/locale-fallback.mjs && node tests/analytics-build.mjs",
+    "build": "pnpm content:check && astro check && astro build && node scripts/generate-artifacts.mjs && node tests/generated-artifacts.mjs && node tests/table-rendering.mjs && node tests/pagefind-search.mjs && node tests/locale-fallback.mjs && node tests/analytics-build.mjs",
     "check": "node scripts/run-quality-gate.mjs",
     "check:links": "node scripts/check-links.mjs",
     "check:browser": "node tests/browser-quality.mjs",
@@ -20,6 +20,7 @@
   "dependencies": {
     "@astrojs/starlight": "0.39.3",
     "astro": "^6.1.4",
+    "remark-gfm": "^4.0.1",
     "sharp": "^0.34.3"
   },
   "devDependencies": {
