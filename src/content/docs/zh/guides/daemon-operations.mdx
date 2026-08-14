@@ -45,7 +45,7 @@ chorus daemon --browse-root /home/demo/workspace
 
 ## 配置 `daemon.json`
 
-daemon 的设置都读自 `~/.chorus/daemon.json`，一个扁平的 JSON 文件，同时保存智能体凭据和运行选项。该文件以 `0600` 权限（仅所有者可读写）写入，采用先写临时文件再原子重命名的方式，因此写入过程中崩溃也不会留下被截断的文件。文件路径固定为 `~/.chorus/daemon.json`（从主目录解析而来），没有用于改变文件位置的环境变量。
+daemon 的设置都读自 `~/.chorus/daemon.json`。常见的单智能体场景下，它是一个扁平的 JSON 对象，同时保存智能体凭据和运行选项；若要用一个 daemon 同时服务多个智能体，则改为在 `agents` 数组中逐一列出（见下文「在一个 daemon 中运行多个智能体」一节）。无论哪种形式，该文件都以 `0600` 权限（仅所有者可读写）写入，采用先写临时文件再原子重命名的方式，因此写入过程中崩溃也不会留下被截断的文件。文件路径固定为 `~/.chorus/daemon.json`（从主目录解析而来），没有用于改变文件位置的环境变量。
 
 ### 字段
 
@@ -59,6 +59,7 @@ daemon 的设置都读自 `~/.chorus/daemon.json`，一个扁平的 JSON 文件�
 | `browseRoots` | string[] | 向远程工作目录发现开放的根目录。浏览根目录不会创建连接。 |
 | `agent` | string | 要唤起的本地运行后端：`"claude-code"`、`"codex"` 或 `"kiro"`。 |
 | `sigintTimeoutMs` | number | 收到 `SIGINT` 后强制终止已唤起智能体前的宽限时间（毫秒）。默认 `10000`。 |
+| `agents` | object[] | *可选。* 用一个 daemon 服务多个独立智能体；每个条目会针对该智能体覆盖顶层字段。见下文「在一个 daemon 中运行多个智能体」。 |
 
 执行 `chorus login` 加 `chorus daemon install` 后的最简文件：
 
@@ -100,6 +101,56 @@ daemon 的设置都读自 `~/.chorus/daemon.json`，一个扁平的 JSON 文件�
 | 权限模式 | *（不持久化）* | `--yolo` / `--chorus-only` | `CHORUS_YOLO` / `CHORUS_CHORUS_ONLY` |
 
 权限模式特意不保存到 `daemon.json`。请在启动时传入 `--chorus-only`（或设置 `CHORUS_CHORUS_ONLY=1`）；安装为服务时，`--chorus-only` 会被写入服务单元，而不是文件。
+
+## 在一个 daemon 中运行多个智能体
+
+一个 `chorus daemon` 进程可以**同时服务多个完全独立的智能体**（不同的人设、权限、账户，甚至不同的运行后端），而无需为每个智能体单独跑一个 daemon。把它们逐一列在 `agents` 数组中，每个条目就是一个智能体：
+
+```json
+{
+  "url": "https://chorus.example.com",
+  "sigintTimeoutMs": 8000,
+  "agents": [
+    { "apiKey": "cho_alpha", "agentType": "claude-code", "cwds": ["/home/demo/project-a"] },
+    { "apiKey": "cho_beta", "agentType": "kiro", "cwds": ["/home/demo/project-b"], "permissionMode": "chorus" }
+  ]
+}
+```
+
+每个**顶层**字段都是**默认值**；在某个智能体上设置的字段只会**覆盖**该智能体自己的取值。每个智能体都有自己的身份（由其密钥决定）、自己的连接（每个 `cwds` 一个）、自己的唤起队列和自己的运行后端，因此它们各自独立地被唤起和运行，一个智能体出错不会影响其他智能体。在服务器端，每个智能体都以 agent、主机、目录为键，作为独立连接显示在**设置 → 智能体**（Settings → Agents）中。多个智能体甚至可以共享同一个工作目录；daemon 不会对它们串行化，因此请避免在同一个 git 工作树中并发地做互相冲突的工作（改用不同的分支或 worktree）。
+
+:::note[向后兼容]
+若没有 `agents` 数组，扁平的顶层 `url` / `apiKey` / `cwds` 会被当作恰好一个智能体，现有的单智能体安装照旧运行，无需改动。
+:::
+
+### 每个智能体的字段
+
+| 字段 | 含义 |
+| --- | --- |
+| `apiKey`（必填） | 该智能体的 `cho_` 密钥，决定其身份。 |
+| `url` | Chorus 服务器（可按智能体不同，如不同的服务器或公司）。 |
+| `agentType` | `claude-code`、`codex` 或 `kiro`（后端可以混用）。 |
+| `cwds` | 该智能体服务的工作目录（每个一个连接）。 |
+| `permissionMode` | `yolo` 或 `chorus`。 |
+| `maxConcurrency` | 该智能体自己的唤起并发上限（默认 `4`）。 |
+| `sigintTimeoutMs` | 中断升级的宽限时间（毫秒）。 |
+| `browseRoots` | 目录发现的允许列表。 |
+
+### 添加另一个智能体
+
+- **`chorus login --add`** 校验一个新密钥并把它追加为另一个智能体。在扁平文件上首次使用 `--add` 时，会把已有凭据迁移到 `agents[0]`，并把新密钥添加为 `agents[1]`；重复的密钥会被拒绝，已有的智能体绝不会被覆盖。
+- **`chorus daemon install --add`** 会循环运行安装向导，让你在一次运行中添加多个智能体（仅限终端）。
+- 始终支持**手动编辑** `~/.chorus/daemon.json`。
+
+编辑文件后请重启 daemon（`chorus daemon restart`），然后在**设置 → 智能体**（Settings → Agents）中确认每个智能体都已出现。
+
+### 各后端如何拿到自己的密钥
+
+每个智能体都用自己的密钥认证，但这个密钥*如何*到达被唤起的子进程，取决于后端：
+
+- **Claude Code**：自动。daemon 会为每次唤起写入一份携带该智能体 URL 和密钥的 MCP 配置。无需额外配置。
+- **Kiro**：自动，通过环境变量。已安装的 `mcp.json` 引用 `${CHORUS_URL}` 和 `${env:CHORUS_API_KEY}`，daemon 会在每次唤起时导出它们，因此每个 Kiro 智能体都用自己的密钥认证。
+- **Codex**：Codex 从自己的 `~/.codex/config.toml` 读取 Chorus 服务器 URL 和密钥，而不是从环境变量读取，且其安装脚本会写入一个字面量密钥。这对**单个** Codex 智能体是正确的。若要在一个 daemon 中运行**两个使用不同密钥的 Codex 智能体**，请把 Codex 配置为从环境变量读取密钥：在 `config.toml` 中设置 `bearer_token_env_var = "CHORUS_API_KEY"`（或 `codex mcp add … --bearer-token-env-var CHORUS_API_KEY`）。这样 daemon 会在每次唤起时注入各智能体自己的密钥，每个 Codex 智能体便以自己的身份认证。若使用写死的字面量密钥，两个 Codex 智能体会共用那一个密钥，因而共用同一个身份，所以多智能体 Codex 场景请优先使用环境变量形式。
 
 ## 安装 Linux 用户服务
 

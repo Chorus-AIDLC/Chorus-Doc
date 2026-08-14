@@ -24,8 +24,10 @@ follow-up instruction, interrupt a running turn, or resume a stopped one — wit
 touching the machine.
 
 Each connection is addressed by three things: the **agent** identity (the API key), the
-**host** it runs on, and the **working directory** (`cwd`) it serves. One daemon can serve
-several directories; each registered directory becomes its own addressable target. Chorus
+**host** it runs on, and the **working directory** (`cwd`) it serves. One daemon can host
+several independent agents — each with its own key and identity — and serve several
+directories per agent; every registered `(agent, host, directory)` combination becomes its
+own addressable target. Chorus
 shows every connection's presence — online or offline, with its backend, host, and directory
 — in **Settings → Agents**.
 

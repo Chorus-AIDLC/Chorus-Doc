@@ -38,11 +38,14 @@ agent receives the filesystem and tool permissions of the user running the daemo
 
 ## Configure `daemon.json`
 
-The daemon reads its settings from `~/.chorus/daemon.json` — a single flat JSON file that
-holds both the agent credential and the runtime options. It is written with `0600`
-(owner read/write only) using an atomic temp-file-plus-rename, so a crash mid-write never
-leaves a truncated file. The path is fixed at `~/.chorus/daemon.json` (resolved from your
-home directory); there is no environment variable to relocate the file itself.
+The daemon reads its settings from `~/.chorus/daemon.json`. In the common single-agent case
+it is one flat JSON object holding the agent credential and the runtime options; to serve
+several agents from one daemon you instead list them under an `agents` array — see
+[Run several agents in one daemon](#run-several-agents-in-one-daemon). Either way it is
+written with `0600` (owner read/write only) using an atomic temp-file-plus-rename, so a crash
+mid-write never leaves a truncated file. The path is fixed at `~/.chorus/daemon.json`
+(resolved from your home directory); there is no environment variable to relocate the file
+itself.
 
 ### Fields
 
@@ -56,6 +59,7 @@ home directory); there is no environment variable to relocate the file itself.
 | `browseRoots` | string[] | Roots exposed to remote working-directory discovery. A browse root does not create a connection. |
 | `agent` | string | Local backend to wake: `"claude-code"`, `"codex"`, or `"kiro"`. |
 | `sigintTimeoutMs` | number | Grace window (ms) after `SIGINT` before a woken agent is force-killed. Default `10000`. |
+| `agents` | object[] | *Optional.* Serve several independent agents from one daemon; each entry overrides the top-level fields for that agent. See [Run several agents in one daemon](#run-several-agents-in-one-daemon). |
 
 A minimal file after `chorus login` plus `chorus daemon install`:
 
@@ -108,6 +112,80 @@ then `daemon.json`, so a one-off flag or env override never has to be written to
 The permission mode is deliberately not stored in `daemon.json`. Pass `--chorus-only`
 (or set `CHORUS_CHORUS_ONLY=1`) at start time; the installed service captures
 `--chorus-only` in its unit, not in the file.
+
+## Run several agents in one daemon
+
+One `chorus daemon` process can serve **several fully independent agents at once** — different
+personas, permissions, accounts, or even different backends — instead of running a separate
+daemon per agent. List them under an `agents` array; each entry is one agent:
+
+```json
+{
+  "url": "https://chorus.example.com",
+  "sigintTimeoutMs": 8000,
+  "agents": [
+    { "apiKey": "cho_alpha", "agentType": "claude-code", "cwds": ["/home/demo/project-a"] },
+    { "apiKey": "cho_beta", "agentType": "kiro", "cwds": ["/home/demo/project-b"], "permissionMode": "chorus" }
+  ]
+}
+```
+
+Every **top-level** field is a **default**; a field set on an agent **overrides** it for that
+agent only. Each agent gets its own identity (from its key), its own connections (one per its
+`cwds`), its own wake queue, and its own backend — so they are woken and run independently, and
+one agent's failure never disrupts the others. On the server each appears as its own connection
+in **Settings → Agents**, keyed on agent, host, and directory. Agents may even share a working
+directory; the daemon does not serialize them, so avoid concurrent conflicting work in one git
+tree (use separate branches or worktrees).
+
+:::note[Back-compat]
+With no `agents` array, the flat top-level `url` / `apiKey` / `cwds` are treated as exactly one
+agent — existing single-agent installs run unchanged.
+:::
+
+### Per-agent fields
+
+| Field | Meaning |
+| --- | --- |
+| `apiKey` *(required)* | The agent's `cho_` key — determines its identity. |
+| `url` | Chorus server (may differ per agent — a different server or company). |
+| `agentType` | `claude-code`, `codex`, or `kiro` (backends may be mixed). |
+| `cwds` | Working directories this agent serves (one connection each). |
+| `permissionMode` | `yolo` or `chorus`. |
+| `maxConcurrency` | This agent's own wake-concurrency cap (default `4`). |
+| `sigintTimeoutMs` | Interrupt-escalation grace window (ms). |
+| `browseRoots` | Directory-discovery allowlist. |
+
+### Add another agent
+
+- **`chorus login --add`** validates a new key and appends it as another agent. The first
+  `--add` on a flat file migrates the existing credential into `agents[0]` and adds the new key
+  as `agents[1]`; a duplicate key is refused, and an existing agent is never overwritten.
+- **`chorus daemon install --add`** loops the install wizard so you can add several agents in
+  one pass (terminal only).
+- **Hand-editing** `~/.chorus/daemon.json` is always supported.
+
+Restart the daemon after editing the file (`chorus daemon restart`), then confirm each agent
+appears in **Settings → Agents**.
+
+### How each backend receives its key
+
+Each agent authenticates with its own key, but *how* that key reaches the woken subprocess
+depends on the backend:
+
+- **Claude Code** — automatic. The daemon writes a per-wake MCP config carrying that agent's URL
+  and key. Nothing to configure.
+- **Kiro** — automatic, via the environment. The installed `mcp.json` references `${CHORUS_URL}`
+  and `${env:CHORUS_API_KEY}`, which the daemon exports per wake, so each Kiro agent
+  authenticates with its own key.
+- **Codex** — Codex reads its Chorus server URL and key from its own `~/.codex/config.toml`, not
+  from the environment, and its installer bakes a literal key. That is correct for a **single**
+  Codex agent. To run **two Codex agents with different keys** in one daemon, configure Codex to
+  read the key from the environment — set `bearer_token_env_var = "CHORUS_API_KEY"` in
+  `config.toml` (or `codex mcp add … --bearer-token-env-var CHORUS_API_KEY`). The daemon injects
+  each agent's own key per wake, so each Codex agent then authenticates as itself. With a baked
+  literal key, two Codex agents would share that one key — and so one identity — so prefer the
+  environment form for multi-agent Codex.
 
 ## Install the Linux service
 
