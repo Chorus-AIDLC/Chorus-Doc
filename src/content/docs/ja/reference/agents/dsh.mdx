@@ -1,0 +1,56 @@
+---
+title: DeepSeek Harness
+description: 第一者 npm バンドルを通じて DeepSeek Harness (dsh) を Chorus に接続します。
+docsLocale: ja
+route: /ja/reference/agents/dsh/
+---
+
+# DeepSeek Harness
+
+DeepSeek Harness (dsh) は、第一者の npm バンドル `@chorus-aidlc/chorus-dsh` を通じて Chorus に接続します。このバンドルは、Chorus の MCP ツール、ワークフロースキル、ペルソナを dsh プロファイルに追加します。dsh は対話的に使用します。dsh の無人 daemon wake は、このリリースでは利用できません。
+
+インストール前に、`0.1.0-rc.7` 以降の dsh（および `pnpm`）を使い、[エージェントのアクセスを準備する](/ja/guides/administrator-setup/)に従ってエージェントキーを作成します。
+
+## バンドルをインストールする
+
+Chorus バンドルを dsh プロファイルに追加します。コマンド内の `name` プレースホルダーを、使用したいプロファイル名に置き換えてください。dsh プロファイルは pnpm ワークスペースのルートなので、`-w` が必要です：
+
+```bash
+dsh plugin --profile <name> add @chorus-aidlc/chorus-dsh -w
+```
+
+## 認証情報を保存する
+
+dsh はツールのサブプロセスから認証情報らしい変数を取り除くため、Chorus の URL とエージェントキーを dsh が解決できる場所に保存します。Chorus サーバーは `$DSH_HOME/.env` に書き込むヘルパーを提供します：
+
+```bash
+export CHORUS_URL="https://chorus.example.com"
+export CHORUS_API_KEY="cho_your_agent_key"
+bash <(curl -fsSL "$CHORUS_URL/dsh-credentials.sh")
+```
+
+dsh は次の順序で認証情報を解決します：環境変数 → `$DSH_HOME/.credentials.yaml` → `<cwd>/.env` → `$DSH_HOME/.env`。
+
+## 接続を確認する
+
+プロファイルを起動します：
+
+```bash
+dsh --profile <name>
+```
+
+「check in to chorus」と依頼します。Chorus で**設定 → エージェント**を開き、dsh の接続がオンラインであることを確認します。
+
+## 機能と制限
+
+- バンドルは Chorus の MCP ツール、ワークフロースキル、Chorus ペルソナを提供します。
+- dsh は自身のプロファイルを通じて対話的に動作します。
+- dsh は `chorus daemon --agent` では受け付けられません。dsh の無人 daemon wake はこのリリースでは利用できないため、当面は対話的に使用してください。
+
+## よくある問題
+
+- **`dsh` または `pnpm` が見つからない：** 両方の前提ツールをインストールし、新しいシェルを開きます。
+- **`ERR_PNPM_ADDING_TO_ROOT`：** `-w` を付けてコマンドを再実行します。dsh プロファイルは pnpm ワークスペースのルートです。
+- **パッケージが見つからない：** レジストリへのアクセスとパッケージ名 `@chorus-aidlc/chorus-dsh` を確認し、追加コマンドを再実行します。
+- **チェックインが認可されない：** `CHORUS_URL` と `cho_` エージェントキーがエクスポートされているか `$DSH_HOME/.env` に保存されていることを確認し、プロファイルを起動し直します。
+- **プロファイル更新後にチェックインが失敗する：** dsh プロファイルを再起動し、有効な composition を再読み込みします。

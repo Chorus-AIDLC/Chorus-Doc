@@ -146,6 +146,7 @@ export default defineConfig({
                 { slug: 'reference/agents/codex' },
                 { slug: 'reference/agents/kiro' },
                 { slug: 'reference/agents/openclaw' },
+                { slug: 'reference/agents/dsh' },
                 { slug: 'reference/agents/opencode' },
                 { slug: 'reference/agents/pi' },
                 { slug: 'reference/agents/generic-mcp' },

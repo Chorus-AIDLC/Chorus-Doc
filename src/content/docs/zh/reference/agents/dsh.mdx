@@ -1,0 +1,56 @@
+---
+title: DeepSeek Harness
+description: 通过第一方 npm bundle 安装并验证 DeepSeek Harness (dsh) 的 Chorus 接入。
+docsLocale: zh
+route: /zh/reference/agents/dsh/
+---
+
+# DeepSeek Harness
+
+DeepSeek Harness (dsh) 通过第一方 npm bundle `@chorus-aidlc/chorus-dsh` 接入 Chorus。该 bundle 会把 Chorus 的 MCP 工具、工作流技能和 persona 注入到一个 dsh profile。目前以交互方式使用 dsh；本版本暂不提供 dsh 的无人值守 daemon wake。
+
+安装前请使用 `0.1.0-rc.7` 或更高版本的 dsh（并安装 `pnpm`），并按照[准备智能体访问](/zh/guides/administrator-setup/)创建一个智能体密钥。
+
+## 安装 bundle
+
+把 Chorus bundle 加入某个 dsh profile。将命令中的 `name` 占位符替换为你要使用的 profile。必须带 `-w`，因为 dsh profile 是一个 pnpm workspace 根：
+
+```bash
+dsh plugin --profile <name> add @chorus-aidlc/chorus-dsh -w
+```
+
+## 写入凭证
+
+dsh 会从工具子进程中剥离形似凭证的环境变量，因此需要把 Chorus 地址和智能体密钥持久化到 dsh 能解析的位置。Chorus 服务提供了一个脚本，会写入 `$DSH_HOME/.env`：
+
+```bash
+export CHORUS_URL="https://chorus.example.com"
+export CHORUS_API_KEY="cho_your_agent_key"
+bash <(curl -fsSL "$CHORUS_URL/dsh-credentials.sh")
+```
+
+dsh 解析凭证的顺序为：环境变量 → `$DSH_HOME/.credentials.yaml` → `<cwd>/.env` → `$DSH_HOME/.env`。
+
+## 验证连接
+
+启动该 profile：
+
+```bash
+dsh --profile <name>
+```
+
+让它执行 “check in to chorus”。在 Chorus 中打开**设置 → 智能体**，确认 dsh 连接已上线。
+
+## 能力与限制
+
+- bundle 提供 Chorus 的 MCP 工具、工作流技能和 Chorus persona。
+- dsh 通过自己的 profile 以交互方式运行。
+- dsh 不能作为 `chorus daemon --agent` 的运行后端；本版本暂不提供 dsh 的无人值守 daemon wake，请先以交互方式使用。
+
+## 常见问题
+
+- **找不到 `dsh` 或 `pnpm`**：安装这两个前置工具并重新打开 shell。
+- **`ERR_PNPM_ADDING_TO_ROOT`**：带 `-w` 重新运行命令，因为 dsh profile 是一个 pnpm workspace 根。
+- **找不到包**：确认 registry 访问和包名 `@chorus-aidlc/chorus-dsh`，然后重新运行安装命令。
+- **check-in 未授权**：确认 `CHORUS_URL` 和 `cho_` 智能体密钥已导出或已写入 `$DSH_HOME/.env`，然后重新启动 profile。
+- **profile 更新后无法 check in**：重启该 dsh profile，使最终 composition 重新加载。
