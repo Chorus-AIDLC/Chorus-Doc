@@ -11,14 +11,21 @@ OpenClaw 通过第一方插件接入 Chorus。插件使用 OpenClaw 自己的原
 
 ## 安装插件
 
-OpenClaw 版本需为 `2026.4.27` 或更高。运行：
+`chorus agents add` 会为你安装并启用插件：
+
+```bash
+npm install --global @chorus-aidlc/chorus
+chorus agents add --agents openclaw
+```
+
+也可以直接用 OpenClaw 安装（OpenClaw 版本需为 `2026.4.27` 或更高）：
 
 ```bash
 openclaw plugins install npm:@chorus-aidlc/chorus-openclaw-plugin
 openclaw plugins enable chorus-openclaw-plugin
 ```
 
-在 `~/.openclaw/openclaw.json` 中配置：
+无论用哪种方式，都要在 `~/.openclaw/openclaw.json` 中配置：
 
 - `plugins.entries.chorus-openclaw-plugin.config.chorusUrl`：Chorus 根地址，例如 `https://chorus.example.com`
 - `plugins.entries.chorus-openclaw-plugin.config.apiKey`：为该智能体创建的 API 密钥

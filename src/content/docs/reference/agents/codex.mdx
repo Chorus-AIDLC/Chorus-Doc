@@ -21,14 +21,18 @@ Install Codex if it is not already available:
 npm install --global @openai/codex
 ```
 
-Set your Chorus URL and run the installer:
+Then install the Chorus integration with the `chorus` CLI:
 
 ```bash
-export CHORUS_URL="https://chorus.example.com"
-curl -fsSL "$CHORUS_URL/install-codex.sh" | bash
+npm install --global @chorus-aidlc/chorus
+chorus agents add --agents codex
 ```
 
-Restart Codex after installation.
+Enter the Chorus URL and agent key when prompted. `chorus agents add` installs the Codex
+plugin and configures Codex keyless: it writes `CHORUS_URL`, `CHORUS_API_KEY`, and
+`CHORUS_AGENT_PROFILE` into `~/.codex/.env` and sets `bearer_token_env_var = "CHORUS_API_KEY"`
+in `~/.codex/config.toml`, so Codex reads its key from the environment rather than a baked
+literal. Restart Codex afterward.
 
 ## Enable remote start
 
@@ -74,9 +78,9 @@ for the full flow.
 
 ## Common issues
 
-- **`codex` is not found:** install `@openai/codex` globally and rerun the installer.
-- **Check-in is unauthorized:** rotate the agent key and rerun the installer or
-  `chorus login`.
+- **`codex` is not found:** install `@openai/codex` globally and re-run `chorus agents add`.
+- **Check-in is unauthorized:** rotate the agent key and re-run `chorus agents add` (which
+  refreshes `~/.codex/.env`).
 - **Plugin or hooks are disabled:** enable them in `/plugins` and `/hooks`, then restart
   Codex.
 - **Daemon is offline:** run `chorus daemon status`, then see

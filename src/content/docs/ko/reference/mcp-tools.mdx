@@ -48,6 +48,10 @@ Authorization: Bearer cho_REDACTED
 }
 ```
 
+셸에서는 `chorus mcp call <tool>` 명령이 같은 에이전트 인증 정보로 이 도구들 중 무엇이든 호출합니다.
+스크립트나 일회성 호출을 위한, 토큰이 필요 없는 경로입니다. [chorus CLI](/ko/reference/cli/)를
+참고하세요.
+
 :::note
 MCP 트랜스포트 세션은 Chorus의 **AgentSession** 과 무관합니다. AgentSession은 스웜 모드 하위 에이전트를
 위한 별도의 관측 가능성 구조로, 아래의 session 도구로 만들고 추적합니다.

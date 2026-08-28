@@ -80,10 +80,12 @@ OpenSpec change slug: <slug>
 
 The mirror is byte-faithful — the plugin streams each file's bytes into the draft rather than
 re-typing the content through the model, which keeps the local file and the Chorus draft
-identical. You do not run this yourself; the plugin's skill handles it. The exact wrapper
-contract (the `chorus-api.sh` document-mirror flow, its halt-on-error rules, and post-approval
-re-sync) lives in the authoritative sources rather than being reproduced here — see
-`docs/OPENSPEC_MODE.md` and the plugin skill `public/chorus-plugin/skills/openspec-aware/SKILL.md`.
+identical. You do not run this yourself; the plugin's skill handles it with the native MCP
+client, `chorus mcp call <tool> --arg-file content=<file>`, and falls back to the legacy
+`chorus-api.sh` / `chorus-mcp-call.sh` wrappers only when the `chorus` CLI is not on `PATH`.
+The exact contract (its halt-on-error rules and post-approval re-sync) lives in the
+authoritative sources rather than being reproduced here — see `docs/OPENSPEC_MODE.md` and the
+plugin skill `public/chorus-plugin/skills/openspec-aware/SKILL.md`.
 
 ## When `openspec archive` runs
 
@@ -126,13 +128,14 @@ no slug line to new proposals — behavior is identical to a host without OpenSp
   re-detect. When `CHORUS_OPENSPEC_ACTIVE=1`, author on disk and mirror; when `0`, follow the
   free-form path. After the last task of the change is verified, a PostToolUse hook injects an
   `openspec archive <slug>` reminder.
-- **Constraints.** Every document-draft mirror call must go through the plugin wrapper
-  (`chorus-api.sh mcp-tool` on Claude Code, `chorus-mcp-call.sh` on Codex) with file bytes
-  encoded verbatim — never re-type document content inline, and halt on any wrapper error. Do
-  not mirror `tasks.md`. The proposal description must carry the exact line
-  `OpenSpec change slug: <slug>`. When the mode is off, do not scaffold `openspec/changes/`
-  and do not add the slug line. The standalone `public/skill/` distribution does not support
-  OpenSpec mode.
+- **Constraints.** Every document-draft mirror call must go through
+  `chorus mcp call <tool> '<json>' --arg-file content=<file>` (the native MCP client) with the
+  file's bytes streamed verbatim — falling back to the legacy `chorus-api.sh mcp-tool` /
+  `chorus-mcp-call.sh` wrappers only when `chorus` is not on `PATH`. Never re-type document
+  content inline, and halt on any error. Do not mirror `tasks.md`. The proposal description
+  must carry the exact line `OpenSpec change slug: <slug>`. When the mode is off, do not
+  scaffold `openspec/changes/` and do not add the slug line. The standalone `public/skill/`
+  distribution does not support OpenSpec mode.
 - **Cite.** `docs/OPENSPEC_MODE.md` (user-facing summary and detection contract),
   `public/chorus-plugin/skills/openspec-aware/SKILL.md` (Claude Code authoritative skill), and
   `plugins/chorus/skills/openspec-aware/SKILL.md` (Codex authoritative skill).

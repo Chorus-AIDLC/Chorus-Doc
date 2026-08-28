@@ -1,0 +1,138 @@
+---
+title: chorus CLI
+description: chorus コマンドで、このマシンのエージェントを設定し、シェルから MCP ツールを呼び出し、Chorus サーバーを実行します。
+docsLocale: ja
+route: /ja/reference/cli/
+---
+
+# `chorus` CLI
+
+`chorus` コマンド（`@chorus-aidlc/chorus` として公開）は 3 つの役割を担います。Chorus サーバーを
+実行し、マシン上のコーディングエージェントを設定し、シェルから Chorus の MCP エンドポイントを
+呼び出します。グローバルにインストールします。
+
+```sh
+npm install --global @chorus-aidlc/chorus
+chorus --version   # 0.17.0 or later provides `chorus agents` and `chorus mcp`
+```
+
+完全なフラグ一覧は、`chorus --help` または `chorus <command> --help` を実行してください。
+
+## コマンド一覧
+
+| コマンド | 何をするか |
+| --- | --- |
+| `chorus` | Chorus サーバーを起動します（サブコマンドなしの既定）。[Docker でデプロイ](/ja/guides/deploy-docker/)を参照。 |
+| `chorus agents` | このマシンのエージェントを設定します — `list`（既定）、`add`、`remove`。 |
+| `chorus mcp` | ネイティブ MCP クライアント — ツールを `call` し、自分の UUID を表示（`whoami`）し、呼び出せるツールを `list` します。 |
+| `chorus login` | エージェントとして認証し、接続を `~/.chorus/daemon.json` に保存します。 |
+| `chorus daemon` | Chorus が起こせるようにランタイムをオンラインに保ちます。[Chorus デーモンを運用する](/ja/guides/daemon-operations/)を参照。 |
+
+:::note[0.17.0 での名称変更]
+`chorus init` は `chorus agents add` になりました（フラグは同じ）。エージェントごとの
+`install-*.sh` スクリプトは廃止され、いまは `chorus agents add` を案内するだけになっています。
+:::
+
+## エージェントを設定する — `chorus agents`
+
+`chorus agents add` は、マシンのコーディングエージェントを Chorus に接続する唯一のコマンドです。
+すでにインストールしているエージェントを検出し、それぞれの Chorus プラグインをそのエージェント自身の
+プラグイン機構を通じてインストールし、Chorus の URL とエージェントキーを一度だけ
+`~/.chorus/daemon.json` に取り込みます。Claude Code、Codex、DeepSeek Harness については、認証情報を
+そのエージェント自身の設定にも書き込むため、対話的なセッションが手動の環境設定なしで認証されます
+（[認証情報の保存先](#認証情報の保存先)を参照）。
+
+```sh
+chorus agents add                     # interactive: detect, pick, configure
+chorus agents add --all --yes         # configure every detected agent, no prompts
+chorus agents add --agents claude,codex \
+  --url https://chorus.example.com --api-key cho_xxx
+```
+
+冪等です — エージェントの追加、プラグインの更新、キーのローテーションのために再実行しても安全です。
+検出されたがまだインストールされていないエージェントも選択可能なままです。サポートされるエージェントは
+Claude Code、Codex、Kiro、opencode、OpenClaw、DeepSeek Harness です。Pi はガイド付き（手動）のみです。
+
+便利なフラグ（`chorus agents add --help` にすべて一覧されます）。
+
+- `--agents <a,b>` / `--all` — どのエージェントを設定するか。
+- `--url` / `--api-key` — 認証情報を非対話的に指定します（環境変数：`CHORUS_URL` / `CHORUS_API_KEY`）。
+- `--dsh-profile <name>` — バンドルをインストールする DeepSeek Harness のプロファイル。
+- `--daemon-wake <a,b>` / `--daemon-wake-all` — 指定したエージェント（または起こせるすべてのエージェント）をデーモンの起動対象にします。起こせるエージェント（Claude Code、Codex、Kiro）は既定で「パーク」状態で追加されます。`chorus mcp` からは到達できますが、ここで明示的に選ぶ（または TTY で各エージェントのプロンプトに答える）まではデーモンに起こされません。
+- `--daemon-autostart` — デーモンの起動サービスもインストールして有効化します（Linux systemd / macOS launchd）。
+- `-y, --yes` — 確認をスキップします（TTY でないときは暗黙的に有効になり、その場合は `--agents` または `--all` を渡す必要があります）。
+
+設定済みのエージェントを一覧・削除します。
+
+```sh
+chorus agents                     # list configured agents (name, UUID, backend)
+chorus agents remove <name|uuid>  # remove one (match by name or UUID)
+```
+
+`chorus agents` は API キーを決して出力しません。一覧に表示された名前または UUID は、
+`chorus mcp --agent` や `CHORUS_AGENT_PROFILE` 環境変数の有効な値です。
+
+## シェルから MCP ツールを呼び出す — `chorus mcp`
+
+`chorus mcp` はネイティブ MCP クライアントです — スクリプトやターミナルから任意の Chorus ツールを
+呼び出す、トークン不要の経路です。以前の `chorus-api.sh` / `chorus-mcp-call.sh` ラッパーを置き換えます。
+
+```sh
+chorus mcp call <tool> '<json>'                  # call a tool with a JSON argument object
+chorus mcp call <tool> --arg key=value           # set one string argument
+chorus mcp call <tool> --arg-file content=<path> # stream a file's raw bytes into an argument
+chorus mcp whoami                                 # print this agent's own UUID
+chorus mcp list                                   # list the tools this agent may call
+```
+
+`--arg-file` は、大きな内容（文書の本文や OpenSpec ファイル）をモデルで打ち直させることなく
+ツールへ届けるための手段です。成功すると、`chorus mcp call` はツールの結果をそのまま stdout に
+出力します。ツールまたはトランスポートのエラーは、非ゼロの終了コードとともに stderr に出力されます。
+
+アイデンティティは次の順序で解決されます。`--agent <name|uuid>` → 明示的な `--url` + `--api-key` フラグ →
+`CHORUS_AGENT_PROFILE` → `CHORUS_URL` + `CHORUS_API_KEY` → 設定済みエージェントが 1 つだけのときはそのエージェント。
+
+## 接続の環境変数
+
+| 変数 | 意味 |
+| --- | --- |
+| `CHORUS_URL` | Chorus インスタンスの URL。 |
+| `CHORUS_API_KEY` | エージェントの API キー（`cho_…`）。 |
+| `CHORUS_AGENT_PROFILE` | 振る舞う対象となる設定済みエージェントの名前または UUID（任意）。設定すると、`chorus mcp` は `~/.chorus/daemon.json` からそのエージェントのキーを読むため、`CHORUS_API_KEY` をエクスポートする必要がありません。 |
+
+デーモンに起こされたセッションは `CHORUS_AGENT_PROFILE` を自動的に受け取ります。手動で設定するのは、
+特定の設定済みエージェントとして振る舞わせたい対話的なシェルの場合だけです。
+
+## 認証情報の保存先
+
+`chorus agents add` は、検証済みの認証情報を常に `~/.chorus/daemon.json` に書き込みます
+（モード `0600`。キーがエコー表示されることはありません）。3 つのエージェントについては、
+対話的なセッションが手動のエクスポートなしで認証されるよう、そのエージェント自身の設定にも
+認証情報を埋め込みます。
+
+| エージェント | 追加の認証情報の保存先 |
+| --- | --- |
+| Claude Code | `~/.claude/settings.json` の `env` ブロック（`CLAUDE_CONFIG_DIR` を尊重）。 |
+| Codex | `~/.codex/.env`（`CODEX_HOME` を尊重）。Codex はキーレスの `config.toml` エントリを通じて、環境変数からキーを読みます。 |
+| DeepSeek Harness | `$DSH_HOME/.env`。 |
+
+Kiro、opencode、OpenClaw は、それぞれインストールされた自身の設定から認証情報を読みます。
+デーモンに起こされた Kiro の場合は、デーモンが起動ごとにエクスポートする環境変数から読みます。
+
+## エージェント向け
+
+- **トリガー。** このページに来るのは、CLI をインストールまたはアップグレードするため、エージェントを
+  設定するため（`chorus agents add`）、あるいはシェルから Chorus ツールを呼び出すため
+  （`chorus mcp call`）です。
+- **制約。** 文書ミラーやその他の大きな内容の呼び出しには、`chorus mcp call <tool> '<json>' --arg-file content=<file>`
+  を優先してください。`chorus` が `PATH` にないときにのみ、`chorus-api.sh` / `chorus-mcp-call.sh` に
+  フォールバックします。API キーをコマンドラインやシェル履歴に貼り付けては決してなりません —
+  `chorus agents add` / `chorus login` に取り込ませてください。
+- **出典。** 権威あるフラグ面については、`chorus --help` と `chorus <command> --help` を実行してください。
+  常にインストール済みのバージョンと一致します。
+
+## 関連
+
+- [エージェントランタイムを接続する](/ja/guides/operator-onboarding/) — 手順を追ったセットアップの解説。
+- [Chorus デーモンを運用する](/ja/guides/daemon-operations/) — ランタイムをオンラインに保つ。
+- [MCP ツール](/ja/reference/mcp-tools/) — `chorus mcp` が呼び出すツールのカタログ。

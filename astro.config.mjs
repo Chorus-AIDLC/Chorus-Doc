@@ -199,6 +199,7 @@ export default defineConfig({
             { slug: 'reference/search' },
             { slug: 'reference/resource-graph' },
             { slug: 'reference/authentication' },
+            { slug: 'reference/cli' },
             { slug: 'reference/mcp-tools' },
             { slug: 'reference/realtime' },
             { slug: 'reference/glossary' },

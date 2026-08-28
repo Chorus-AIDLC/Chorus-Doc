@@ -16,14 +16,27 @@ Claude Code には第一者の Chorus プラグインがあります。対話的
 
 ## プラグインをインストールする
 
-Claude Code を起動するシェルで、Chorus URL と専用のエージェントキーを設定します。
+最も手早い方法は `chorus` CLI です。プラグインをインストールし、認証情報を保存してくれます。
+
+```bash
+npm install --global @chorus-aidlc/chorus
+chorus agents add --agents claude
+```
+
+プロンプトが出たら、Chorus URL とエージェントキーを入力します。`chorus agents add` は
+`claude plugin marketplace add` / `claude plugin install` を代わりに実行し、`CHORUS_URL`、
+`CHORUS_API_KEY`、`CHORUS_AGENT_PROFILE` をユーザー全体の `~/.claude/settings.json` の `env`
+ブロックに書き込むため、対話的な Claude Code セッションは手動の環境設定なしで認証されます。
+その後、Claude Code を再起動します。
+
+手動でインストールする場合は、起動するシェルで認証情報を設定します。
 
 ```bash
 export CHORUS_URL="https://chorus.example.com"
 export CHORUS_API_KEY="cho_REDACTED"
 ```
 
-次に、Claude Code 内で以下のコマンドを実行します。
+次に、Claude Code 内からプラグインを追加します。
 
 ```text
 /plugin marketplace add Chorus-AIDLC/chorus
@@ -74,8 +87,9 @@ Claude Code バックエンドの場合、それは直接の着想の UUID で�
 ## よくある問題
 
 - **プラグインが表示されない：** Claude Code を再起動し、`/plugin list` を確認します。
-- **チェックインが認可されない：** エージェントキーを作成またはローテーションし、
-  `CHORUS_API_KEY` を更新して、Claude Code を再起動します。
+- **チェックインが認可されない：** エージェントキーを作成またはローテーションし、次に
+  `chorus agents add` を再実行して（または `~/.claude/settings.json` の `env` ブロックを更新して）、
+  Claude Code を再起動します。
 - **デーモンがオフライン：** `chorus daemon status` を実行し、次に
   [トラブルシューティング](/ja/guides/troubleshooting/)を参照します。
 - **想定と異なるプロジェクトが表示される：** 意図した絶対パスの `--cwd` 値でデーモンを

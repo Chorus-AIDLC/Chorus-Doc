@@ -11,15 +11,21 @@ OpenCode 集成由社区项目 [etnperlong/opencode-chorus](https://github.com/e
 
 ## 安装集成
 
-设置 Chorus 根地址和 API 密钥，然后运行安装脚本：
+用 `chorus` 命令行工具安装这个社区集成：
+
+```bash
+npm install --global @chorus-aidlc/chorus
+chorus agents add --agents opencode
+```
+
+`chorus agents add` 会运行 `opencode plugin opencode-chorus -g`，把社区包注册到全局 `~/.config/opencode/opencode.json`，OpenCode 会在下次启动时下载它。OpenCode 从 shell 读取凭据，因此请在启动 OpenCode 的环境中设置：
 
 ```bash
 export CHORUS_URL="https://chorus.example.com"
 export CHORUS_API_KEY="cho_REDACTED"
-curl -fsSL "$CHORUS_URL/install-opencode.sh" | bash
 ```
 
-`CHORUS_URL` 应填写 Chorus 根地址，不要附加 `/api/mcp`。脚本会把社区包加入 `~/.config/opencode/opencode.json`，OpenCode 会在启动时下载该包。
+`CHORUS_URL` 应填写 Chorus 根地址，不要附加 `/api/mcp`。
 
 ## 验证连接
 

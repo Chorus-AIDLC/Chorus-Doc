@@ -48,6 +48,10 @@ Authorization: Bearer cho_REDACTED
 }
 ```
 
+シェルからは、`chorus mcp call <tool>` コマンドが同じエージェント認証情報でこれらのツールのいずれも
+呼び出せます — スクリプトや一度きりの呼び出しのための、トークン不要の経路です。
+[chorus CLI](/ja/reference/cli/)を参照してください。
+
 :::note
 MCP トランスポートのセッションは Chorus の **AgentSession** とは無関係です。AgentSession はスウォーム
 モードのサブエージェント向けの別個の可観測性の構造で、下記の session ツールで作成・追跡します。

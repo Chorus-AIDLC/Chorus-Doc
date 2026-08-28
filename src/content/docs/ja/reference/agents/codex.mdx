@@ -21,14 +21,18 @@ Codex には、ツール、ワークフロースキル、フックを備えた�
 npm install --global @openai/codex
 ```
 
-Chorus URL を設定し、インストーラーを実行します。
+次に、`chorus` CLI で Chorus 統合をインストールします。
 
 ```bash
-export CHORUS_URL="https://chorus.example.com"
-curl -fsSL "$CHORUS_URL/install-codex.sh" | bash
+npm install --global @chorus-aidlc/chorus
+chorus agents add --agents codex
 ```
 
-インストール後に Codex を再起動します。
+プロンプトが出たら、Chorus URL とエージェントキーを入力します。`chorus agents add` は Codex
+プラグインをインストールし、Codex をキーレスに設定します。`CHORUS_URL`、`CHORUS_API_KEY`、
+`CHORUS_AGENT_PROFILE` を `~/.codex/.env` に書き込み、`~/.codex/config.toml` に
+`bearer_token_env_var = "CHORUS_API_KEY"` を設定するため、Codex はリテラルを埋め込む代わりに
+環境変数からキーを読みます。その後、Codex を再起動します。
 
 ## リモート起動を有効にする
 
@@ -74,10 +78,10 @@ Codex は自分の thread id を生成するため、コピーした値はその
 
 ## よくある問題
 
-- **`codex` が見つからない：** `@openai/codex` をグローバルにインストールし、インストーラーを
-  再実行します。
-- **チェックインが認可されない：** エージェントキーをローテーションし、インストーラーまたは
-  `chorus login` を再実行します。
+- **`codex` が見つからない：** `@openai/codex` をグローバルにインストールし、`chorus agents add`
+  を再実行します。
+- **チェックインが認可されない：** エージェントキーをローテーションし、`chorus agents add` を
+  再実行します（`~/.codex/.env` が更新されます）。
 - **プラグインまたはフックが無効：** `/plugins` と `/hooks` で有効にし、Codex を再起動します。
 - **デーモンがオフライン：** `chorus daemon status` を実行し、次に
   [トラブルシューティング](/ja/guides/troubleshooting/)を参照します。

@@ -1,0 +1,133 @@
+---
+title: chorus 命令行工具
+description: 用 chorus 命令配置本机的智能体、从 shell 调用 MCP 工具，并运行 Chorus 服务器。
+docsLocale: zh
+route: /zh/reference/cli/
+---
+
+# `chorus` 命令行工具
+
+`chorus` 命令（发布为 `@chorus-aidlc/chorus`）承担三项工作：运行 Chorus 服务器、配置本机上的
+编码智能体，以及从 shell 调用 Chorus MCP 端点。全局安装它：
+
+```sh
+npm install --global @chorus-aidlc/chorus
+chorus --version   # 0.17.0 or later provides `chorus agents` and `chorus mcp`
+```
+
+运行 `chorus --help` 或 `chorus <command> --help` 查看完整的参数列表。
+
+## 命令一览
+
+| 命令 | 作用 |
+| --- | --- |
+| `chorus` | 启动 Chorus 服务器（不带子命令时的默认行为）。参见[使用 Docker 部署](/zh/guides/deploy-docker/)。 |
+| `chorus agents` | 配置本机的智能体：`list`（默认）、`add`、`remove`。 |
+| `chorus mcp` | 原生 MCP 客户端：`call` 调用工具、打印你的 UUID（`whoami`），或 `list` 列出可调用的工具。 |
+| `chorus login` | 以智能体身份认证，并把连接保存到 `~/.chorus/daemon.json`。 |
+| `chorus daemon` | 让运行环境保持在线，以便 Chorus 唤起它。参见[管理后台服务](/zh/guides/daemon-operations/)。 |
+
+:::note[0.17.0 中的重命名]
+`chorus init` 现已改为 `chorus agents add`（参数不变）。各智能体的 `install-*.sh` 脚本已废弃，
+它们现在只会引导你去运行 `chorus agents add`。
+:::
+
+## 配置智能体：`chorus agents`
+
+`chorus agents add` 是把本机编码智能体连接到 Chorus 的唯一一条命令。它会检测你已安装的智能体，
+通过各智能体自己的插件机制为其安装 Chorus 插件，并把 Chorus 网址和智能体密钥一次性写入
+`~/.chorus/daemon.json`。对 Claude Code、Codex 和 DeepSeek Harness，它还会把凭据写入该智能体
+自己的配置，因此交互式会话无需手动设置环境变量即可完成认证（见下文「凭据写往何处」一节）。
+
+```sh
+chorus agents add                     # interactive: detect, pick, configure
+chorus agents add --all --yes         # configure every detected agent, no prompts
+chorus agents add --agents claude,codex \
+  --url https://chorus.example.com --api-key cho_xxx
+```
+
+它是幂等的：可以安全地重新运行，以添加智能体、刷新插件或轮换密钥。已检测到但尚未安装的智能体
+仍可选择。支持的智能体有 Claude Code、Codex、Kiro、opencode、OpenClaw 和 DeepSeek Harness；Pi
+仅提供引导式（手动）安装。
+
+常用参数（`chorus agents add --help` 会列出全部）：
+
+- `--agents <a,b>` / `--all`：要配置哪些智能体。
+- `--url` / `--api-key`：以非交互方式提供凭据（环境变量：`CHORUS_URL` / `CHORUS_API_KEY`）。
+- `--dsh-profile <name>`：把 bundle 安装进哪个 DeepSeek Harness profile。
+- `--daemon-wake <a,b>` / `--daemon-wake-all`：把指定的（或全部可唤起的）智能体选入 daemon 唤起范围。可唤起的智能体（Claude Code、Codex、Kiro）默认以「停靠」状态添加：`chorus mcp` 可以访问它，但在你于此显式选入（或在 TTY 下逐个应答提示）之前，daemon 不会唤起它。
+- `--daemon-autostart`：同时安装并启用 daemon 开机服务（Linux systemd / macOS launchd）。
+- `-y, --yes`：跳过确认（非 TTY 环境下自动生效，此时必须传入 `--agents` 或 `--all`）。
+
+列出并移除已配置的智能体：
+
+```sh
+chorus agents                     # list configured agents (name, UUID, backend)
+chorus agents remove <name|uuid>  # remove one (match by name or UUID)
+```
+
+`chorus agents` 绝不会打印 API 密钥。列出的名称或 UUID 都是 `chorus mcp --agent` 或
+`CHORUS_AGENT_PROFILE` 环境变量的有效取值。
+
+## 从 shell 调用 MCP 工具：`chorus mcp`
+
+`chorus mcp` 是一个原生 MCP 客户端，一条从脚本或终端调用任意 Chorus 工具的免令牌路径。它取代了
+早先的 `chorus-api.sh` / `chorus-mcp-call.sh` 封装脚本。
+
+```sh
+chorus mcp call <tool> '<json>'                  # call a tool with a JSON argument object
+chorus mcp call <tool> --arg key=value           # set one string argument
+chorus mcp call <tool> --arg-file content=<path> # stream a file's raw bytes into an argument
+chorus mcp whoami                                 # print this agent's own UUID
+chorus mcp list                                   # list the tools this agent may call
+```
+
+`--arg-file` 是让大段内容（如文档正文、OpenSpec 文件）不经模型重新逐字敲入就能送达工具的方式。
+成功时，`chorus mcp call` 会把工具结果原样打印到 stdout；工具或传输错误会输出到 stderr，并以
+非零退出码结束。
+
+身份按以下顺序解析：`--agent <name|uuid>` → 显式的 `--url` + `--api-key` 参数 →
+`CHORUS_AGENT_PROFILE` → `CHORUS_URL` + `CHORUS_API_KEY` → 仅存在一个已配置智能体时的那一个。
+
+## 连接环境变量
+
+| 变量 | 含义 |
+| --- | --- |
+| `CHORUS_URL` | Chorus 实例的 URL。 |
+| `CHORUS_API_KEY` | 智能体 API 密钥（`cho_…`）。 |
+| `CHORUS_AGENT_PROFILE` | 可选，要充当的已配置智能体的名称或 UUID。设置后，`chorus mcp` 会从 `~/.chorus/daemon.json` 读取该智能体的密钥，因此你无需导出 `CHORUS_API_KEY`。 |
+
+daemon 唤起的会话会自动获得 `CHORUS_AGENT_PROFILE`；只有当交互式 shell 需要充当某个特定的
+已配置智能体时，你才需要手动设置它。
+
+## 凭据写往何处
+
+`chorus agents add` 总是把校验后的凭据写入 `~/.chorus/daemon.json`（权限 `0600`；密钥绝不会
+回显）。对其中三种智能体，它还会把凭据播种进该智能体自己的配置，让交互式会话无需任何手动导出
+即可完成认证：
+
+| 智能体 | 额外的凭据落地位置 |
+| --- | --- |
+| Claude Code | `~/.claude/settings.json` 的 `env` 块（遵循 `CLAUDE_CONFIG_DIR`）。 |
+| Codex | `~/.codex/.env`（遵循 `CODEX_HOME`）；Codex 通过一个不内置密钥的 `config.toml` 条目从环境变量读取密钥。 |
+| DeepSeek Harness | `$DSH_HOME/.env`。 |
+
+Kiro、opencode 和 OpenClaw 从各自已安装的配置读取凭据；对于 daemon 唤起的 Kiro，则从 daemon
+每次唤起时导出的环境变量读取。
+
+## 面向 Agent
+
+- **触发条件。** 你来到本页，是为了安装或升级命令行工具、配置某个智能体（`chorus agents add`），
+  或从 shell 调用某个 Chorus 工具（`chorus mcp call`）。
+- **约束。** 对文档镜像等大段内容的调用，优先使用
+  `chorus mcp call <tool> '<json>' --arg-file content=<file>`；仅当 `chorus` 不在 `PATH` 中时，
+  才回退到 `chorus-api.sh` / `chorus-mcp-call.sh`。绝不要把 API 密钥粘贴到命令行或终端历史里，
+  让 `chorus agents add` / `chorus login` 来捕获它。
+- **引用来源。** 运行 `chorus --help` 和 `chorus <command> --help` 查看权威的参数面；它始终与
+  已安装的版本一致。
+
+## 相关阅读
+
+- [连接智能体运行环境](/zh/guides/operator-onboarding/)：分步的设置演练。
+- [管理后台服务](/zh/guides/daemon-operations/)：让运行环境保持在线。
+- [MCP 工具目录](/zh/reference/mcp-tools/)：`chorus mcp` 调用的工具目录。

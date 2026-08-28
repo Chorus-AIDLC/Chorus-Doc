@@ -64,7 +64,8 @@ chorus daemon \
 
 ### 파일은 어떻게 만들어지는가
 
-- `chorus login`은 URL과 키를 검증한 뒤 `url`, `apiKey`, `agentUuid`, `agentName`을 씁니다.
+- `chorus agents add`가 이 파일을 처음 만드는 통상적인 방법입니다. 구성된 각 에이전트의 인증 정보를 검증하고 `agents` 배열의 항목으로 씁니다. [에이전트 런타임 연결](/ko/guides/operator-onboarding/)을 참고하세요.
+- `chorus login`은 URL과 키를 검증한 뒤, 단일 평면 에이전트에 대해 `url`, `apiKey`, `agentUuid`, `agentName`을 씁니다.
 - `chorus daemon install`은 추가로 `cwds`, `browseRoots`, `agent`를 씁니다(이들이 아직 설정되지 않았으면 제공할 디렉터리와 백엔드를 묻습니다).
 - 터미널에서 `chorus daemon`을 처음 실행하면, 빠진 인증 정보를 대화식으로 채워 씁니다.
 
@@ -136,7 +137,7 @@ chorus daemon \
 
 - **Claude Code** — 자동. 데몬은 깨울 때마다 해당 에이전트의 URL과 키를 담은 MCP 설정을 씁니다. 구성할 것이 없습니다.
 - **Kiro** — 환경 변수를 통해 자동. 설치된 `mcp.json`은 `${CHORUS_URL}`과 `${env:CHORUS_API_KEY}`를 참조하고, 데몬이 깨울 때마다 이를 내보내므로, 각 Kiro 에이전트는 자신의 키로 인증합니다.
-- **Codex** — Codex는 Chorus 서버 URL과 키를 환경 변수가 아니라 자신의 `~/.codex/config.toml`에서 읽으며, 설치 프로그램은 리터럴 키를 씁니다. 이는 **단일** Codex 에이전트에는 올바른 동작입니다. 하나의 데몬에서 **서로 다른 키를 가진 두 개의 Codex 에이전트**를 실행하려면, Codex가 키를 환경 변수에서 읽도록 구성하세요 — `config.toml`에 `bearer_token_env_var = "CHORUS_API_KEY"`를 설정합니다(또는 `codex mcp add … --bearer-token-env-var CHORUS_API_KEY`). 그러면 데몬이 깨울 때마다 각 에이전트 자신의 키를 주입하여, 각 Codex 에이전트가 자기 자신으로 인증합니다. 리터럴 키를 쓰면 두 Codex 에이전트가 그 하나의 키 — 따라서 하나의 아이덴티티 — 를 공유하게 되므로, 다중 에이전트 Codex에서는 환경 변수 형식을 우선하세요.
+- **Codex** — 환경 변수를 통해 자동. `chorus agents add`는 Codex를 keyless로 구성합니다. `CHORUS_URL` / `CHORUS_API_KEY` / `CHORUS_AGENT_PROFILE`를 `~/.codex/.env`(Codex가 시작할 때 로드함)에 쓰고 `config.toml`에 `bearer_token_env_var = "CHORUS_API_KEY"`를 설정하므로, Codex는 리터럴 키가 아니라 환경 변수에서 자신의 키를 읽습니다. 데몬이 깨울 때마다 각 에이전트 자신의 키를 주입하므로, 하나의 데몬에 있는 여러 Codex 에이전트가 각자 자기 자신으로 인증합니다.
 
 ## Linux 서비스 설치하기
 
@@ -149,7 +150,7 @@ chorus daemon install \
   --chorus-only
 ```
 
-설치 프로그램은 서비스를 즉시 시작하고, 사용자가 로그인할 때 시작되도록 구성합니다. 서비스가 저장된 인증 정보를 읽을 수 있도록 먼저 `chorus login`을 실행하세요.
+설치 프로그램은 서비스를 즉시 시작하고, 사용자가 로그인할 때 시작되도록 구성합니다. 서비스가 저장된 인증 정보를 읽을 수 있도록 먼저 `chorus agents add`(또는 `chorus login`)를 실행하세요. 또는 `chorus agents add`에 `--daemon-autostart`를 전달하면 같은 단계에서 이 부팅 서비스를 설치할 수 있습니다.
 
 :::note[왜 인증 정보가 파일에 담기는가]
 `systemd --user` 유닛은 깨끗한 부팅 환경에서 시작하며, 당신이 셸에서 내보낸 `CHORUS_URL` / `CHORUS_API_KEY`를 상속하지 **않습니다**. 그래서 `chorus daemon install`은 유닛을 쓰기 전에 인증 정보를 해석·검증하고 `~/.chorus/daemon.json`(`0600`)에 저장합니다. 유닛은 파일 경로도 인증 정보도 참조하지 않으며, `HOME`만 설정해 데몬이 부팅 시 `~/.chorus/daemon.json`을 찾을 수 있게 합니다. 제공하는 `cwds`와 선택한 `agent`는 같은 파일에 있습니다. 유닛에 담기는 것은 `--chorus-only`뿐입니다.
@@ -168,7 +169,7 @@ chorus daemon uninstall
 인증 정보, 작업 디렉터리, 백엔드, 권한 모드를 바꾼 뒤에는 서비스를 다시 설치하거나 재시작하고, **설정 → 에이전트**(Settings → Agents)에서 연결을 확인하세요.
 
 :::note[macOS와 Windows]
-macOS와 Windows에서는 `chorus daemon install`이 서비스 템플릿과 수동 설정 단계를 출력합니다. 연결을 테스트할 때의 기준으로 포그라운드 `chorus daemon`을 사용하세요.
+macOS에서는 `chorus daemon install`이 Linux에서와 똑같이 실제 launchd 부팅 서비스를 설치합니다. Windows에서는 서비스 템플릿과 수동 설정 단계를 출력하므로, 연결을 테스트할 때의 기준으로 포그라운드 `chorus daemon`을 사용하세요.
 :::
 
 ## 서비스 없이 실행하기

@@ -46,7 +46,8 @@ they appear as difference-and-pointer notes rather than as equals.
 The Claude Code plugin (`chorus@chorus-plugins`) packages:
 
 - **Chorus MCP tools** — a `.mcp.json` template that configures the Chorus MCP server from
-  the `CHORUS_URL` and `CHORUS_API_KEY` you set in the launching shell.
+  `CHORUS_URL` and `CHORUS_API_KEY`. `chorus agents add` writes those into the `env` block of
+  `~/.claude/settings.json`, so an interactive session authenticates without a manual export.
 - **Workflow skills** — the `/chorus` overview plus the stage skills invoked as
   `/chorus:idea`, `/chorus:proposal`, `/chorus:develop`, `/chorus:review`,
   `/chorus:quick-dev`, and `/chorus:yolo`.
@@ -74,10 +75,12 @@ The Codex plugin (`chorus@chorus-plugins` for Codex) packages:
   and `TaskCompleted` hooks.
 
 The Codex MCP server is **not** bundled with the plugin. Codex does not expand `${VAR}` in
-plugin MCP config or pass the shell environment to MCP subprocesses, so the installer
-writes an `[mcp_servers.chorus]` section with a literal URL and bearer token to
-`~/.codex/config.toml` instead. Codex also has no `userConfig` surface, so reviewer and
-OpenSpec behavior is controlled by skill logic rather than plugin toggles.
+plugin MCP config, so `chorus agents add` configures Codex keyless instead: it writes
+`CHORUS_URL` / `CHORUS_API_KEY` / `CHORUS_AGENT_PROFILE` into `~/.codex/.env` (which Codex
+loads at startup) and sets `bearer_token_env_var = "CHORUS_API_KEY"` in
+`~/.codex/config.toml`, so no literal key is stored on disk. Codex also has no `userConfig`
+surface, so reviewer and OpenSpec behavior is controlled by skill logic rather than plugin
+toggles.
 
 ### Ports: OpenClaw, Kiro, and Pi
 
@@ -97,8 +100,15 @@ Code and Codex. Treat the notes below as pointers, not a parity claim.
 
 Upgrade in place; your agent key and Chorus URL are unaffected.
 
-- **Claude Code** — manage the plugin from the `/plugin` menu, or re-run the marketplace
-  add and install to pull the latest version:
+- **Any agent** — re-run `chorus agents add`. It is idempotent and refreshes each configured
+  agent's plugin and credential in one pass:
+
+  ```bash
+  chorus agents add
+  ```
+
+- **Claude Code** — you can also manage the plugin from the `/plugin` menu, or re-run the
+  marketplace add and install to pull the latest version:
 
   ```text
   /plugin marketplace add Chorus-AIDLC/chorus
@@ -107,17 +117,11 @@ Upgrade in place; your agent key and Chorus URL are unaffected.
 
   Restart Claude Code, then run `/plugin list` and confirm the new version is enabled.
 
-- **Codex** — re-run the installer; it is idempotent and updates everything at once:
+- **Codex** — re-running `chorus agents add` refreshes the plugin and the `~/.codex/.env`
+  credential, and is also how you rotate the agent key. Finish with `/plugins` inside Codex.
 
-  ```bash
-  curl -sSL https://raw.githubusercontent.com/Chorus-AIDLC/Chorus/main/public/install-codex.sh | bash
-  ```
-
-  Re-running `install-codex.sh` rewrites the MCP config and refreshes the plugin, and is
-  also how you rotate the agent key. Finish with `/plugins` inside Codex.
-
-For OpenClaw, Kiro, and Pi, upgrade through the same mechanism you installed with, described
-on each platform page above.
+For OpenClaw, Kiro, and Pi, re-run `chorus agents add` or upgrade through the same mechanism
+you installed with, described on each platform page above.
 
 ## Uninstall the plugin
 
@@ -125,9 +129,9 @@ on each platform page above.
   Removing the plugin also removes its hooks and reviewer sub-agents. The agent key in your
   environment is not a plugin artifact; remove it separately if you no longer need it.
 - **Codex** — disable or remove the plugin from the `/plugins` menu. Because the MCP server
-  is configured separately, also delete the `[mcp_servers.chorus]` and
-  `[mcp_servers.chorus.http_headers]` sections from `~/.codex/config.toml` to fully
-  disconnect. The installer keeps a one-time backup at `config.toml.chorus-bak`.
+  is configured separately, also delete the `[mcp_servers.chorus]` section from
+  `~/.codex/config.toml` and the Chorus keys from `~/.codex/.env` to fully disconnect. A
+  one-time backup is kept at `config.toml.chorus-bak`.
 
 For OpenClaw, Kiro, and Pi, remove the integration through the runtime's own plugin or
 package manager as described on its platform page above.

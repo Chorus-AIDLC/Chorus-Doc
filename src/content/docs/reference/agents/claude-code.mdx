@@ -15,14 +15,28 @@ Before installation, create an agent key by following
 
 ## Install the plugin
 
-Set the Chorus URL and the dedicated agent key in the shell that launches Claude Code:
+The quickest path is the `chorus` CLI, which installs the plugin and stores the credential
+for you:
+
+```bash
+npm install --global @chorus-aidlc/chorus
+chorus agents add --agents claude
+```
+
+Enter the Chorus URL and agent key when prompted. `chorus agents add` runs
+`claude plugin marketplace add` / `claude plugin install` for you and writes `CHORUS_URL`,
+`CHORUS_API_KEY`, and `CHORUS_AGENT_PROFILE` into the `env` block of your user-global
+`~/.claude/settings.json`, so an interactive Claude Code session authenticates with no manual
+environment setup. Restart Claude Code afterward.
+
+To install by hand instead, set the credential in the launching shell:
 
 ```bash
 export CHORUS_URL="https://chorus.example.com"
 export CHORUS_API_KEY="cho_REDACTED"
 ```
 
-Then run these commands inside Claude Code:
+Then add the plugin from inside Claude Code:
 
 ```text
 /plugin marketplace add Chorus-AIDLC/chorus
@@ -75,8 +89,9 @@ the full flow.
 ## Common issues
 
 - **Plugin does not appear:** restart Claude Code, then check `/plugin list`.
-- **Check-in is unauthorized:** create or rotate the agent key, update
-  `CHORUS_API_KEY`, and restart Claude Code.
+- **Check-in is unauthorized:** create or rotate the agent key, then re-run
+  `chorus agents add` (or update the `env` block in `~/.claude/settings.json`), and restart
+  Claude Code.
 - **Daemon is offline:** run `chorus daemon status`, then see
   [Troubleshooting](/guides/troubleshooting/).
 - **Wrong project is available:** reinstall the daemon with the intended absolute

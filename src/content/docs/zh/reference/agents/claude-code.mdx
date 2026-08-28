@@ -11,14 +11,26 @@ Claude Code 是 Chorus 第一方支持的运行后端。安装插件后，你可
 
 ## 安装插件
 
-先在启动 Claude Code 的终端中设置 Chorus 地址和专用 API 密钥：
+最快的方式是使用 `chorus` 命令行工具，它会为你安装插件并保存凭据：
+
+```bash
+npm install --global @chorus-aidlc/chorus
+chorus agents add --agents claude
+```
+
+在提示时输入 Chorus 地址和智能体密钥。`chorus agents add` 会替你运行
+`claude plugin marketplace add` / `claude plugin install`，并把 `CHORUS_URL`、
+`CHORUS_API_KEY` 和 `CHORUS_AGENT_PROFILE` 写入用户全局 `~/.claude/settings.json` 的 `env` 块，
+因此交互式 Claude Code 会话无需手动设置环境变量即可完成认证。完成后重新启动 Claude Code。
+
+若要改为手动安装，请在启动 Claude Code 的终端中设置凭据：
 
 ```bash
 export CHORUS_URL="https://chorus.example.com"
 export CHORUS_API_KEY="cho_REDACTED"
 ```
 
-然后在 Claude Code 中运行：
+然后在 Claude Code 中添加插件：
 
 ```text
 /plugin marketplace add Chorus-AIDLC/chorus
@@ -60,6 +72,6 @@ claude --resume <sessionId>
 ## 常见问题
 
 - **插件命令不存在**：重新启动 Claude Code，并用 `/plugin list` 检查插件是否启用。
-- **`chorus_checkin` 返回 `401`**：在 Chorus 中更新 API 密钥，更新 `CHORUS_API_KEY` 后重新启动 Claude Code。
+- **`chorus_checkin` 返回 `401`**：创建或轮换智能体密钥，然后重新运行 `chorus agents add`（或更新 `~/.claude/settings.json` 中的 `env` 块），再重新启动 Claude Code。
 - **在线智能体列表中没有 Claude Code**：运行 `chorus daemon status`；需要进一步排查时运行 `chorus daemon logs`。
 - **工作目录错误**：使用正确的绝对路径重新执行 `chorus daemon install --agent claude-code --cwd ...`。

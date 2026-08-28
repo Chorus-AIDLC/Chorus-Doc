@@ -15,21 +15,18 @@ Before installation, install Kiro CLI v2 and create an agent key by following
 
 ## Install the integration
 
-For a user-wide installation:
+Install the Chorus integration with the `chorus` CLI:
 
 ```bash
-export CHORUS_URL="https://chorus.example.com"
-export CHORUS_API_KEY="cho_REDACTED"
-curl -fsSL "$CHORUS_URL/install-kiro.sh" | bash
+npm install --global @chorus-aidlc/chorus
+chorus agents add --agents kiro
 ```
 
-To install only for the current workspace:
-
-```bash
-curl -fsSL "$CHORUS_URL/install-kiro.sh" | bash -s -- --workspace
-```
-
-Restart Kiro after installation.
+Enter the Chorus URL and agent key when prompted. `chorus agents add` downloads the Kiro
+integration files from your connected Chorus instance into `~/.kiro` (skills, reviewer
+agents, and hooks) and merges the Chorus MCP server into `~/.kiro/settings/mcp.json`. Set
+`KIRO_DIR` before running to install into a different Kiro directory. Restart Kiro after
+installation.
 
 ## Enable remote start
 
@@ -73,10 +70,10 @@ the full flow.
 
 ## Common issues
 
-- **Kiro CLI is not found:** install Kiro CLI v2 and rerun the installer.
+- **Kiro CLI is not found:** install Kiro CLI v2 and re-run `chorus agents add`.
 - **Skills are missing:** check whether a workspace installation is overriding the
   user-wide installation, then restart Kiro.
-- **Check-in is unauthorized:** ensure the agent key is available to the shell that starts
-  Kiro, or run `chorus login` again for daemon mode.
+- **Check-in is unauthorized:** re-run `chorus agents add` so `mcp.json` and the credential
+  are refreshed; for daemon mode the daemon supplies the key per wake.
 - **Daemon is offline:** run `chorus daemon status`, then see
   [Troubleshooting](/guides/troubleshooting/).

@@ -9,6 +9,11 @@ route: /zh/reference/agents/generic-mcp/
 
 任何支持 Streamable HTTP 和自定义 HTTP 请求头的 MCP 客户端，都可以直接连接 Chorus。此方式只提供工具调用，不会安装 Chorus 技能、钩子或工作流自动化。
 
+:::tip[从 shell 调用工具]
+如果你只需要从脚本或终端调用 Chorus 工具，而不是从 MCP 客户端调用，可使用内置的
+`chorus mcp call <tool>` 命令，参见 [chorus 命令行工具](/zh/reference/cli/)。
+:::
+
 ## 配置连接
 
 在客户端中添加名为 `chorus` 的 MCP 服务器：

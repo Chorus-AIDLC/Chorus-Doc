@@ -11,6 +11,12 @@ Use this option when your client supports Streamable HTTP MCP but has no dedicat
 integration. The connection exposes Chorus tools only; it does not install a Chorus
 workflow or make the client remotely available.
 
+:::tip[Calling tools from a shell]
+If you only need to call Chorus tools from a script or terminal rather than from an MCP
+client, use the built-in `chorus mcp call <tool>` command — see
+[The chorus CLI](/reference/cli/).
+:::
+
 Before configuration, create an agent key with only the permissions that client needs by
 following [Prepare agent access](/guides/administrator-setup/).
 

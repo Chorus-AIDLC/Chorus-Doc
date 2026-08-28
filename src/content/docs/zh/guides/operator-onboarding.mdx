@@ -20,20 +20,34 @@ import Screenshot from '../../../../components/Screenshot.astro';
 
 其他智能体平台的安装方法和能力不同，请查看[智能体平台参考](/zh/reference/agents/)，不要直接套用本页命令。
 
-## 登录 Chorus
-
-安装 Chorus 命令行工具：
+安装 Chorus 命令行工具（0.17.0 或更高版本）：
 
 ```sh
 npm install --global @chorus-aidlc/chorus
-chorus login
 ```
 
-`chorus login` 会依次询问 Chorus 网址和 API 密钥，验证成功后将配置保存到 `~/.chorus/daemon.json`。输入密钥时终端不会显示内容。
+## 配置智能体
 
-:::caution[不要在命令行中直接填写密钥]
-命令参数可能保留在终端历史或进程列表中。请使用 `chorus login` 输入并保存密钥，不要把真实密钥写入脚本、仓库配置或共享日志。
+`chorus agents add` 是把本机智能体连接到 Chorus 的一条命令。它会检测你已安装的智能体，为每个智能体安装其 Chorus 插件，并把 Chorus 网址和 API 密钥一次性写入 `~/.chorus/daemon.json`。对 Claude Code、Codex 和 DeepSeek Harness，它还会把凭据写入该智能体自己的配置，因此交互式会话无需手动设置任何环境变量即可完成认证。
+
+```sh
+chorus agents add
+```
+
+在提示时输入 Chorus 网址和 API 密钥，然后选择要配置的智能体。该命令是幂等的：随时可以重新运行，以添加智能体、刷新插件或轮换密钥。要在不出现提示的情况下配置指定智能体：
+
+```sh
+chorus agents add --agents claude,codex \
+  --url https://chorus.example.com --api-key cho_REDACTED --yes
+```
+
+:::caution[保护好 API 密钥]
+优先使用交互式提示，让密钥不会进入终端历史。如果必须传入 `--api-key`，请在配置为不记录历史的 shell 中运行，且绝不要把密钥写入仓库中的文件或支持工单。
 :::
+
+如果你只需要保存凭据而不安装插件（例如在智能体已经配置好的机器上），改用 `chorus login` 即可：它会校验网址和密钥，并把连接写入 `~/.chorus/daemon.json`（权限 `0600`）。
+
+完整的 `chorus agents` 与 `chorus mcp` 命令面，参见 [chorus 命令行工具](/zh/reference/cli/)。
 
 ## 启动智能体
 
@@ -45,7 +59,7 @@ chorus daemon --agent claude-code --cwd /home/demo/workspace --chorus-only
 
 使用 Codex 或 Kiro 时，把 `claude-code` 分别替换为 `codex` 或 `kiro`。`--chorus-only` 会限制智能体只能使用 Chorus 提供的协作工具，适合首次验证；需要完整命令执行能力时，应先确认主机隔离和团队安全策略。
 
-保持该终端运行。确认连接正常后，再按照[管理后台服务](/zh/guides/daemon-operations/)配置长期运行。
+保持该终端运行，同时确认连接是否正常。若想安装一个开机服务，让 daemon 在登录时自动启动，可给 `chorus agents add` 加上 `--daemon-autostart`，或参阅[管理后台服务](/zh/guides/daemon-operations/)。
 
 ## 确认智能体在线
 
@@ -58,5 +72,7 @@ chorus daemon --agent claude-code --cwd /home/demo/workspace --chorus-only
   height={900}
   caption="在线连接会列出智能体使用的运行后端、主机和工作目录。"
 />
+
+随时可以运行 `chorus agents` 列出本机已配置的智能体（名称、UUID 和运行后端；绝不会打印 API 密钥），并用 `chorus agents remove <name|uuid>` 移除其中一个。
 
 状态为在线且三项信息都正确后，智能体即可接收工作。若状态一直离线，请参阅[排查智能体连接故障](/zh/guides/troubleshooting/)。

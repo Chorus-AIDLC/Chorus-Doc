@@ -79,9 +79,10 @@ OpenSpec change slug: <slug>
 
 ミラーはバイト単位で忠実です — プラグインは各ファイルのバイト列をドラフトへ流し込み、モデルに内容を
 打ち直させないため、ローカルファイルと Chorus ドラフトは同一に保たれます。これを自分で実行することは
-ありません。プラグインのスキルが処理します。厳密なラッパーの契約（`chorus-api.sh` の文書ミラーフロー、
-そのエラー時停止ルール、承認後の再同期）は、ここで再掲するのではなく権威ある情報源に記載されています。
-`docs/OPENSPEC_MODE.md` とプラグインスキル
+ありません。プラグインのスキルが、ネイティブ MCP クライアント `chorus mcp call <tool> --arg-file content=<file>`
+を使って処理し、`chorus` CLI が `PATH` にないときにのみ、従来の `chorus-api.sh` / `chorus-mcp-call.sh`
+ラッパーにフォールバックします。厳密な契約（そのエラー時停止ルールと承認後の再同期）は、ここで再掲する
+のではなく権威ある情報源に記載されています。`docs/OPENSPEC_MODE.md` とプラグインスキル
 `public/chorus-plugin/skills/openspec-aware/SKILL.md` を参照してください。
 
 ## `openspec archive` はいつ走るか
@@ -123,13 +124,13 @@ Codex プラグインには userConfig の面がないため、そこでは環�
   `CHORUS_OPENSPEC_ACTIVE=1` のときはディスク上で編集してミラーし、`0` のときは自由形式の経路をたどります。
   変更の最後の課題が検証された後、PostToolUse フックが `openspec archive <slug>` のリマインダーを
   注入します。
-- **制約。** 文書ドラフトのミラー呼び出しはすべて、プラグインのラッパー（Claude Code では
-  `chorus-api.sh mcp-tool`、Codex では `chorus-mcp-call.sh`）を通し、ファイルのバイト列をそのまま
-  エンコードする必要があります。文書の内容をインラインで打ち直しては決してならず、ラッパーのエラーが
-  あれば停止します。`tasks.md` はミラーしないでください。提案の説明には正確な
-  `OpenSpec change slug: <slug>` の 1 行を付ける必要があります。モードがオフのときは、
-  `openspec/changes/` をスキャフォールドせず、スラッグ行も加えないでください。スタンドアロンの
-  `public/skill/` 配布物は OpenSpec モードをサポートしません。
+- **制約。** 文書ドラフトのミラー呼び出しはすべて、`chorus mcp call <tool> '<json>' --arg-file content=<file>`
+  （ネイティブ MCP クライアント）を通し、ファイルのバイト列をそのままストリームする必要があります。
+  `chorus` が `PATH` にないときにのみ、従来の `chorus-api.sh mcp-tool` / `chorus-mcp-call.sh` ラッパーに
+  フォールバックします。文書の内容をインラインで打ち直しては決してならず、エラーがあれば停止します。
+  `tasks.md` はミラーしないでください。提案の説明には正確な `OpenSpec change slug: <slug>` の 1 行を
+  付ける必要があります。モードがオフのときは、`openspec/changes/` をスキャフォールドせず、スラッグ行も
+  加えないでください。スタンドアロンの `public/skill/` 配布物は OpenSpec モードをサポートしません。
 - **出典。** `docs/OPENSPEC_MODE.md`（ユーザー向けの概要と検出の契約）、
   `public/chorus-plugin/skills/openspec-aware/SKILL.md`（Claude Code の権威あるスキル）、および
   `plugins/chorus/skills/openspec-aware/SKILL.md`（Codex の権威あるスキル）。

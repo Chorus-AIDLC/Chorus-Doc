@@ -20,25 +20,34 @@ Chorus 관리자에게 에이전트 API 키를 받은 뒤에 이 가이드를 �
 - 선택한 에이전트 CLI가 설치되고 인증되어 있을 것.
 - 승인된 작업 디렉터리 최소 하나.
 
-Chorus 명령을 설치합니다.
+Chorus 명령을 설치합니다(0.17.0 이상).
 
 ```sh
 npm install --global @chorus-aidlc/chorus
 ```
 
-## 연결 저장하기
+## 에이전트 구성하기
 
-다음을 실행합니다.
+`chorus agents add`는 이 컴퓨터의 에이전트를 Chorus에 연결하는 단 하나의 명령입니다. 이미 설치되어 있는 에이전트를 감지하고, 각각의 Chorus 플러그인을 설치하며, Chorus URL과 API 키를 한 번 받아 `~/.chorus/daemon.json`에 저장합니다. Claude Code, Codex, DeepSeek Harness의 경우에는 인증 정보를 그 에이전트 자신의 구성에도 쓰므로, 대화식 세션이 수동 환경 설정 없이 인증합니다.
 
 ```sh
-chorus login
+chorus agents add
 ```
 
-프롬프트가 나오면 Chorus URL과 API 키를 입력합니다. Chorus는 인증 정보를 검증하고, 연결을 파일 모드 `0600`으로 `~/.chorus/daemon.json`에 저장합니다.
+프롬프트가 나오면 Chorus URL과 API 키를 입력한 뒤, 구성할 에이전트를 고릅니다. 이 명령은 멱등적이므로, 에이전트를 추가하거나 플러그인을 새로 고치거나 키를 교체하려면 언제든 다시 실행하면 됩니다. 특정 에이전트를 프롬프트 없이 구성하려면:
+
+```sh
+chorus agents add --agents claude,codex \
+  --url https://chorus.example.com --api-key cho_REDACTED --yes
+```
 
 :::caution[API 키를 보호하세요]
-키는 프롬프트에서만 입력하세요. 셸 명령, 셸 기록, 커밋되는 환경 파일, 지원 메시지에 넣지 마세요.
+키가 셸 기록에 남지 않도록 대화식 프롬프트를 우선하세요. `--api-key`를 꼭 전달해야 한다면, 기록을 남기지 않도록 구성된 셸에서 실행하고, 키를 커밋되는 파일이나 지원 메시지에 절대 넣지 마세요.
 :::
+
+플러그인을 설치하지 않고 인증 정보만 저장하면 되는 경우 — 예를 들어 에이전트가 이미 설정된 컴퓨터에서는 — 대신 `chorus login`을 실행하세요. URL과 키를 검증하고 연결을 `~/.chorus/daemon.json`(모드 `0600`)에 씁니다.
+
+`chorus agents`와 `chorus mcp`의 전체 표면은 [chorus CLI](/ko/reference/cli/)를 참고하세요.
 
 ## 런타임 시작하기
 
@@ -50,7 +59,7 @@ chorus daemon --agent claude-code --cwd /path/to/your/project --chorus-only
 
 필요하면 `claude-code`를 `codex` 또는 `kiro`로 바꿉니다. `--chorus-only`는 깨어난 에이전트를 Chorus 도구로 제한합니다. 에이전트가 로컬 도구 전체를 의도적으로 사용하게 하고 그 보안상의 영향을 검토했을 때만 이를 생략하세요.
 
-연결을 확인하는 동안 이 명령은 계속 실행해 둡니다.
+연결을 확인하는 동안 이 명령은 계속 실행해 둡니다. 로그인 시 데몬이 올라오도록 부팅 서비스를 설치하려면 `chorus agents add`에 `--daemon-autostart`를 추가하거나, [Chorus 데몬 운영](/ko/guides/daemon-operations/)을 참고하세요.
 
 ## 연결 확인하기
 
@@ -68,5 +77,7 @@ Chorus에서 **설정 → 에이전트**(Settings → Agents)를 열고 에이�
   height={900}
   caption="온라인 런타임은 그 백엔드, 호스트, 등록된 작업 디렉터리를 나열합니다."
 />
+
+언제든 `chorus agents`를 실행하면 이 컴퓨터에 구성된 에이전트(이름, UUID, 백엔드. API 키는 절대 출력되지 않음)를 나열하고, `chorus agents remove <name|uuid>`로 하나를 제거할 수 있습니다.
 
 확인이 끝나면 `Ctrl+C`로 포그라운드 런타임을 멈춥니다. 로그인이나 재시작을 넘어 계속 사용할 수 있게 하려면 [Chorus 데몬 운영](/ko/guides/daemon-operations/)으로 이어 가세요.

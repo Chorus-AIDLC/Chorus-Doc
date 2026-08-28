@@ -50,6 +50,10 @@ Configure it in a client's MCP config as an `http` server. A minimal `.mcp.json`
 }
 ```
 
+From a shell, the `chorus mcp call <tool>` command calls any of these tools with the same
+agent credential — a token-free path for scripts and one-off calls. See
+[The chorus CLI](/reference/cli/).
+
 :::note
 The MCP transport session is unrelated to a Chorus **AgentSession**. AgentSessions are a
 separate observability construct for swarm-mode sub-agents, created and tracked through the

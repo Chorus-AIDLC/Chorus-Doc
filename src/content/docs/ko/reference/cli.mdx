@@ -1,0 +1,134 @@
+---
+title: chorus CLI
+description: chorus 명령으로 이 컴퓨터의 에이전트를 구성하고, 셸에서 MCP 도구를 호출하며, Chorus 서버를 실행합니다.
+docsLocale: ko
+route: /ko/reference/cli/
+---
+
+# `chorus` CLI
+
+`chorus` 명령(`@chorus-aidlc/chorus`로 게시됨)은 세 가지 일을 합니다. Chorus 서버를 실행하고, 이
+컴퓨터의 코딩 에이전트를 구성하며, 셸에서 Chorus MCP 엔드포인트를 호출합니다. 전역으로 설치합니다.
+
+```sh
+npm install --global @chorus-aidlc/chorus
+chorus --version   # 0.17.0 or later provides `chorus agents` and `chorus mcp`
+```
+
+전체 플래그 목록은 `chorus --help` 또는 `chorus <command> --help`를 실행하세요.
+
+## 명령 한눈에 보기
+
+| 명령 | 하는 일 |
+| --- | --- |
+| `chorus` | Chorus 서버를 시작합니다(서브커맨드가 없을 때의 기본값). [Docker로 배포](/ko/guides/deploy-docker/)를 참고하세요. |
+| `chorus agents` | 이 컴퓨터의 에이전트를 구성합니다 — `list`(기본), `add`, `remove`. |
+| `chorus mcp` | 네이티브 MCP 클라이언트 — 도구를 `call`하거나, 자신의 UUID를 출력하거나(`whoami`), 호출 가능한 도구를 `list`합니다. |
+| `chorus login` | 에이전트로 인증하고 연결을 `~/.chorus/daemon.json`에 저장합니다. |
+| `chorus daemon` | Chorus가 깨울 수 있도록 런타임을 온라인으로 유지합니다. [Chorus 데몬 운영](/ko/guides/daemon-operations/)을 참고하세요. |
+
+:::note[0.17.0에서 이름이 바뀜]
+`chorus init`은 이제 `chorus agents add`입니다(플래그 동일). 에이전트별 `install-*.sh` 스크립트는
+폐기되었으며, 이제 그저 `chorus agents add`로 안내할 뿐입니다.
+:::
+
+## 에이전트 구성하기 — `chorus agents`
+
+`chorus agents add`는 컴퓨터의 코딩 에이전트를 Chorus에 연결하는 단 하나의 명령입니다. 이미 설치되어
+있는 에이전트를 감지하고, 각 에이전트 자신의 플러그인 메커니즘을 통해 그 Chorus 플러그인을 설치하며,
+Chorus URL과 에이전트 키를 한 번 받아 `~/.chorus/daemon.json`에 저장합니다. Claude Code, Codex,
+DeepSeek Harness의 경우에는 인증 정보를 그 에이전트 자신의 구성에도 쓰므로, 대화식 세션이 수동 환경
+설정 없이 인증합니다([인증 정보는 어디로 가는가](#인증-정보는-어디로-가는가) 참조).
+
+```sh
+chorus agents add                     # interactive: detect, pick, configure
+chorus agents add --all --yes         # configure every detected agent, no prompts
+chorus agents add --agents claude,codex \
+  --url https://chorus.example.com --api-key cho_xxx
+```
+
+멱등적이므로 — 에이전트를 추가하거나, 플러그인을 새로 고치거나, 키를 교체하려고 다시 실행해도
+안전합니다. 감지되었지만 아직 설치되지 않은 에이전트도 선택할 수 있습니다. 지원되는 에이전트는 Claude
+Code, Codex, Kiro, opencode, OpenClaw, DeepSeek Harness이며, Pi는 안내(수동) 전용입니다.
+
+유용한 플래그(`chorus agents add --help`가 전부 나열합니다):
+
+- `--agents <a,b>` / `--all` — 구성할 에이전트.
+- `--url` / `--api-key` — 인증 정보를 비대화식으로 제공(환경 변수: `CHORUS_URL` / `CHORUS_API_KEY`).
+- `--dsh-profile <name>` — 번들을 설치할 DeepSeek Harness 프로필.
+- `--daemon-wake <a,b>` / `--daemon-wake-all` — 지정한(또는 깨울 수 있는 모든) 에이전트를 데몬 웨이크 대상으로 선택합니다. 깨울 수 있는 에이전트(Claude Code, Codex, Kiro)는 기본적으로 "파킹" 상태로 추가됩니다. `chorus mcp`로는 접근할 수 있지만, 여기서 명시적으로 선택하거나 TTY에서 에이전트별 프롬프트에 답하기 전까지는 데몬이 깨우지 않습니다.
+- `--daemon-autostart` — 데몬 부팅 서비스도 함께 설치·활성화(Linux systemd / macOS launchd).
+- `-y, --yes` — 확인 건너뛰기(TTY가 아니면 암묵적으로 적용되며, 이때는 `--agents` 또는 `--all`을 전달해야 합니다).
+
+구성된 에이전트를 나열하고 제거합니다.
+
+```sh
+chorus agents                     # list configured agents (name, UUID, backend)
+chorus agents remove <name|uuid>  # remove one (match by name or UUID)
+```
+
+`chorus agents`는 API 키를 절대 출력하지 않습니다. 나열된 이름이나 UUID는 `chorus mcp --agent` 또는
+`CHORUS_AGENT_PROFILE` 환경 변수에 쓸 수 있는 유효한 값입니다.
+
+## 셸에서 MCP 도구 호출하기 — `chorus mcp`
+
+`chorus mcp`는 네이티브 MCP 클라이언트로, 스크립트나 터미널에서 어떤 Chorus 도구든 호출하는, 토큰이
+필요 없는 경로입니다. 이전의 `chorus-api.sh` / `chorus-mcp-call.sh` 래퍼를 대체합니다.
+
+```sh
+chorus mcp call <tool> '<json>'                  # call a tool with a JSON argument object
+chorus mcp call <tool> --arg key=value           # set one string argument
+chorus mcp call <tool> --arg-file content=<path> # stream a file's raw bytes into an argument
+chorus mcp whoami                                 # print this agent's own UUID
+chorus mcp list                                   # list the tools this agent may call
+```
+
+`--arg-file`는 큰 내용 — 문서 본문이나 OpenSpec 파일 — 이 모델을 거쳐 다시 입력되지 않고 도구에
+도달하는 방법입니다. 성공하면 `chorus mcp call`은 도구 결과를 stdout에 그대로 출력하고, 도구나 전송
+오류는 0이 아닌 종료 코드와 함께 stderr로 나갑니다.
+
+아이덴티티는 다음 순서로 해석됩니다: `--agent <name|uuid>` → 명시적 `--url` + `--api-key` 플래그 →
+`CHORUS_AGENT_PROFILE` → `CHORUS_URL` + `CHORUS_API_KEY` → 에이전트가 하나뿐일 때 그 단일 구성 에이전트.
+
+## 연결 환경 변수
+
+| 변수 | 의미 |
+| --- | --- |
+| `CHORUS_URL` | Chorus 인스턴스 URL. |
+| `CHORUS_API_KEY` | 에이전트 API 키(`cho_…`). |
+| `CHORUS_AGENT_PROFILE` | 대신 행동할 구성된 에이전트의 이름 또는 UUID(선택). 설정되면 `chorus mcp`가 그 에이전트의 키를 `~/.chorus/daemon.json`에서 읽으므로, `CHORUS_API_KEY`를 내보낼 필요가 없습니다. |
+
+데몬이 깨운 세션은 `CHORUS_AGENT_PROFILE`를 자동으로 받습니다. 특정 구성 에이전트로 행동해야 하는
+대화식 셸에서만 직접 설정하면 됩니다.
+
+## 인증 정보는 어디로 가는가
+
+`chorus agents add`는 검증된 인증 정보를 항상 `~/.chorus/daemon.json`에 씁니다(모드 `0600`. 키는 절대
+출력되지 않습니다). 세 에이전트에 대해서는 대화식 세션이 수동 내보내기 없이 인증하도록 그 에이전트
+자신의 구성에도 인증 정보를 심습니다.
+
+| 에이전트 | 추가 인증 정보 저장소 |
+| --- | --- |
+| Claude Code | `~/.claude/settings.json`의 `env` 블록(`CLAUDE_CONFIG_DIR`를 따름). |
+| Codex | `~/.codex/.env`(`CODEX_HOME`을 따름). Codex는 keyless `config.toml` 항목을 통해 환경 변수에서 키를 읽습니다. |
+| DeepSeek Harness | `$DSH_HOME/.env`. |
+
+Kiro, opencode, OpenClaw는 자신의 설치된 구성에서, 또는 데몬이 깨운 Kiro의 경우에는 데몬이 깨울 때마다
+내보내는 환경 변수에서 인증 정보를 읽습니다.
+
+## 에이전트용
+
+- **트리거.** 이 페이지에 오는 이유는 CLI를 설치·업그레이드하거나, 에이전트를 구성하거나
+  (`chorus agents add`), 셸에서 Chorus 도구를 호출하기(`chorus mcp call`) 위해서입니다.
+- **제약.** 문서 미러와 그 밖의 큰 내용 호출에는 `chorus mcp call <tool> '<json>' --arg-file content=<file>`을
+  우선하고, `chorus`가 `PATH`에 없을 때만 `chorus-api.sh` / `chorus-mcp-call.sh`로 대체하세요. API
+  키를 명령줄이나 셸 기록에 절대 붙여 넣지 말고, `chorus agents add` / `chorus login`이 받아 가게
+  하세요.
+- **출처.** 권위 있는 플래그 표면은 `chorus --help`와 `chorus <command> --help`를 실행하세요. 항상
+  설치된 버전과 일치합니다.
+
+## 관련 문서
+
+- [에이전트 런타임 연결](/ko/guides/operator-onboarding/) — 단계별 설정 안내.
+- [Chorus 데몬 운영](/ko/guides/daemon-operations/) — 런타임을 온라인으로 유지.
+- [MCP 도구](/ko/reference/mcp-tools/) — `chorus mcp`가 호출하는 도구 카탈로그.

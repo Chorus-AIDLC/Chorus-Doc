@@ -20,25 +20,34 @@ Chorus の管理者からエージェントの API キーを受け取った後�
 - 選んだエージェント CLI がインストールされ、認証済みであること。
 - 承認された作業ディレクトリが少なくとも一つ。
 
-Chorus コマンドをインストールします。
+Chorus コマンド（0.17.0 以降）をインストールします。
 
 ```sh
 npm install --global @chorus-aidlc/chorus
 ```
 
-## 接続を保存する
+## エージェントを設定する
 
-次を実行します。
+`chorus agents add` は、このマシンのエージェントを Chorus に接続する唯一のコマンドです。すでにインストールしているエージェントを検出し、それぞれの Chorus プラグインをインストールし、Chorus の URL と API キーを一度だけ `~/.chorus/daemon.json` に取り込みます。Claude Code、Codex、DeepSeek Harness については、認証情報をそのエージェント自身の設定にも書き込むため、対話的なセッションが手動の環境設定なしで認証されます。
 
 ```sh
-chorus login
+chorus agents add
 ```
 
-プロンプトが出たら、Chorus の URL と API キーを入力します。Chorus は認証情報を検証し、接続をファイルモード `0600` で `~/.chorus/daemon.json` に保存します。
+プロンプトが出たら、Chorus の URL と API キーを入力し、設定するエージェントを選びます。このコマンドは冪等です — エージェントの追加、プラグインの更新、キーのローテーションのために、いつでも再実行できます。プロンプトなしで特定のエージェントを設定するには、次のようにします。
+
+```sh
+chorus agents add --agents claude,codex \
+  --url https://chorus.example.com --api-key cho_REDACTED --yes
+```
 
 :::caution[API キーを守る]
-キーはプロンプトでだけ入力してください。シェルコマンド、シェル履歴、コミットされる環境ファイル、サポートへのメッセージには追加しないでください。
+キーがシェル履歴に残らないよう、対話的なプロンプトを優先してください。`--api-key` を渡す必要がある場合は、履歴を記録しないよう設定したシェルで実行し、キーをコミットされるファイルやサポートへのメッセージには決して追加しないでください。
 :::
+
+プラグインをインストールせずに認証情報だけを保存したい場合 — 例えば、エージェントがすでにセットアップ済みのマシンでは — 代わりに `chorus login` を実行してください。URL とキーを検証し、接続を `~/.chorus/daemon.json`（モード `0600`）に書き込みます。
+
+`chorus agents` と `chorus mcp` の全体像については、[chorus CLI](/ja/reference/cli/)を参照してください。
 
 ## ランタイムを起動する
 
@@ -50,7 +59,7 @@ chorus daemon --agent claude-code --cwd /path/to/your/project --chorus-only
 
 必要に応じて `claude-code` を `codex` または `kiro` に置き換えます。`--chorus-only` は、起こされたエージェントを Chorus のツールに制限します。省略するのは、エージェントにローカルのツール一式を意図的に使わせたく、そのセキュリティ上の影響を確認済みのときだけにしてください。
 
-接続を確認する間、このコマンドは実行したままにします。
+接続を確認する間、このコマンドは実行したままにします。ログイン時にデーモンが起動する起動サービスをインストールするには、`chorus agents add` に `--daemon-autostart` を追加するか、[Chorus デーモンを運用する](/ja/guides/daemon-operations/)を参照してください。
 
 ## 接続を確認する
 
@@ -68,5 +77,7 @@ Chorus で **設定 → エージェント**（Settings → Agents）を開き�
   height={900}
   caption="オンラインのランタイムは、そのバックエンド、ホスト、登録済みの作業ディレクトリを一覧します。"
 />
+
+このマシンに設定されたエージェントを一覧するには、いつでも `chorus agents` を実行します（名前、UUID、バックエンドが表示され、API キーは決して出力されません）。1 つを削除するには `chorus agents remove <name|uuid>` を使います。
 
 確認後は `Ctrl+C` でフォアグラウンドのランタイムを停止します。ログインや再起動をまたいで使えるようにするには、[Chorus デーモンを運用する](/ja/guides/daemon-operations/)へ進んでください。

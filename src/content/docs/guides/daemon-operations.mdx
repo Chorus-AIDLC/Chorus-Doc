@@ -78,8 +78,11 @@ A minimal file after `chorus login` plus `chorus daemon install`:
 
 ### How the file is created
 
+- `chorus agents add` is the usual way the file is first created: it validates each
+  configured agent's credential and writes it as an entry in the `agents` array. See
+  [Connect an agent runtime](/guides/operator-onboarding/).
 - `chorus login` validates your URL and key, then writes `url`, `apiKey`, `agentUuid`,
-  and `agentName`.
+  and `agentName` for a single flat agent.
 - `chorus daemon install` additionally writes `cwds`, `browseRoots`, and `agent` (it
   prompts for the served directories and backend when they are not already set).
 - A first `chorus daemon` run on a terminal completes any missing credentials
@@ -178,14 +181,11 @@ depends on the backend:
 - **Kiro** — automatic, via the environment. The installed `mcp.json` references `${CHORUS_URL}`
   and `${env:CHORUS_API_KEY}`, which the daemon exports per wake, so each Kiro agent
   authenticates with its own key.
-- **Codex** — Codex reads its Chorus server URL and key from its own `~/.codex/config.toml`, not
-  from the environment, and its installer bakes a literal key. That is correct for a **single**
-  Codex agent. To run **two Codex agents with different keys** in one daemon, configure Codex to
-  read the key from the environment — set `bearer_token_env_var = "CHORUS_API_KEY"` in
-  `config.toml` (or `codex mcp add … --bearer-token-env-var CHORUS_API_KEY`). The daemon injects
-  each agent's own key per wake, so each Codex agent then authenticates as itself. With a baked
-  literal key, two Codex agents would share that one key — and so one identity — so prefer the
-  environment form for multi-agent Codex.
+- **Codex** — automatic, via the environment. `chorus agents add` configures Codex keyless: it
+  writes `CHORUS_URL` / `CHORUS_API_KEY` / `CHORUS_AGENT_PROFILE` into `~/.codex/.env` (which
+  Codex loads at startup) and sets `bearer_token_env_var = "CHORUS_API_KEY"` in `config.toml`, so
+  Codex reads its key from the environment rather than a baked literal. The daemon injects each
+  agent's own key per wake, so several Codex agents in one daemon each authenticate as themselves.
 
 ## Install the Linux service
 
@@ -199,7 +199,9 @@ chorus daemon install \
 ```
 
 The installer starts the service immediately and configures it to start when the user
-logs in. Run `chorus login` first so the service can read the saved credential.
+logs in. Run `chorus agents add` (or `chorus login`) first so the service can read the
+saved credential — or pass `--daemon-autostart` to `chorus agents add` to install this boot
+service in the same step.
 
 :::note[Why credentials live in the file]
 A `systemd --user` unit starts in a clean boot environment and does **not** inherit the
@@ -225,8 +227,9 @@ After changing credentials, working directories, backend, or permission mode, re
 or restart the service and verify the connection in **Settings → Agents**.
 
 :::note[macOS and Windows]
-On macOS and Windows, `chorus daemon install` prints a service template and manual setup
-steps. Use foreground `chorus daemon` as the baseline when testing a connection.
+On macOS, `chorus daemon install` installs a real launchd boot service, the same way it does
+on Linux. On Windows it prints a service template and manual setup steps; use foreground
+`chorus daemon` as the baseline when testing a connection.
 :::
 
 ## Run without a service

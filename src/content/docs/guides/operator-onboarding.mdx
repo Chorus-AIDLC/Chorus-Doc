@@ -21,27 +21,44 @@ You need:
 - the selected agent CLI installed and authenticated;
 - at least one approved working directory.
 
-Install the Chorus command:
+Install the Chorus command (0.17.0 or later):
 
 ```sh
 npm install --global @chorus-aidlc/chorus
 ```
 
-## Save the connection
+## Configure the agent
 
-Run:
+`chorus agents add` is the one command that connects this machine's agents to Chorus. It
+detects the agents you already have installed, installs each one's Chorus plugin, and
+captures your Chorus URL and API key once into `~/.chorus/daemon.json`. For Claude Code,
+Codex, and the DeepSeek Harness it also writes the credential into that agent's own config,
+so interactive sessions authenticate with no manual environment setup.
 
 ```sh
-chorus login
+chorus agents add
 ```
 
-Enter the Chorus URL and API key when prompted. Chorus validates the credential and saves
-the connection in `~/.chorus/daemon.json` with file mode `0600`.
+Enter the Chorus URL and API key when prompted, then pick the agents to configure. The
+command is idempotent — re-run it any time to add an agent, refresh a plugin, or rotate a
+key. To configure specific agents without prompts:
+
+```sh
+chorus agents add --agents claude,codex \
+  --url https://chorus.example.com --api-key cho_REDACTED --yes
+```
 
 :::caution[Protect the API key]
-Enter the key only at the prompt. Do not add it to a shell command, shell history,
-committed environment file, or support message.
+Prefer the interactive prompt so the key never lands in shell history. If you must pass
+`--api-key`, run it in a shell configured not to record history, and never add the key to a
+committed file or support message.
 :::
+
+If you only need to save the credential without installing a plugin — for example on a
+machine where the agent is already set up — run `chorus login` instead; it validates the URL
+and key and writes the connection to `~/.chorus/daemon.json` (mode `0600`).
+
+See [The chorus CLI](/reference/cli/) for the full `chorus agents` and `chorus mcp` surface.
 
 ## Start the runtime
 
@@ -55,7 +72,9 @@ Replace `claude-code` with `codex` or `kiro` when needed. `--chorus-only` restri
 woken agent to Chorus tools. Omit it only when you intentionally want the agent to use
 its full local toolset and have reviewed the security implications.
 
-Keep the command running while you verify the connection.
+Keep the command running while you verify the connection. To install a boot service so the
+daemon comes up on login, add `--daemon-autostart` to `chorus agents add`, or see
+[Operate the Chorus daemon](/guides/daemon-operations/).
 
 ## Verify the connection
 
@@ -73,6 +92,10 @@ In Chorus, open **Settings → Agents** and inspect the agent connection. Confir
   height={900}
   caption="An online runtime lists its backend, host, and registered working directory."
 />
+
+Run `chorus agents` at any time to list the agents configured on this machine (names,
+UUIDs, and backends; API keys are never printed), and `chorus agents remove <name|uuid>` to
+drop one.
 
 Stop the foreground runtime with `Ctrl+C` after verification. To keep it available across
 logins or restarts, continue with [Operate the Chorus daemon](/guides/daemon-operations/).

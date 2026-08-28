@@ -15,29 +15,28 @@ not available in this release.
 Before installation, use dsh `0.1.0-rc.7` or newer with `pnpm`, and create an agent key by
 following [Prepare agent access](/guides/administrator-setup/).
 
-## Install the bundle
+## Install the bundle and store credentials
 
-Add the Chorus bundle to a dsh profile. Replace the `name` placeholder with the profile you
-want to use. The `-w` flag is required because a dsh profile is a pnpm workspace root:
+`chorus agents add` installs the bundle into a dsh profile and writes your credentials to
+`$DSH_HOME/.env` in one step. Name the profile with `--dsh-profile`:
+
+```bash
+npm install --global @chorus-aidlc/chorus
+chorus agents add --agents dsh --dsh-profile <name>
+```
+
+Enter the Chorus URL and agent key when prompted. Because dsh removes credential-shaped
+variables from tool subprocesses, `chorus agents add` persists `CHORUS_URL`,
+`CHORUS_API_KEY`, and `CHORUS_AGENT_PROFILE` into `$DSH_HOME/.env`, which dsh loads into the
+session. dsh resolves credentials in this order: environment, then
+`$DSH_HOME/.credentials.yaml`, then `<cwd>/.env`, then `$DSH_HOME/.env`.
+
+To add the bundle by hand instead, run the following (the `-w` flag is required because a dsh
+profile is a pnpm workspace root), then set the credentials in `$DSH_HOME/.env` yourself:
 
 ```bash
 dsh plugin --profile <name> add @chorus-aidlc/chorus-dsh -w
 ```
-
-## Store credentials
-
-dsh removes credential-shaped variables from tool subprocesses, so persist your Chorus URL
-and agent key where dsh resolves them. The Chorus server ships a helper that writes
-`$DSH_HOME/.env`:
-
-```bash
-export CHORUS_URL="https://chorus.example.com"
-export CHORUS_API_KEY="cho_your_agent_key"
-bash <(curl -fsSL "$CHORUS_URL/dsh-credentials.sh")
-```
-
-dsh resolves credentials in this order: environment, then `$DSH_HOME/.credentials.yaml`, then
-`<cwd>/.env`, then `$DSH_HOME/.env`.
 
 ## Verify the connection
 
@@ -64,7 +63,8 @@ dsh connection is online.
   workspace root.
 - **Package not found:** verify registry access and the package name
   `@chorus-aidlc/chorus-dsh`, then rerun the add command.
-- **Check-in is unauthorized:** confirm `CHORUS_URL` and the `cho_` agent key are exported or
-  stored in `$DSH_HOME/.env`, then relaunch the profile.
+- **Check-in is unauthorized:** confirm `CHORUS_URL` and the `cho_` agent key are stored in
+  `$DSH_HOME/.env` (re-run `chorus agents add --agents dsh --dsh-profile <name>` to refresh
+  them), then relaunch the profile.
 - **Check-in fails after a profile update:** restart the dsh profile so the effective
   composition reloads.

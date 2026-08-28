@@ -16,16 +16,22 @@ OpenCode または Chorus をアップグレードするときは、そのプロ
 
 ## 統合をインストールする
 
-OpenCode を起動する環境で、Chorus のルート URL とエージェントキーを設定します。
+`chorus` CLI でコミュニティ統合をインストールします。
+
+```bash
+npm install --global @chorus-aidlc/chorus
+chorus agents add --agents opencode
+```
+
+`chorus agents add` は `opencode plugin opencode-chorus -g` を実行し、コミュニティパッケージを
+グローバルの `~/.config/opencode/opencode.json` に登録します。OpenCode は次回起動時にそれを
+ダウンロードします。OpenCode は認証情報をシェルから読み込むため、OpenCode を起動する環境で
+設定します。
 
 ```bash
 export CHORUS_URL="https://chorus.example.com"
 export CHORUS_API_KEY="cho_REDACTED"
-curl -fsSL "$CHORUS_URL/install-opencode.sh" | bash
 ```
-
-インストーラーが OpenCode の設定を更新します。OpenCode は次回起動時にコミュニティパッケージを
-ダウンロードします。
 
 ## 接続を確認する
 

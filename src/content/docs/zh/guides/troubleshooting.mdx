@@ -9,7 +9,7 @@ sidebar:
 
 ## 智能体一直离线
 
-先停止后台服务，再在终端前台运行：
+先运行 `chorus agents` 确认该智能体已在本机配置（会列出每个智能体的名称、UUID 和运行后端；绝不会打印 API 密钥）。若配置无误但仍未上线，请停止后台服务，再在终端前台运行：
 
 ```sh
 chorus daemon --verbose --chorus-only
@@ -17,7 +17,7 @@ chorus daemon --verbose --chorus-only
 
 检查启动信息中的 Chorus 网址、智能体身份和运行后端。常见状态码：
 
-- `401`：API 密钥错误、过期或已撤销。重新运行 `chorus login`。
+- `401`：API 密钥错误、过期或已撤销。运行 `chorus agents add`（或 `chorus login`），填入正确的 Chorus 网址和智能体 API 密钥。
 - `403`：登录成功，但智能体没有执行当前操作所需的权限。请让管理员检查权限，不要直接改用管理员预设。
 
 随后打开设置（Settings），查看在线智能体（Online Agents）的心跳是否更新。如果终端显示已连接而页面仍离线，请确认终端与浏览器访问的是同一个 Chorus 实例。

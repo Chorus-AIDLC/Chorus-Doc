@@ -16,16 +16,21 @@ OpenCode 또는 Chorus를 업그레이드할 때는 해당 프로젝트의 호�
 
 ## 통합 설치
 
-OpenCode를 시작하는 환경에서 Chorus 루트 URL과 에이전트 키를 설정합니다.
+`chorus` CLI로 커뮤니티 통합을 설치합니다.
+
+```bash
+npm install --global @chorus-aidlc/chorus
+chorus agents add --agents opencode
+```
+
+`chorus agents add`는 `opencode plugin opencode-chorus -g`를 실행하여 커뮤니티 패키지를 전역
+`~/.config/opencode/opencode.json`에 등록하고, OpenCode는 다음에 시작할 때 이를 내려받습니다.
+OpenCode는 셸에서 인증 정보를 읽으므로, OpenCode를 시작하는 환경에서 인증 정보를 설정합니다.
 
 ```bash
 export CHORUS_URL="https://chorus.example.com"
 export CHORUS_API_KEY="cho_REDACTED"
-curl -fsSL "$CHORUS_URL/install-opencode.sh" | bash
 ```
-
-설치 프로그램이 OpenCode 구성을 업데이트합니다. OpenCode는 다음에 시작할 때 커뮤니티 패키지를
-내려받습니다.
 
 ## 연결 확인
 

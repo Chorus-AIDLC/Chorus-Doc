@@ -17,14 +17,14 @@ Codex 是 Chorus 第一方支持的运行后端。安装集成后，你可以在
 npm install --global @openai/codex
 ```
 
-设置 Chorus 地址并运行官方安装脚本：
+然后用 `chorus` 命令行工具安装 Chorus 集成：
 
 ```bash
-export CHORUS_URL="https://chorus.example.com"
-curl -fsSL "$CHORUS_URL/install-codex.sh" | bash
+npm install --global @chorus-aidlc/chorus
+chorus agents add --agents codex
 ```
 
-安装脚本会配置 Codex 插件、MCP 服务器和钩子，并在修改现有配置前创建备份。
+在提示时输入 Chorus 地址和智能体密钥。`chorus agents add` 会安装 Codex 插件，并把 Codex 配置为不内置密钥：它把 `CHORUS_URL`、`CHORUS_API_KEY` 和 `CHORUS_AGENT_PROFILE` 写入 `~/.codex/.env`，并在 `~/.codex/config.toml` 中设置 `bearer_token_env_var = "CHORUS_API_KEY"`，因此 Codex 从环境变量读取密钥，而不是从写死的字面量读取。完成后重新启动 Codex。
 
 ## 启用远程启动
 
@@ -59,7 +59,7 @@ Codex 会自行生成 thread id，因此复制到的值就是这个 thread id，
 
 ## 常见问题
 
-- **找不到 `codex`**：确认 npm 全局可执行目录在 `PATH` 中，然后重新运行安装脚本。
-- **`chorus_checkin` 返回 `401`**：更新 API 密钥，并重新运行 `chorus login`。
+- **找不到 `codex`**：确认 npm 全局可执行目录在 `PATH` 中，然后重新运行 `chorus agents add`。
+- **`chorus_checkin` 返回 `401`**：轮换智能体密钥，然后重新运行 `chorus agents add`（它会刷新 `~/.codex/.env`）。
 - **插件或钩子未启用**：在 `/plugins` 和 `/hooks` 中检查状态，然后重新启动 Codex。
 - **在线智能体离线**：运行 `chorus daemon status` 和 `chorus daemon logs`；必要时执行 `chorus daemon restart`。

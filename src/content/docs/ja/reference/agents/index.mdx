@@ -45,8 +45,9 @@ Claude Code、Codex、Kiro が、サポートされる Chorus デーモンのバ
 
 Claude Code プラグイン（`chorus@chorus-plugins`）は次を同梱します。
 
-- **Chorus MCP ツール**：起動シェルで設定した `CHORUS_URL` と `CHORUS_API_KEY` から Chorus MCP
-  サーバーを設定する `.mcp.json` テンプレート。
+- **Chorus MCP ツール**：`CHORUS_URL` と `CHORUS_API_KEY` から Chorus MCP サーバーを設定する
+  `.mcp.json` テンプレート。`chorus agents add` がこれらを `~/.claude/settings.json` の `env`
+  ブロックに書き込むため、対話的なセッションは手動のエクスポートなしで認証されます。
 - **ワークフロースキル**：`/chorus` の総覧に加え、`/chorus:idea`、`/chorus:proposal`、
   `/chorus:develop`、`/chorus:review`、`/chorus:quick-dev`、`/chorus:yolo` として呼び出す各段階の
   スキル。
@@ -73,10 +74,12 @@ Codex プラグイン（Codex 版 `chorus@chorus-plugins`）は次を同梱し�
   ありません。
 
 Codex の MCP サーバーはプラグインに同梱**されません**。Codex はプラグインの MCP 設定内で
-`${VAR}` を展開せず、シェル環境を MCP サブプロセスに渡さないため、インストーラーは代わりに、
-リテラルの URL と bearer トークンを含む `[mcp_servers.chorus]` セクションを
-`~/.codex/config.toml` に書き込みます。Codex には `userConfig` の面もないため、レビューと
-OpenSpec の挙動は、プラグインのトグルではなくスキルのロジックによって制御されます。
+`${VAR}` を展開しないため、`chorus agents add` は代わりに Codex をキーレスに設定します。
+`CHORUS_URL` / `CHORUS_API_KEY` / `CHORUS_AGENT_PROFILE` を `~/.codex/.env`（Codex が起動時に
+読み込む）に書き込み、`~/.codex/config.toml` に `bearer_token_env_var = "CHORUS_API_KEY"` を
+設定するため、リテラルのキーがディスクに保存されることはありません。Codex には `userConfig` の
+面もないため、レビューと OpenSpec の挙動は、プラグインのトグルではなくスキルのロジックによって
+制御されます。
 
 ### 移植版：OpenClaw、Kiro、Pi
 
@@ -96,8 +99,15 @@ OpenSpec の挙動は、プラグインのトグルではなくスキルのロ�
 
 その場でアップグレードできます。エージェントキーと Chorus URL は影響を受けません。
 
+- **どのエージェントでも**：`chorus agents add` を再実行します。冪等であり、設定された各
+  エージェントのプラグインと認証情報を一度にまとめて更新します。
+
+  ```bash
+  chorus agents add
+  ```
+
 - **Claude Code**：`/plugin` メニューからプラグインを管理するか、marketplace add と install を
-  再実行して最新版を取得します。
+  再実行して最新版を取得することもできます。
 
   ```text
   /plugin marketplace add Chorus-AIDLC/chorus
@@ -107,17 +117,12 @@ OpenSpec の挙動は、プラグインのトグルではなくスキルのロ�
   Claude Code を再起動し、`/plugin list` を実行して新しいバージョンが有効になっていることを
   確認します。
 
-- **Codex**：インストーラーを再実行します。冪等であり、すべてを一度に更新します。
+- **Codex**：`chorus agents add` を再実行すると、プラグインと `~/.codex/.env` の認証情報が更新
+  されます。これはエージェントキーをローテーションする方法でもあります。最後に Codex 内で
+  `/plugins` を実行します。
 
-  ```bash
-  curl -sSL https://raw.githubusercontent.com/Chorus-AIDLC/Chorus/main/public/install-codex.sh | bash
-  ```
-
-  `install-codex.sh` を再実行すると MCP 設定が書き換えられ、プラグインが更新されます。これは
-  エージェントキーをローテーションする方法でもあります。最後に Codex 内で `/plugins` を実行します。
-
-OpenClaw、Kiro、Pi は、インストール時と同じ仕組みでアップグレードします。手順は上記の各
-プラットフォームページに記載しています。
+OpenClaw、Kiro、Pi は、`chorus agents add` を再実行するか、インストール時と同じ仕組みで
+アップグレードします。手順は上記の各プラットフォームページに記載しています。
 
 ## プラグインをアンインストールする
 
@@ -125,9 +130,9 @@ OpenClaw、Kiro、Pi は、インストール時と同じ仕組みでアップ�
   プラグインを削除すると、そのフックとレビュー用サブエージェントも削除されます。環境内の
   エージェントキーはプラグインの成果物ではありません。不要になった場合は別途削除してください。
 - **Codex**：`/plugins` メニューからプラグインを無効化または削除します。MCP サーバーは別に
-  設定されているため、完全に切断するには `~/.codex/config.toml` から `[mcp_servers.chorus]` と
-  `[mcp_servers.chorus.http_headers]` の 2 つのセクションも削除します。インストーラーは一度限りの
-  バックアップを `config.toml.chorus-bak` に保存します。
+  設定されているため、完全に切断するには `~/.codex/config.toml` から `[mcp_servers.chorus]`
+  セクションを、`~/.codex/.env` から Chorus のキーも削除します。一度限りのバックアップが
+  `config.toml.chorus-bak` に保存されます。
 
 OpenClaw、Kiro、Pi は、上記の各プラットフォームページで説明しているとおり、ランタイム自身の
 プラグインまたはパッケージマネージャーから統合を削除します。

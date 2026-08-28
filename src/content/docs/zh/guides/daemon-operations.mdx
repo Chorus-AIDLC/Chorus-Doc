@@ -78,7 +78,8 @@ daemon 的设置都读自 `~/.chorus/daemon.json`。常见的单智能体场景�
 
 ### 文件如何创建
 
-- `chorus login` 校验 URL 和密钥后，写入 `url`、`apiKey`、`agentUuid` 和 `agentName`。
+- `chorus agents add` 是该文件首次创建的常规方式：它会校验每个已配置智能体的凭据，并将其作为 `agents` 数组中的一个条目写入。参见[连接智能体运行环境](/zh/guides/operator-onboarding/)。
+- `chorus login` 校验 URL 和密钥后，写入 `url`、`apiKey`、`agentUuid` 和 `agentName`，对应一个扁平的单智能体。
 - `chorus daemon install` 会额外写入 `cwds`、`browseRoots` 和 `agent`（当这些项尚未设置时，会提示输入所服务的目录和运行后端）。
 - 首次在终端运行 `chorus daemon` 时，会以交互方式补全缺失的凭据并写入。
 
@@ -150,7 +151,7 @@ daemon 的设置都读自 `~/.chorus/daemon.json`。常见的单智能体场景�
 
 - **Claude Code**：自动。daemon 会为每次唤起写入一份携带该智能体 URL 和密钥的 MCP 配置。无需额外配置。
 - **Kiro**：自动，通过环境变量。已安装的 `mcp.json` 引用 `${CHORUS_URL}` 和 `${env:CHORUS_API_KEY}`，daemon 会在每次唤起时导出它们，因此每个 Kiro 智能体都用自己的密钥认证。
-- **Codex**：Codex 从自己的 `~/.codex/config.toml` 读取 Chorus 服务器 URL 和密钥，而不是从环境变量读取，且其安装脚本会写入一个字面量密钥。这对**单个** Codex 智能体是正确的。若要在一个 daemon 中运行**两个使用不同密钥的 Codex 智能体**，请把 Codex 配置为从环境变量读取密钥：在 `config.toml` 中设置 `bearer_token_env_var = "CHORUS_API_KEY"`（或 `codex mcp add … --bearer-token-env-var CHORUS_API_KEY`）。这样 daemon 会在每次唤起时注入各智能体自己的密钥，每个 Codex 智能体便以自己的身份认证。若使用写死的字面量密钥，两个 Codex 智能体会共用那一个密钥，因而共用同一个身份，所以多智能体 Codex 场景请优先使用环境变量形式。
+- **Codex**：自动，通过环境变量。`chorus agents add` 会把 Codex 配置为不内置密钥：它把 `CHORUS_URL` / `CHORUS_API_KEY` / `CHORUS_AGENT_PROFILE` 写入 `~/.codex/.env`（Codex 在启动时加载它），并在 `config.toml` 中设置 `bearer_token_env_var = "CHORUS_API_KEY"`，因此 Codex 从环境变量读取密钥，而不是从写死的字面量读取。daemon 会在每次唤起时注入各智能体自己的密钥，因此一个 daemon 中的多个 Codex 智能体各自以自己的身份认证。
 
 ## 安装 Linux 用户服务
 
@@ -160,6 +161,8 @@ daemon 的设置都读自 `~/.chorus/daemon.json`。常见的单智能体场景�
 chorus daemon install --agent claude-code --cwd /home/demo/workspace --chorus-only
 chorus daemon status
 ```
+
+安装脚本会立即启动该服务，并将其配置为在用户登录时自动启动。请先运行 `chorus agents add`（或 `chorus login`），服务才能读取已保存的凭据；也可以给 `chorus agents add` 传入 `--daemon-autostart`，在同一步中安装这个开机服务。
 
 常用管理命令：
 
@@ -181,6 +184,6 @@ chorus daemon uninstall
 
 ## macOS 与 Windows
 
-在 macOS 和 Windows 上，建议以前台方式运行 `chorus daemon`。`chorus daemon install` 会输出可供检查的 launchd 或任务计划程序模板，但不会直接完成系统服务安装。
+在 macOS 上，`chorus daemon install` 会像在 Linux 上一样安装真正的 launchd 开机服务。在 Windows 上，它会输出服务模板和手动配置步骤；测试连接时，请以前台方式运行 `chorus daemon` 作为基准。
 
 服务在线后，可继续阅读[从 Chorus 发起远程工作](/zh/guides/remote-control/)；运行异常时，请查看[排查智能体连接故障](/zh/guides/troubleshooting/)。

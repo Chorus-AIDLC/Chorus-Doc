@@ -72,9 +72,10 @@ OpenSpec change slug: <slug>
 ```
 
 镜像是逐字节忠实的，插件把每个文件的字节流写入草稿，而不是让模型重新逐字敲一遍内容，从而保证
-磁盘文件与 Chorus 草稿完全一致。你无需自己执行，这由插件的技能完成。具体的封装脚本契约（
-`chorus-api.sh` 文档镜像流程、其遇错即停规则，以及审批后的再同步）保留在权威来源中，本页不再
-复述，参见 `docs/OPENSPEC_MODE.md` 与插件技能
+磁盘文件与 Chorus 草稿完全一致。你无需自己执行，这由插件的技能借助原生 MCP 客户端
+`chorus mcp call <tool> --arg-file content=<file>` 完成；仅当 `chorus` 命令行工具不在 `PATH`
+中时，才回退到旧版 `chorus-api.sh` / `chorus-mcp-call.sh` 封装脚本。具体契约（其遇错即停规则
+与审批后的再同步）保留在权威来源中，本页不再复述，参见 `docs/OPENSPEC_MODE.md` 与插件技能
 `public/chorus-plugin/skills/openspec-aware/SKILL.md`。
 
 ## `openspec archive` 何时运行
@@ -112,11 +113,12 @@ Codex 插件没有 userConfig 界面，因此那里只有环境变量生效。�
   小节读取 `CHORUS_OPENSPEC_ACTIVE` 并据此分支，它们不重新检测。当 `CHORUS_OPENSPEC_ACTIVE=1`
   时，在磁盘上编写并镜像；为 `0` 时走自由格式路径。变更的最后一个任务通过验证后，一个 PostToolUse
   钩子会注入 `openspec archive <slug>` 提醒。
-- **约束。** 每一次文档草稿的镜像调用都必须经由插件封装脚本（Claude Code 上是
-  `chorus-api.sh mcp-tool`，Codex 上是 `chorus-mcp-call.sh`），并逐字节地编码文件内容，切勿把
-  文档内容内联重敲，且遇到任何封装脚本错误都要停止。不要镜像 `tasks.md`。方案描述必须带上精确的
-  `OpenSpec change slug: <slug>` 一行。模式关闭时，不要搭建 `openspec/changes/`，也不要加 slug 行。
-  独立的 `public/skill/` 分发包不支持 OpenSpec 模式。
+- **约束。** 每一次文档草稿的镜像调用都必须经由
+  `chorus mcp call <tool> '<json>' --arg-file content=<file>`（原生 MCP 客户端），并把文件字节
+  逐字节流式写入；仅当 `chorus` 不在 `PATH` 中时，才回退到旧版 `chorus-api.sh mcp-tool` /
+  `chorus-mcp-call.sh` 封装脚本。切勿把文档内容内联重敲，且遇到任何错误都要停止。不要镜像
+  `tasks.md`。方案描述必须带上精确的 `OpenSpec change slug: <slug>` 一行。模式关闭时，不要搭建
+  `openspec/changes/`，也不要加 slug 行。独立的 `public/skill/` 分发包不支持 OpenSpec 模式。
 - **引用来源。** `docs/OPENSPEC_MODE.md`（面向用户的概述与检测契约）、
   `public/chorus-plugin/skills/openspec-aware/SKILL.md`（Claude Code 权威技能）、以及
   `plugins/chorus/skills/openspec-aware/SKILL.md`（Codex 权威技能）。

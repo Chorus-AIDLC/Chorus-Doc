@@ -15,14 +15,24 @@ OpenClaw には第一者の Chorus プラグインがあります。OpenClaw ゲ
 
 ## プラグインをインストールする
 
+`chorus agents add` がプラグインをインストールして有効化してくれます。
+
+```bash
+npm install --global @chorus-aidlc/chorus
+chorus agents add --agents openclaw
+```
+
+あるいは、OpenClaw で直接インストールします。
+
 ```bash
 openclaw plugins install npm:@chorus-aidlc/chorus-openclaw-plugin
 openclaw plugins enable chorus-openclaw-plugin
 ```
 
-`~/.openclaw/openclaw.json` で、`plugins.entries.chorus-openclaw-plugin.config.chorusUrl` に
-Chorus URL を、`apiKey` に専用のエージェントキーを設定します。初回インストール後、または設定を
-変更したあとは、OpenClaw ゲートウェイを再起動します。
+いずれの方法でも、`~/.openclaw/openclaw.json` で認証情報を設定します。
+`plugins.entries.chorus-openclaw-plugin.config.chorusUrl` に Chorus URL を、`apiKey` に専用の
+エージェントキーを設定します。初回インストール後、または設定を変更したあとは、OpenClaw
+ゲートウェイを再起動します。
 
 ## 接続を確認する
 

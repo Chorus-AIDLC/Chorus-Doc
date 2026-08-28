@@ -15,12 +15,21 @@ Before installation, use OpenClaw `2026.4.27` or newer and create an agent key b
 
 ## Install the plugin
 
+`chorus agents add` installs and enables the plugin for you:
+
+```bash
+npm install --global @chorus-aidlc/chorus
+chorus agents add --agents openclaw
+```
+
+Or install it directly with OpenClaw:
+
 ```bash
 openclaw plugins install npm:@chorus-aidlc/chorus-openclaw-plugin
 openclaw plugins enable chorus-openclaw-plugin
 ```
 
-In `~/.openclaw/openclaw.json`, set
+Either way, open `~/.openclaw/openclaw.json` and set
 `plugins.entries.chorus-openclaw-plugin.config.chorusUrl` to your Chorus URL and `apiKey`
 to the dedicated agent key. Restart the OpenClaw gateway after the first installation or
 any configuration change.

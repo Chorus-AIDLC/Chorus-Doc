@@ -64,7 +64,8 @@ chorus daemon \
 
 ### ファイルはどう作られるか
 
-- `chorus login` は URL とキーを検証してから、`url`、`apiKey`、`agentUuid`、`agentName` を書き込みます。
+- `chorus agents add` は、通常このファイルが最初に作られる方法です。設定された各エージェントの認証情報を検証し、`agents` 配列のエントリとして書き込みます。[エージェントランタイムを接続する](/ja/guides/operator-onboarding/)を参照してください。
+- `chorus login` は URL とキーを検証してから、単一のフラットなエージェントとして `url`、`apiKey`、`agentUuid`、`agentName` を書き込みます。
 - `chorus daemon install` はさらに `cwds`、`browseRoots`、`agent` を書き込みます（これらがまだ設定されていない場合は、提供するディレクトリとバックエンドを尋ねます）。
 - 端末で初めて `chorus daemon` を実行すると、欠けている認証情報を対話的に補完して書き込みます。
 
@@ -136,7 +137,7 @@ chorus daemon \
 
 - **Claude Code** — 自動です。デーモンは起動ごとに、そのエージェントの URL とキーを含む MCP 設定を書き出します。設定は不要です。
 - **Kiro** — 環境変数を通じて自動です。インストールされた `mcp.json` は `${CHORUS_URL}` と `${env:CHORUS_API_KEY}` を参照し、デーモンが起動ごとにそれらをエクスポートするため、各 Kiro エージェントは自分のキーで認証します。
-- **Codex** — Codex は Chorus サーバーの URL とキーを、環境変数ではなく自分の `~/.codex/config.toml` から読み込み、そのインストーラーはリテラルのキーを書き込みます。これは**単一の** Codex エージェントには正しい動作です。1 つのデーモンで**異なるキーを持つ 2 つの Codex エージェント**を動かすには、Codex がキーを環境変数から読むように設定してください。`config.toml` に `bearer_token_env_var = "CHORUS_API_KEY"` を設定します（または `codex mcp add … --bearer-token-env-var CHORUS_API_KEY`）。するとデーモンは起動ごとに各エージェント自身のキーを注入し、各 Codex エージェントが自分自身として認証します。リテラルのキーを書き込んだ場合、2 つの Codex エージェントはその 1 つのキー、ひいては 1 つのアイデンティティを共有してしまうため、複数エージェントの Codex では環境変数の形式を優先してください。
+- **Codex** — 環境変数を通じて自動です。`chorus agents add` は Codex をキーレスに設定します。`CHORUS_URL` / `CHORUS_API_KEY` / `CHORUS_AGENT_PROFILE` を `~/.codex/.env`（Codex が起動時に読み込む）に書き込み、`config.toml` に `bearer_token_env_var = "CHORUS_API_KEY"` を設定するため、Codex はリテラルを埋め込む代わりに環境変数からキーを読みます。デーモンは起動ごとに各エージェント自身のキーを注入するため、1 つのデーモン内の複数の Codex エージェントがそれぞれ自分自身として認証します。
 
 ## Linux サービスをインストールする
 
@@ -149,7 +150,7 @@ chorus daemon install \
   --chorus-only
 ```
 
-インストーラーはサービスを直ちに起動し、ユーザーがログインしたときに開始するよう設定します。サービスが保存済みの認証情報を読めるように、先に `chorus login` を実行してください。
+インストーラーはサービスを直ちに起動し、ユーザーがログインしたときに開始するよう設定します。サービスが保存済みの認証情報を読めるように、先に `chorus agents add`（または `chorus login`）を実行してください。あるいは、この起動サービスを同じ手順で一緒にインストールするには、`chorus agents add` に `--daemon-autostart` を渡してください。
 
 :::note[なぜ認証情報がファイルに置かれるのか]
 `systemd --user` ユニットはクリーンな起動環境で始まり、シェルでエクスポートした `CHORUS_URL` / `CHORUS_API_KEY` を継承**しません**。そのため `chorus daemon install` は、ユニットを書き込む前に、認証情報を解決・検証し、`~/.chorus/daemon.json`（`0600`）に永続化します。ユニットはファイルパスも認証情報も参照せず、`HOME` を設定するだけで、デーモンが起動時に `~/.chorus/daemon.json` を見つけられるようにします。提供する `cwds` と選んだ `agent` は同じファイルにあります。ユニットに取り込まれるのは `--chorus-only` だけです。
@@ -168,7 +169,7 @@ chorus daemon uninstall
 認証情報、作業ディレクトリ、バックエンド、権限モードを変更した後は、サービスを再インストールまたは再起動し、**設定 → エージェント**（Settings → Agents）で接続を確認してください。
 
 :::note[macOS と Windows]
-macOS と Windows では、`chorus daemon install` はサービスのテンプレートと手動セットアップの手順を出力します。接続を試すときの基準として、フォアグラウンドの `chorus daemon` を使ってください。
+macOS では、`chorus daemon install` は Linux と同じように、本物の launchd 起動サービスをインストールします。Windows ではサービスのテンプレートと手動セットアップの手順を出力します。接続を試すときの基準として、フォアグラウンドの `chorus daemon` を使ってください。
 :::
 
 ## サービスなしで実行する

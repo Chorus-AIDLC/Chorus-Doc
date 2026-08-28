@@ -47,6 +47,8 @@ Authorization: Bearer cho_REDACTED
 }
 ```
 
+在 shell 中，`chorus mcp call <tool>` 命令可用同一份智能体凭据调用上述任意工具，是一条面向脚本与一次性调用的免令牌路径。参见 [chorus 命令行工具](/zh/reference/cli/)。
+
 :::note
 MCP 传输会话与 Chorus 的 **AgentSession** 无关。AgentSession 是用于蜂群模式子智能体的一套
 独立的可观测性构造，通过下文的 session 工具创建与跟踪。

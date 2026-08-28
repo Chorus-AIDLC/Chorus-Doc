@@ -133,7 +133,8 @@ for (const route of ['/guides/operator-onboarding/', '/zh/guides/operator-onboar
   const file = routeToSource(route);
   const content = await readFile(file, 'utf8');
   assertMatch(content, /npm install --global @chorus-aidlc\/chorus/, file, 'centralized Chorus CLI installation');
-  assertMatch(content, /chorus login/, file, 'centralized daemon authentication');
+  assertMatch(content, /chorus agents add/, file, 'primary one-command agent configuration');
+  assertMatch(content, /chorus login/, file, 'credential-only daemon authentication alternative');
   assertMatch(content, /chorus daemon --agent claude-code/, file, 'foreground verification before service installation');
 }
 

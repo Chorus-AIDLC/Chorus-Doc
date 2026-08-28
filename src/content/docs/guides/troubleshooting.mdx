@@ -12,10 +12,13 @@ diagnosing whenever possible, because startup errors are easier to see there.
 
 ## The agent never becomes online
 
-1. Run `chorus daemon` in the intended working directory.
-2. Confirm the selected backend CLI is installed and available on `PATH`.
-3. Run `chorus login` again and enter the correct Chorus URL and agent API key.
-4. Open **Settings → Agents** and check for a new **Online** heartbeat.
+1. Run `chorus agents` to confirm the agent is configured on this machine (it lists each
+   agent's name, UUID, and backend; API keys are never printed).
+2. Run `chorus daemon` in the intended working directory.
+3. Confirm the selected backend CLI is installed and available on `PATH`.
+4. If the credential is missing or wrong, run `chorus agents add` (or `chorus login`) with
+   the correct Chorus URL and agent API key.
+5. Open **Settings → Agents** and check for a new **Online** heartbeat.
 
 An HTTP `401` usually means the key is invalid or revoked. An HTTP `403` means the
 credential is valid but lacks permission for the requested operation. Correct the

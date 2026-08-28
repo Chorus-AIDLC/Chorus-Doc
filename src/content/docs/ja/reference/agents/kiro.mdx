@@ -15,21 +15,18 @@ Kiro CLI には、ツール、ワークフロースキル、エージェント�
 
 ## 統合をインストールする
 
-ユーザー全体にインストールする場合：
+`chorus` CLI で Chorus 統合をインストールします。
 
 ```bash
-export CHORUS_URL="https://chorus.example.com"
-export CHORUS_API_KEY="cho_REDACTED"
-curl -fsSL "$CHORUS_URL/install-kiro.sh" | bash
+npm install --global @chorus-aidlc/chorus
+chorus agents add --agents kiro
 ```
 
-現在のワークスペースのみにインストールする場合：
-
-```bash
-curl -fsSL "$CHORUS_URL/install-kiro.sh" | bash -s -- --workspace
-```
-
-インストール後に Kiro を再起動します。
+プロンプトが出たら、Chorus URL とエージェントキーを入力します。`chorus agents add` は、接続された
+Chorus インスタンスから Kiro 統合ファイル（スキル、レビューエージェント、フック）を `~/.kiro` に
+ダウンロードし、Chorus MCP サーバーを `~/.kiro/settings/mcp.json` にマージします。別の Kiro
+ディレクトリにインストールするには、実行前に `KIRO_DIR` を設定します。インストール後に Kiro を
+再起動します。
 
 ## リモート起動を有効にする
 
@@ -73,10 +70,10 @@ kiro-cli chat --resume-id <sessionId>
 
 ## よくある問題
 
-- **Kiro CLI が見つからない：** Kiro CLI v2 をインストールし、インストーラーを再実行します。
+- **Kiro CLI が見つからない：** Kiro CLI v2 をインストールし、`chorus agents add` を再実行します。
 - **スキルが見当たらない：** ワークスペースのインストールがユーザー全体のインストールを上書きして
   いないか確認し、Kiro を再起動します。
-- **チェックインが認可されない：** Kiro を起動するシェルでエージェントキーが利用できることを確認
-  するか、デーモンモードでは `chorus login` を再実行します。
+- **チェックインが認可されない：** `chorus agents add` を再実行して `mcp.json` と認証情報を更新
+  します。デーモンモードでは、デーモンが起動ごとにキーを供給します。
 - **デーモンがオフライン：** `chorus daemon status` を実行し、次に
   [トラブルシューティング](/ja/guides/troubleshooting/)を参照します。

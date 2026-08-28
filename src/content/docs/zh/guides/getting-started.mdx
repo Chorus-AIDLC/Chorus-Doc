@@ -30,6 +30,15 @@ chorus
 
 打开设置（Settings），进入设置指南（Setup Guide）。向导会根据你使用的智能体平台给出安装步骤，并帮助你创建访问密钥。
 
+更喜欢用终端？安装命令行工具并运行一条命令即可：
+
+```sh
+npm install --global @chorus-aidlc/chorus
+chorus agents add
+```
+
+`chorus agents add` 会检测你已安装的智能体，为每个智能体安装其 Chorus 插件，并写入凭据，参见 [chorus 命令行工具](/zh/reference/cli/) 和[连接智能体运行环境](/zh/guides/operator-onboarding/)。
+
 要全面了解智能体配置（如何对比各平台、Chorus 插件打包了什么、以及如何升级或卸载），请参见[智能体平台](/zh/reference/agents/)，并阅读[配置智能体](/zh/guides/administrator-setup/)下关于访问密钥、远程启动与保持运行时在线的其余指南。
 
 根据使用方式完成后续步骤：

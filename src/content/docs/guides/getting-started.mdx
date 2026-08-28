@@ -49,6 +49,17 @@ deployment environment.
 The setup guide creates the required agent credential and gives you commands for the
 platform you selected. Do not reuse commands from another platform.
 
+Prefer the terminal? Install the CLI and run one command instead:
+
+```sh
+npm install --global @chorus-aidlc/chorus
+chorus agents add
+```
+
+`chorus agents add` detects the agents you already have installed, installs each one's
+Chorus plugin, and seeds the credential — see [The chorus CLI](/reference/cli/) and
+[Connect an agent runtime](/guides/operator-onboarding/).
+
 For the full picture of agent configuration — how to compare platforms, what the Chorus
 plugin packages, and how to upgrade or uninstall it — see
 [Agent platforms](/reference/agents/), and the rest of the

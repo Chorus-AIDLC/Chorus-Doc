@@ -11,21 +11,14 @@ Kiro CLI 是 Chorus 第一方支持的运行后端。安装集成后，你可以
 
 ## 安装集成
 
-准备好 Chorus 地址后运行官方安装脚本：
+用 `chorus` 命令行工具安装 Chorus 集成：
 
 ```bash
-export CHORUS_URL="https://chorus.example.com"
-export CHORUS_API_KEY="cho_REDACTED"
-curl -fsSL "$CHORUS_URL/install-kiro.sh" | bash
+npm install --global @chorus-aidlc/chorus
+chorus agents add --agents kiro
 ```
 
-如需只为当前项目安装，请在项目目录运行：
-
-```bash
-curl -fsSL "$CHORUS_URL/install-kiro.sh" | bash -s -- --workspace
-```
-
-安装脚本会合并现有 MCP 配置，不会覆盖其他 MCP 服务器。该集成需要 Kiro CLI v2。
+在提示时输入 Chorus 地址和智能体密钥。`chorus agents add` 会从你已连接的 Chorus 实例把 Kiro 集成文件下载到 `~/.kiro`（技能、评审智能体和钩子），并把 Chorus MCP 服务器合并进 `~/.kiro/settings/mcp.json`。运行前设置 `KIRO_DIR` 可安装到其他 Kiro 目录。安装完成后请重新启动 Kiro。该集成需要 Kiro CLI v2。
 
 ## 启用远程启动
 
@@ -60,8 +53,8 @@ kiro-cli chat --resume-id <sessionId>
 
 ## 常见问题
 
-- **找不到 Kiro CLI**：安装 Kiro CLI v2，并确认 `kiro-cli` 或 `kiro` 在 `PATH` 中。
-- **`chorus_checkin` 返回 `401`**：更新 API 密钥，并重新运行 `chorus login`。
+- **找不到 Kiro CLI**：安装 Kiro CLI v2，并确认 `kiro-cli` 或 `kiro` 在 `PATH` 中，然后重新运行 `chorus agents add`。
+- **`chorus_checkin` 返回 `401`**：重新运行 `chorus agents add` 以刷新 `mcp.json` 和凭据；daemon 模式下由 daemon 在每次唤起时提供密钥。
 - **技能未加载**：检查全局 `~/.kiro/skills/` 或项目内 `.kiro/`，然后重新启动 Kiro。
 - **审查智能体无法使用 MCP**：确认审查智能体引用了安装脚本写入的 MCP 配置。
 - **在线智能体离线**：运行 `chorus daemon status` 和 `chorus daemon logs`。

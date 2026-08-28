@@ -1,0 +1,141 @@
+---
+title: The chorus CLI
+description: Configure this machine's agents, call MCP tools from the shell, and run the Chorus server with the chorus command.
+docsLocale: en
+route: /reference/cli/
+---
+
+# The `chorus` CLI
+
+The `chorus` command (published as `@chorus-aidlc/chorus`) does three jobs: it runs the
+Chorus server, configures the coding agents on your machine, and calls the Chorus MCP
+endpoint from the shell. Install it globally:
+
+```sh
+npm install --global @chorus-aidlc/chorus
+chorus --version   # 0.17.0 or later provides `chorus agents` and `chorus mcp`
+```
+
+Run `chorus --help`, or `chorus <command> --help`, for the complete flag list.
+
+## Commands at a glance
+
+| Command | What it does |
+| --- | --- |
+| `chorus` | Start the Chorus server (the default with no subcommand). See [Deploy with Docker](/guides/deploy-docker/). |
+| `chorus agents` | Configure this machine's agents — `list` (default), `add`, `remove`. |
+| `chorus mcp` | Native MCP client — `call` a tool, print your UUID (`whoami`), or `list` callable tools. |
+| `chorus login` | Authenticate as an agent and save the connection to `~/.chorus/daemon.json`. |
+| `chorus daemon` | Keep a runtime online so Chorus can wake it. See [Operate the Chorus daemon](/guides/daemon-operations/). |
+
+:::note[Renamed in 0.17.0]
+`chorus init` is now `chorus agents add` (same flags). The per-agent `install-*.sh`
+scripts are retired — they now just point you at `chorus agents add`.
+:::
+
+## Configure agents — `chorus agents`
+
+`chorus agents add` is the one command that connects a machine's coding agents to Chorus.
+It detects the agents you already have installed, installs each one's Chorus plugin through
+that agent's own plugin mechanism, and captures your Chorus URL and agent key once into
+`~/.chorus/daemon.json`. For Claude Code, Codex, and the DeepSeek Harness it also writes the
+credential into that agent's own configuration, so interactive sessions authenticate with no
+manual environment setup (see [Where the credential goes](#where-the-credential-goes)).
+
+```sh
+chorus agents add                     # interactive: detect, pick, configure
+chorus agents add --all --yes         # configure every detected agent, no prompts
+chorus agents add --agents claude,codex \
+  --url https://chorus.example.com --api-key cho_xxx
+```
+
+It is idempotent — safe to re-run to add an agent, refresh a plugin, or rotate a key.
+Detected but not-yet-installed agents stay selectable. Supported agents are Claude Code,
+Codex, Kiro, opencode, OpenClaw, and the DeepSeek Harness; Pi is guided (manual) only.
+
+Useful flags (`chorus agents add --help` lists them all):
+
+- `--agents <a,b>` / `--all` — which agents to configure.
+- `--url` / `--api-key` — supply the credential non-interactively (env: `CHORUS_URL` / `CHORUS_API_KEY`).
+- `--dsh-profile <name>` — the DeepSeek Harness profile to install the bundle into.
+- `--daemon-wake <a,b>` / `--daemon-wake-all` — opt the named (or every) wakeable agent into
+  daemon waking. Wakeable agents (Claude Code, Codex, Kiro) are added *parked* by default —
+  reachable by `chorus mcp` but not woken by the daemon until opted in here or at the
+  per-agent TTY prompt.
+- `--daemon-autostart` — also install and enable the daemon boot service (Linux systemd / macOS launchd).
+- `-y, --yes` — skip confirmations (implied when not a TTY, where you must pass `--agents` or `--all`).
+
+List and remove configured agents:
+
+```sh
+chorus agents                     # list configured agents (name, UUID, backend)
+chorus agents remove <name|uuid>  # remove one (match by name or UUID)
+```
+
+`chorus agents` never prints an API key. A listed name or UUID is a valid value for
+`chorus mcp --agent` or the `CHORUS_AGENT_PROFILE` environment variable.
+
+## Call MCP tools from the shell — `chorus mcp`
+
+`chorus mcp` is a native MCP client — a token-free path to call any Chorus tool from a
+script or terminal. It replaces the earlier `chorus-api.sh` / `chorus-mcp-call.sh` wrappers.
+
+```sh
+chorus mcp call <tool> '<json>'                  # call a tool with a JSON argument object
+chorus mcp call <tool> --arg key=value           # set one string argument
+chorus mcp call <tool> --arg-file content=<path> # stream a file's raw bytes into an argument
+chorus mcp whoami                                 # print this agent's own UUID
+chorus mcp list                                   # list the tools this agent may call
+```
+
+`--arg-file` is how large content — a document body, an OpenSpec file — reaches a tool
+without being re-typed through the model. On success `chorus mcp call` prints the tool
+result verbatim on stdout; a tool or transport error goes to stderr with a non-zero exit
+code.
+
+Identity resolves in this order: `--agent <name|uuid>` → explicit `--url` + `--api-key`
+flags → `CHORUS_AGENT_PROFILE` → `CHORUS_URL` + `CHORUS_API_KEY` → the single configured
+agent when only one exists.
+
+## Connection environment variables
+
+| Variable | Meaning |
+| --- | --- |
+| `CHORUS_URL` | The Chorus instance URL. |
+| `CHORUS_API_KEY` | An agent API key (`cho_…`). |
+| `CHORUS_AGENT_PROFILE` | Optional name or UUID of the configured agent to act as. When set, `chorus mcp` reads that agent's key from `~/.chorus/daemon.json`, so you need not export `CHORUS_API_KEY`. |
+
+Daemon-woken sessions receive `CHORUS_AGENT_PROFILE` automatically; you only set it by hand
+for an interactive shell that should act as a specific configured agent.
+
+## Where the credential goes
+
+`chorus agents add` always writes the validated credential to `~/.chorus/daemon.json`
+(mode `0600`; the key is never echoed). For three agents it also seeds the agent's own
+configuration so interactive sessions authenticate without any manual export:
+
+| Agent | Extra credential sink |
+| --- | --- |
+| Claude Code | The `env` block of `~/.claude/settings.json` (honors `CLAUDE_CONFIG_DIR`). |
+| Codex | `~/.codex/.env` (honors `CODEX_HOME`); Codex reads its key from the environment through a keyless `config.toml` entry. |
+| DeepSeek Harness | `$DSH_HOME/.env`. |
+
+Kiro, opencode, and OpenClaw read their credential from their own installed configuration
+or, for a daemon-woken Kiro, from the per-wake environment the daemon exports.
+
+## For agents
+
+- **Triggers.** You reach this page to install or upgrade the CLI, configure an agent
+  (`chorus agents add`), or call a Chorus tool from the shell (`chorus mcp call`).
+- **Constraints.** Prefer `chorus mcp call <tool> '<json>' --arg-file content=<file>` for
+  document-mirror and other large-content calls; fall back to `chorus-api.sh` /
+  `chorus-mcp-call.sh` only when `chorus` is not on `PATH`. Never paste an API key onto a
+  command line or into shell history — let `chorus agents add` / `chorus login` capture it.
+- **Cite.** Run `chorus --help` and `chorus <command> --help` for the authoritative flag
+  surface; it always matches the installed version.
+
+## Related
+
+- [Connect an agent runtime](/guides/operator-onboarding/) — the step-by-step setup walkthrough.
+- [Operate the Chorus daemon](/guides/daemon-operations/) — keep a runtime online.
+- [MCP tools](/reference/mcp-tools/) — the tool catalog `chorus mcp` calls.
