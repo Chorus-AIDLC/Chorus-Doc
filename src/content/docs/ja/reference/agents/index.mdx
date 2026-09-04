@@ -18,15 +18,15 @@ route: /ja/reference/agents/
 | [OpenClaw](./openclaw/) | Chorus チーム | すでにゲートウェイを運用している OpenClaw ユーザー | 対応（OpenClaw 経由） | OpenClaw ゲートウェイ |
 | [DeepSeek Harness](./dsh/) | Chorus チーム | Chorus ワークフローを求める DeepSeek Harness ユーザー | 非対応 | 非対応 |
 | [OpenCode](./opencode/) | コミュニティ | コミュニティサポートで問題ない OpenCode ユーザー | 非対応 | 非対応 |
-| [Pi](./pi/) | Chorus チーム（高度なセットアップ） | ソースチェックアウトから Chorus を評価するコントリビューター | 非対応 | 非対応 |
+| [Pi](./pi/) | Chorus チーム | 完全な Chorus ワークフローを求める Pi ユーザー | 対応（Chorus デーモン経由） | Chorus デーモン |
 | [Generic MCP client](./generic-mcp/) | MCP 互換のみ | 別の MCP クライアントから Chorus ツールを呼び出す | 非対応 | 非対応 |
 
-Claude Code、Codex、Kiro が、サポートされる Chorus デーモンのバックエンドです。OpenClaw は
-自前のゲートウェイとプラグインを通じてオンラインを維持します。OpenCode、Pi、DeepSeek Harness、および汎用 MCP
+Claude Code、Codex、Kiro、Pi が、サポートされる Chorus デーモンのバックエンドです。OpenClaw は
+自前のゲートウェイとプラグインを通じてオンラインを維持します。OpenCode、DeepSeek Harness、および汎用 MCP
 クライアントは対話的に接続し、Chorus デーモンのバックエンドとしては選択できません。
 
 アクセスキーと権限については、まず[エージェントのアクセスを準備する](/ja/guides/administrator-setup/)を
-ご覧ください。Claude Code、Codex、Kiro をリモートで利用可能にするには、プラットフォームの
+ご覧ください。Claude Code、Codex、Kiro、Pi をリモートで利用可能にするには、プラットフォームの
 セットアップを終えたあとで[デーモンの運用](/ja/guides/daemon-operations/)に進みます。
 
 ## プラグインが同梱するもの
@@ -91,9 +91,11 @@ Codex の MCP サーバーはプラグインに同梱**されません**。Codex
   しません。[OpenClaw](/ja/reference/agents/openclaw/) を参照してください。
 - **Kiro**：ツール、ワークフロースキル、レビューエージェント、フックを備えた統合。ワークスペース
   単位でもユーザー全体でもインストールできます。[Kiro](/ja/reference/agents/kiro/) を参照してください。
-- **Pi**：高度な評価向けのソースのみの統合で、ツール、ワークフロースキル、レビューエージェント、
-  Pi フックを備えます。Pi は Chorus デーモンのバックエンドではなく、リモートで起動・中断・再開する
-  ことはできません。[Pi](/ja/reference/agents/pi/) を参照してください。
+- **Pi**：公開された `@chorus-aidlc/chorus-pi` npm パッケージ（`pi install npm:@chorus-aidlc/chorus-pi`）で、
+  Chorus MCP ツール（`pi-mcp-adapter` 経由）、ワークフロースキル、パッケージ相対のレビュアー
+  エージェント、公式の pi `subagent` ツール、Pi ネイティブのイベントフックを備えます。Pi は
+  **wakeable な Chorus デーモンバックエンド**（`chorus daemon --agent pi`）ですが、独自のネイティブ
+  MCP や権限システムは持ちません。[Pi](/ja/reference/agents/pi/) を参照してください。
 
 ## プラグインをアップグレードする
 

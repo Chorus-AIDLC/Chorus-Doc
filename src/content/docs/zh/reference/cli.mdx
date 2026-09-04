@@ -12,7 +12,7 @@ route: /zh/reference/cli/
 
 ```sh
 npm install --global @chorus-aidlc/chorus
-chorus --version   # 0.17.0 or later provides `chorus agents` and `chorus mcp`
+chorus --version   # 0.17.2 or later provides `chorus agents` and `chorus mcp`
 ```
 
 运行 `chorus --help` 或 `chorus <command> --help` 查看完整的参数列表。
@@ -22,7 +22,7 @@ chorus --version   # 0.17.0 or later provides `chorus agents` and `chorus mcp`
 | 命令 | 作用 |
 | --- | --- |
 | `chorus` | 启动 Chorus 服务器（不带子命令时的默认行为）。参见[使用 Docker 部署](/zh/guides/deploy-docker/)。 |
-| `chorus agents` | 配置本机的智能体：`list`（默认）、`add`、`remove`。 |
+| `chorus agents` | 配置本机的智能体：`list`（默认）、`add`、`remove`，以及 `run`（启动一个）。 |
 | `chorus mcp` | 原生 MCP 客户端：`call` 调用工具、打印你的 UUID（`whoami`），或 `list` 列出可调用的工具。 |
 | `chorus login` | 以智能体身份认证，并把连接保存到 `~/.chorus/daemon.json`。 |
 | `chorus daemon` | 让运行环境保持在线，以便 Chorus 唤起它。参见[管理后台服务](/zh/guides/daemon-operations/)。 |
@@ -68,6 +68,28 @@ chorus agents remove <name|uuid>  # remove one (match by name or UUID)
 
 `chorus agents` 绝不会打印 API 密钥。列出的名称或 UUID 都是 `chorus mcp --agent` 或
 `CHORUS_AGENT_PROFILE` 环境变量的有效取值。
+
+## 启动智能体：`chorus agents run`
+
+`chorus agents run` 在你的终端里启动一个已配置的智能体，并已把它的 Chorus 连接接好，这是 daemon
+唤起的前台对应命令。由于子进程无法改动父 shell 的环境，该命令会把连接直接注入被启动的智能体进程，
+因此你无需手动 export 任何变量。
+
+```sh
+chorus agents run --name work -- --model opus        # 启动名为 "work" 的智能体；把 --model opus 传给它
+chorus agents run                                    # 启动唯一一个已配置的智能体
+chorus agents run --name work --type codex -- resume # 覆盖后端，再把 `resume` 透传过去
+```
+
+- **选哪个智能体**：`--name <name|uuid>` 从 `~/.chorus/daemon.json` 中选取。只有一个智能体时可省略；
+  有多个时请传 `--name`（或设置 `CHORUS_AGENT_PROFILE`），否则命令会报错而不擅自猜测。
+- **注入了什么**（只注入被启动的进程，绝不进入你的 shell，也绝不打印）：`CHORUS_URL`、
+  `CHORUS_API_KEY` 和 `CHORUS_AGENT_PROFILE`。
+- **启动哪个二进制**：默认取该智能体存储的后端，`--type` 可覆盖。类型分别映射到 `claude`、`codex`、
+  `kiro-cli`、`pi`、`opencode`、`openclaw` 和 `dsh-jsonrpc-agent`。以 opencode / OpenClaw /
+  DeepSeek Harness 添加的智能体会被存储为 `offline`（daemon 不会自动唤起它们），启动它们时需显式传 `--type`。
+- **透传**：`--` 之后的一切都会原样交给智能体，因此其完整参数面均可用。智能体继承你的终端，
+  `chorus agents run` 以它的退出码退出。
 
 ## 从 shell 调用 MCP 工具：`chorus mcp`
 

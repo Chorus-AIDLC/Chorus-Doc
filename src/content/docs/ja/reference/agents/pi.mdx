@@ -1,64 +1,157 @@
 ---
 title: Pi
-description: 高度な、ソースのみの Chorus 統合を Pi で評価します。
+description: 公開された chorus-pi パッケージを通じて Pi コーディングエージェントを Chorus に接続します。wakeable なデーモンバックエンドを含みます。
 docsLocale: ja
 route: /ja/reference/agents/pi/
 ---
 
 # Pi
 
-Pi 統合は第一者ですが、現在は高度な評価向けを想定しています。スタンドアロンのパッケージとして
-配布されておらず、インストールには Chorus リポジトリのローカルチェックアウトが必要です。ほとんどの
-エンドユーザーは、別の[サポート対象プラットフォーム](/ja/reference/agents/)を選ぶべきです。
+[Pi コーディングエージェント](https://pi.dev)は第一者の Chorus 統合で、公開された npm パッケージ
+**`@chorus-aidlc/chorus-pi`** として配布されます。Chorus のワークフロースキル、読み取り専用の
+レビュー用サブエージェント、公式の pi `subagent` ツール、そしてセッション対応の拡張フックを、
+Pi ネイティブの拡張 + スキル + エージェントの仕組みを通じて提供し、いずれも一度の `pi install`
+でインストールされます。
+
+Pi は **wakeable な `--agent pi` デーモンバックエンド**として実行することもできます。Chorus
+デーモンがリモートディスパッチ時にヘッドレスな pi セッションを起動するため、Pi は Claude Code、
+Codex、Kiro と同じように逆転した会話（reversed-conversation）ループに参加します。
 
 インストール前に、[エージェントのアクセスを準備する](/ja/guides/administrator-setup/)に従って
 エージェントキーを作成します。
 
-## ソースチェックアウトからインストールする
+## 前提条件
 
-Chorus チェックアウトのルートで実行します。
+- `pi` CLI がインストールされていること（[pi.dev](https://pi.dev) を参照）。
+- `pi-mcp-adapter` パッケージ。Chorus の `chorus_*` MCP ツールを Pi に公開する唯一のランタイム
+  依存関係です（Pi にはネイティブの MCP がありません）。
+  ```bash
+  pi install npm:pi-mcp-adapter
+  ```
+  インストールすべき別個のサブエージェント用パッケージは**ありません**。`chorus-pi` が pi 公式の
+  `subagent` ツールそのものを同梱しています。
+- Chorus の **API キー**（`cho_` で始まります）。
+
+## ステップ 1: 環境変数をエクスポートする
 
 ```bash
-pi install npm:pi-mcp-adapter
-pi install npm:@narumitw/pi-subagents
-pi install ./packages/chorus-pi
-mkdir -p ~/.pi/agent/agents
-cp packages/chorus-pi/agents/*.md ~/.pi/agent/agents/
+export CHORUS_URL="http://localhost:8637"
+export CHORUS_API_KEY="cho_REDACTED"
 ```
 
-Pi はモノレポの Git URL からパッケージのサブディレクトリを選べないため、Chorus リポジトリの URL を
-直接インストールしても、この統合はインストールされません。
+Pi が起動時に読み込めるよう、これらを `~/.bashrc` / `~/.zshrc` に追加します。`CHORUS_URL` はルート
+URL でも、完全な `/api/mcp` エンドポイントでもかまいません。これらが未設定の場合、拡張は
+`.mcp.json` の `chorus` サーバーエントリを読み取るフォールバックに切り替えます。
 
-プロジェクトの `.mcp.json` を次のように設定します。
+## ステップ 2: MCP サーバーを設定する
 
-```text
-URL: https://chorus.example.com/api/mcp
-Authorization: Bearer cho_REDACTED
+Pi の `pi-mcp-adapter` は標準の MCP 設定ファイルを自動検出します。メインエージェントが `chorus_*`
+ツールを取得できるよう、プロジェクトのルート（またはグローバルに `~/.pi/agent/mcp.json`）に
+`.mcp.json` を配置します。
+
+```json
+{
+  "mcpServers": {
+    "chorus": {
+      "type": "http",
+      "url": "http://localhost:8637/api/mcp",
+      "headers": { "Authorization": "Bearer cho_REDACTED" }
+    }
+  }
+}
 ```
 
-`.mcp.json` にはエージェントキーが含まれるため、バージョン管理には含めないでください。
+リテラルの URL とリテラルの Bearer がそのまま動作します。Pi は `.mcp.json` での `${VAR}` 展開を
+必要としません。`.mcp.json` にはエージェントキーが含まれるため、バージョン管理には含めないで
+ください。
+
+## ステップ 3: chorus-pi パッケージをインストールする
+
+```bash
+pi install npm:@chorus-aidlc/chorus-pi
+```
+
+インストールはこれで完了です。`subagent` ツールはパッケージ内に同梱されており、3 つのレビュアー
+エージェントはパッケージ自身の `agents/` ディレクトリから直接検出されます。別個のサブエージェント
+依存関係は**なく**、エージェントファイルを `~/.pi/agent/agents/` へ手動でコピーする必要も
+**ありません**。拡張、スキル、レビュアーエージェントを読み込むために、Pi を再起動します
+（`/reload` または新しいセッション）。
+
+`chorus-pi` をローカルで開発していますか？その場合はリポジトリのチェックアウトからインストール
+します：`pi install ./packages/chorus-pi`。
 
 ## 接続を確認する
 
 Pi を再起動し、`/mcp` を確認して、Pi に `chorus_checkin` の呼び出しを依頼します。応答が想定した
-エージェントの身元と権限を示すことを確認します。最初のターンでも、Chorus プラグインが有効である
-ことが報告されるはずです。
+エージェントの身元と権限を示すこと、そして最初のターンでチェックイン情報とともに
+`# Chorus Plugin — Active` コンテキストが報告されることを確認します。`/skill:chorus` と入力して
+スキルが読み込まれたことを確認し、`/subagents` で `chorus-proposal-reviewer` を確認します。
 
-## 機能と制限
+## 機能
 
-- パッケージは Chorus MCP ツール、ワークフロースキル、レビューエージェント、そして Pi フックを
-  提供します。
-- Pi は Chorus デーモンのバックエンドではありません。
-- Chorus は Pi セッションをリモートで起動、中断、再開することはできません。
-- ローカルの会話の復旧は、Pi 自身のセッション機能を使います。
+- **12 のスキル**が AI-DLC の全段階を駆動します。`/skill:chorus`、`/skill:idea`、`/skill:proposal`、
+  `/skill:develop`、`/skill:review`、`/skill:quick-dev`、`/skill:yolo`、`/skill:brainstorm`、
+  `/skill:orchestrate`、`/skill:docs`、`/skill:chorus-cli`、加えて `openspec-aware` サブ手順。
+- **3 つの読み取り専用レビュー用サブエージェント** — `chorus-proposal-reviewer`、
+  `chorus-task-reviewer`、`chorus-code-reviewer` — はパッケージ相対で検出され（コピー不要）、
+  ブロッキングする `subagent` ツールを介して起動されます。これらは `VERDICT` コメントを投稿して
+  停止します。
+- **公式の pi `subagent` ツール**は `extensions/subagent/`（pi のリファレンスパターン）に同梱され、
+  かつての第三者依存関係 `@narumitw/pi-subagents` を置き換えます。
+- **セッション対応の拡張**が Pi ネイティブのイベントを購読します（`session_start` →
+  `chorus_checkin` + OpenSpec 検出、`subagent` に対する `tool_call` → ワーカーごとの Chorus
+  セッション、`tool_result` → ワーカーセッションのクローズ + レビュアーの促し、`session_shutdown`
+  → クリーンアップ）。
+
+拡張は環境変数で設定します（Pi にはプラグイン設定 UI がありません）。`CHORUS_OPENSPEC_MODE`
+（オプトアウトするには `off`）と `CHORUS_ENABLE_{PROPOSAL,TASK,CODE}_REVIEWER`（既定は `true`）です。
+
+## pi を wakeable なデーモンバックエンドとして実行する
+
+Pi は第一級の **wakeable なデーモンバックエンド**です。Chorus デーモンがリモートディスパッチ時
+（エージェントに割り当てられた着想・課題、`@mention`、提案の決定）に、ヘッドレスな pi セッションを
+起動します。
+
+最も簡単な経路は `chorus init`（別名 `chorus agents add`）です。エージェントのチェックリストで
+**Pi** を選ぶと、パッケージ（`pi install npm:@chorus-aidlc/chorus-pi`）がインストールされ、pi が
+`~/.chorus/daemon.json` に **wakeable** なエージェントとしてシードされます。さらに、オプトイン
+すれば、それを起動するブートデーモンがインストールされます。手動で設定するには、pi バックエンドで
+デーモンを実行します。
+
+```bash
+chorus daemon --agent pi
+```
+
+- デーモンは PATH から `pi` 実行ファイルを解決し（`CHORUS_PI_PATH` で上書き可能）、ヘッドレスで
+  実行します（`pi --mode json -p`）。起動されたセッションには `CHORUS_URL` / `CHORUS_API_KEY` /
+  `CHORUS_AGENT_PROFILE` をエクスポートします。
+- Pi には**権限システムがありません**。そのためサンドボックスや skip-permissions フラグは関与
+  しません。`chorus` モードと `yolo` モードのデーモンは pi を同一に実行します。
+- 起動された pi が Chorus MCP ツールに到達できるのは、このパッケージの拡張 / `pi-mcp-adapter` を
+  通じてのみです。したがって、デーモンが起動する環境に `chorus-pi` をインストールしたままに
+  してください（npm インストールにより、これが確実になります）。
+
+**デーモンが注入するのは Chorus 接続だけで、モデルプロバイダーのキーは決して注入しません。** デーモンは
+起動されたセッションに `CHORUS_URL` / `CHORUS_API_KEY` / `CHORUS_AGENT_PROFILE` だけをエクスポートし、
+それ以外は何も渡しません。pi のモデルプロバイダーが独自の資格情報を必要とする場合、それらはデーモンが
+pi を起動する環境にあらかじめ存在している必要があります。これは pi 固有の話ではありません。デーモンが
+起動するエージェントはデーモンの環境しか継承せず、`systemd --user` サービスはあなたがログインシェルで
+エクスポートした資格情報を見ることはできません。サービス側での設定方法は、[デーモンを運用する](/ja/guides/daemon-operations/)の「起動されるエージェントに必要な資格情報を渡す」節を参照してください。
 
 ## よくある問題
 
-- **MCP サーバーが見当たらない：** `.mcp.json` をプロジェクトのルートに置くか、`/mcp setup` を
-  実行します。
-- **スキルが見当たらない：** インストール後に `/reload` を実行します。
-- **レビューエージェントが見当たらない：** `pi-subagents` がインストールされ、同梱のエージェント
-  ファイルがコピーされていることを確認します。
-- **接続が認可されない：** `.mcp.json` のエージェントキーを差し替え、Pi を再起動します。
+- **MCP サーバーが見当たらない：** `.mcp.json` をプロジェクトのルート（または
+  `~/.pi/agent/mcp.json`）に置くか、`/mcp setup` を実行します。
+- **スキルが見当たらない：** セッションを再起動します（`/reload`）。スキルはセッション開始時に
+  読み込まれます。
+- **レビュアーエージェントが見当たらない：** `chorus-pi` がインストールされ、Pi が再起動された
+  ことを確認します。レビュアーエージェントはパッケージ内に同梱されています（別個のサブエージェント
+  のインストールも、手動のコピーも不要です）。
+- **接続が認可されない：** `CHORUS_URL` / `CHORUS_API_KEY`（または `.mcp.json` の Bearer）を再確認し、
+  Pi を再起動します。
+- **ツール名が二重に見える**（`chorus_chorus_checkin`）：`pi-mcp-adapter` はゲートウェイモードで
+  ツール名にサーバー名をプレフィックスとして付けます。`mcp({ tool: "chorus_chorus_checkin" })` を
+  呼び出すか、chorus サーバーに `"toolPrefix": "none"` を設定してネイティブの `chorus_*` 名を
+  使用します。
 
 一般的な接続の問題については、[トラブルシューティング](/ja/guides/troubleshooting/)を参照してください。

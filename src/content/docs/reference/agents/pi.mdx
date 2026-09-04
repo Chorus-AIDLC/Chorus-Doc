@@ -1,63 +1,147 @@
 ---
 title: Pi
-description: Evaluate the advanced, source-only Chorus integration for Pi.
+description: Connect the Pi coding agent to Chorus via the published chorus-pi package, including the wakeable daemon backend.
 docsLocale: en
 route: /reference/agents/pi/
 ---
 
 # Pi
 
-The Pi integration is first-party but currently intended for advanced evaluation. It is
-not distributed as a standalone package: installation requires a local checkout of the
-Chorus repository. Most end users should choose another
-[supported platform](/reference/agents/).
+The [Pi coding agent](https://pi.dev) is a first-party Chorus integration, distributed as the
+published npm package **`@chorus-aidlc/chorus-pi`**. It ships Chorus workflow skills, read-only
+reviewer sub-agents, the official pi `subagent` tool, and session-aware extension hooks through
+Pi's native extension + skill + agent mechanisms — installed with a single `pi install`.
+
+Pi can also run as a **wakeable `--agent pi` daemon backend**: the Chorus daemon wakes a headless
+pi session on remote dispatch, so Pi participates in the reversed-conversation loop like Claude
+Code, Codex, and Kiro.
 
 Before installation, create an agent key by following
 [Prepare agent access](/guides/administrator-setup/).
 
-## Install from a source checkout
+## Prerequisites
 
-From the root of a Chorus checkout:
+- The `pi` CLI installed (see [pi.dev](https://pi.dev)).
+- The `pi-mcp-adapter` package — the one runtime dependency that exposes the Chorus `chorus_*`
+  MCP tools to Pi (Pi has no native MCP):
+  ```bash
+  pi install npm:pi-mcp-adapter
+  ```
+  There is **no** separate sub-agents package to install — `chorus-pi` bundles pi's official
+  `subagent` tool itself.
+- A Chorus **API key** (starts with `cho_`).
+
+## Step 1: Export environment variables
 
 ```bash
-pi install npm:pi-mcp-adapter
-pi install npm:@narumitw/pi-subagents
-pi install ./packages/chorus-pi
-mkdir -p ~/.pi/agent/agents
-cp packages/chorus-pi/agents/*.md ~/.pi/agent/agents/
+export CHORUS_URL="http://localhost:8637"
+export CHORUS_API_KEY="cho_REDACTED"
 ```
 
-Pi cannot select a package subdirectory from a monorepo Git URL, so installing the Chorus
-repository URL directly does not install this integration.
+Add these to `~/.bashrc` / `~/.zshrc` so Pi reads them on startup. `CHORUS_URL` may be the root
+URL or the full `/api/mcp` endpoint. If these are unset, the extension falls back to reading the
+`chorus` server entry from `.mcp.json`.
 
-Configure the project `.mcp.json` with:
+## Step 2: Configure the MCP server
 
-```text
-URL: https://chorus.example.com/api/mcp
-Authorization: Bearer cho_REDACTED
+Pi's `pi-mcp-adapter` auto-discovers standard MCP config files. Place a `.mcp.json` at the project
+root (or `~/.pi/agent/mcp.json` globally) so the main agent gets the `chorus_*` tools:
+
+```json
+{
+  "mcpServers": {
+    "chorus": {
+      "type": "http",
+      "url": "http://localhost:8637/api/mcp",
+      "headers": { "Authorization": "Bearer cho_REDACTED" }
+    }
+  }
+}
 ```
 
-Keep `.mcp.json` out of version control because it contains the agent key.
+Literal URL + literal Bearer work out of the box — Pi does not require `${VAR}` expansion in
+`.mcp.json`. Keep `.mcp.json` out of version control because it contains the agent key.
+
+## Step 3: Install the chorus-pi package
+
+```bash
+pi install npm:@chorus-aidlc/chorus-pi
+```
+
+That is the whole install. The `subagent` tool ships inside the package, and the three reviewer
+agents are discovered directly from the package's own `agents/` directory — there is **no**
+separate sub-agents dependency and **no** manual copy of agent files into `~/.pi/agent/agents/`.
+Restart Pi (`/reload` or a fresh session) so the extension, skills, and reviewer agents load.
+
+Developing `chorus-pi` locally? Install from a repo checkout instead: `pi install ./packages/chorus-pi`.
 
 ## Verify the connection
 
-Restart Pi, inspect `/mcp`, and ask Pi to call `chorus_checkin`. Confirm that the response
-shows the expected agent identity and permissions. The first turn should also report that
-the Chorus plugin is active.
+Restart Pi, inspect `/mcp`, and ask Pi to call `chorus_checkin`. Confirm the response shows the
+expected agent identity and permissions, and that the first turn reports a
+`# Chorus Plugin — Active` context with your checkin info. Type `/skill:chorus` to confirm skills
+loaded, and inspect `/subagents` for `chorus-proposal-reviewer`.
 
-## Capabilities and limits
+## Capabilities
 
-- The package provides Chorus MCP tools, workflow skills, reviewer agents, and Pi hooks.
-- Pi is not a Chorus daemon backend.
-- Chorus cannot remotely start, interrupt, or resume a Pi session.
-- Local conversation recovery uses Pi's own session facilities.
+- **12 skills** driving every AI-DLC stage — `/skill:chorus`, `/skill:idea`, `/skill:proposal`,
+  `/skill:develop`, `/skill:review`, `/skill:quick-dev`, `/skill:yolo`, `/skill:brainstorm`,
+  `/skill:orchestrate`, `/skill:docs`, `/skill:chorus-cli`, plus the `openspec-aware` sub-procedure.
+- **3 read-only reviewer sub-agents** — `chorus-proposal-reviewer`, `chorus-task-reviewer`,
+  `chorus-code-reviewer` — discovered package-relative (no copy) and spawned via the blocking
+  `subagent` tool; they post a `VERDICT` comment and stop.
+- **The official pi `subagent` tool**, bundled at `extensions/subagent/` (pi's reference pattern),
+  replacing the former third-party `@narumitw/pi-subagents` dependency.
+- **Session-aware extension** subscribing to Pi's native events (`session_start` → `chorus_checkin`
+  + OpenSpec detection, `tool_call` on `subagent` → per-worker Chorus session, `tool_result` →
+  close the worker session + reviewer nudges, `session_shutdown` → cleanup).
+
+The extension is config-by-env (Pi has no plugin-settings UI): `CHORUS_OPENSPEC_MODE` (`off` to
+opt out) and `CHORUS_ENABLE_{PROPOSAL,TASK,CODE}_REVIEWER` (default `true`).
+
+## Run pi as a wakeable daemon backend
+
+Pi is a first-class **wakeable daemon backend** — the Chorus daemon wakes a headless pi session on
+remote dispatch (an idea/task assigned to your agent, an `@mention`, a proposal decision).
+
+The simplest path is `chorus init` (a.k.a. `chorus agents add`): select **Pi** in the agent
+checklist and it installs the package (`pi install npm:@chorus-aidlc/chorus-pi`), seeds pi as a
+**wakeable** agent in `~/.chorus/daemon.json`, and — if you opt in — installs the boot daemon that
+wakes it. To wire it by hand, run the daemon with the pi backend:
+
+```bash
+chorus daemon --agent pi
+```
+
+- The daemon resolves the `pi` executable from PATH (override with `CHORUS_PI_PATH`) and runs it
+  headless (`pi --mode json -p`), exporting `CHORUS_URL` / `CHORUS_API_KEY` / `CHORUS_AGENT_PROFILE`
+  into the woken session.
+- Pi has **no permission system**, so no sandbox / skip-permissions flag is involved — the `chorus`
+  and `yolo` daemon modes run pi identically.
+- A woken pi reaches Chorus MCP tools only through this package's extension / `pi-mcp-adapter`, so
+  keep `chorus-pi` installed in the environment the daemon wakes (the npm install makes that
+  reliable).
+
+**The daemon injects only your Chorus connection — never a model-provider key.** It exports
+`CHORUS_URL` / `CHORUS_API_KEY` / `CHORUS_AGENT_PROFILE` into the woken session and nothing else.
+If your pi model provider needs its own credentials, those must already be present in the
+environment the daemon launches pi in. This is not pi-specific: a daemon-launched agent inherits
+only the daemon's environment, and a `systemd --user` service does not see credentials you export
+in your login shell. See
+[Provide credentials a woken agent needs](/guides/daemon-operations/#provide-credentials-a-woken-agent-needs)
+for setting them on the service.
 
 ## Common issues
 
-- **MCP server is missing:** place `.mcp.json` in the project root or run `/mcp setup`.
-- **Skills are missing:** run `/reload` after installation.
-- **Reviewer agents are missing:** confirm that `pi-subagents` is installed and that the
-  bundled agent files were copied.
-- **Connection is unauthorized:** replace the agent key in `.mcp.json`, then restart Pi.
+- **MCP server is missing:** place `.mcp.json` in the project root (or `~/.pi/agent/mcp.json`), or
+  run `/mcp setup`.
+- **Skills are missing:** restart the session (`/reload`) — skills load at session start.
+- **Reviewer agents are missing:** confirm `chorus-pi` is installed and Pi was restarted; the
+  reviewer agents ship inside the package (no separate sub-agents install, no manual copy).
+- **Connection is unauthorized:** re-check `CHORUS_URL` / `CHORUS_API_KEY` (or the `.mcp.json`
+  Bearer), then restart Pi.
+- **Tool names look doubled** (`chorus_chorus_checkin`): `pi-mcp-adapter` prefixes tools with the
+  server name in gateway mode. Call `mcp({ tool: "chorus_chorus_checkin" })`, or set
+  `"toolPrefix": "none"` on the chorus server to use the native `chorus_*` names.
 
 For general connection problems, see [Troubleshooting](/guides/troubleshooting/).

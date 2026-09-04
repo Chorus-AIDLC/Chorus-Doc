@@ -1,6 +1,6 @@
 ---
 title: 管理后台服务
-description: 为 Claude Code、Codex 或 Kiro 配置工作目录，并让智能体稳定在线。
+description: 为 Claude Code、Codex、Kiro 或 Pi 配置工作目录，并让智能体稳定在线。
 docsLocale: zh
 route: /zh/guides/daemon-operations/
 sidebar:
@@ -9,7 +9,7 @@ sidebar:
 
 ## 选择运行方式
 
-`chorus daemon` 会把本机的 Claude Code、Codex 或 Kiro 连接到 Chorus。首次接入时，建议先在前台运行，确认登录、运行后端和工作目录都正确：
+`chorus daemon` 会把本机的 Claude Code、Codex、Kiro 或 Pi 连接到 Chorus。首次接入时，建议先在前台运行，确认登录、运行后端和工作目录都正确：
 
 ```sh
 chorus daemon --agent claude-code --cwd /home/demo/workspace --chorus-only
@@ -57,7 +57,7 @@ daemon 的设置都读自 `~/.chorus/daemon.json`。常见的单智能体场景�
 | `agentName` | string | 已认证的智能体名称（仅供参考）。 |
 | `cwds` | string[] | 本 daemon 服务的工作目录。每个路径都是一个独立的在线连接。 |
 | `browseRoots` | string[] | 向远程工作目录发现开放的根目录。浏览根目录不会创建连接。 |
-| `agent` | string | 要唤起的本地运行后端：`"claude-code"`、`"codex"` 或 `"kiro"`。 |
+| `agent` | string | 要唤起的本地运行后端：`"claude-code"`、`"codex"`、`"kiro"` 或 `"pi"`。 |
 | `sigintTimeoutMs` | number | 收到 `SIGINT` 后强制终止已唤起智能体前的宽限时间（毫秒）。默认 `10000`。 |
 | `agents` | object[] | *可选。* 用一个 daemon 服务多个独立智能体；每个条目会针对该智能体覆盖顶层字段。见下文「在一个 daemon 中运行多个智能体」。 |
 
@@ -130,7 +130,7 @@ daemon 的设置都读自 `~/.chorus/daemon.json`。常见的单智能体场景�
 | --- | --- |
 | `apiKey`（必填） | 该智能体的 `cho_` 密钥，决定其身份。 |
 | `url` | Chorus 服务器（可按智能体不同，如不同的服务器或公司）。 |
-| `agentType` | `claude-code`、`codex` 或 `kiro`（后端可以混用）。 |
+| `agentType` | `claude-code`、`codex`、`kiro` 或 `pi`（后端可以混用）。 |
 | `cwds` | 该智能体服务的工作目录（每个一个连接）。 |
 | `permissionMode` | `yolo` 或 `chorus`。 |
 | `maxConcurrency` | 该智能体自己的唤起并发上限（默认 `4`）。 |
@@ -152,6 +152,7 @@ daemon 的设置都读自 `~/.chorus/daemon.json`。常见的单智能体场景�
 - **Claude Code**：自动。daemon 会为每次唤起写入一份携带该智能体 URL 和密钥的 MCP 配置。无需额外配置。
 - **Kiro**：自动，通过环境变量。已安装的 `mcp.json` 引用 `${CHORUS_URL}` 和 `${env:CHORUS_API_KEY}`，daemon 会在每次唤起时导出它们，因此每个 Kiro 智能体都用自己的密钥认证。
 - **Codex**：自动，通过环境变量。`chorus agents add` 会把 Codex 配置为不内置密钥：它把 `CHORUS_URL` / `CHORUS_API_KEY` / `CHORUS_AGENT_PROFILE` 写入 `~/.codex/.env`（Codex 在启动时加载它），并在 `config.toml` 中设置 `bearer_token_env_var = "CHORUS_API_KEY"`，因此 Codex 从环境变量读取密钥，而不是从写死的字面量读取。daemon 会在每次唤起时注入各智能体自己的密钥，因此一个 daemon 中的多个 Codex 智能体各自以自己的身份认证。
+- **Pi**：自动，通过环境变量。daemon 会在每次唤起时把各智能体自己的 `CHORUS_URL` / `CHORUS_API_KEY` / `CHORUS_AGENT_PROFILE` 导出到被唤醒的 pi 会话中，由 `chorus-pi` 扩展读取，因此每个 pi 智能体都用自己的密钥认证。
 
 ## 安装 Linux 用户服务
 
@@ -177,6 +178,26 @@ chorus daemon uninstall
 :::note[为什么凭据要存进文件]
 `systemd --user` 单元在干净的启动环境中运行，**不会**继承你在 shell 中导出的 `CHORUS_URL` / `CHORUS_API_KEY`。因此 `chorus daemon install` 会在写入服务单元之前，先解析、校验凭据并将其持久化到 `~/.chorus/daemon.json`（`0600`）。服务单元既不引用文件路径，也不引用凭据，它只设置 `HOME`，让 daemon 在启动时能定位到 `~/.chorus/daemon.json`。所服务的 `cwds` 和所选的 `agent` 也存在同一个文件中；只有 `--chorus-only` 会写入服务单元。
 :::
+
+### 为被唤醒的智能体提供所需凭据
+
+后台服务只把 Chorus 连接注入被唤醒的智能体（`CHORUS_URL`、`CHORUS_API_KEY` 和
+`CHORUS_AGENT_PROFILE`），绝不注入模型提供方密钥。当某个后端从环境变量读取其模型提供方凭据时，这些
+凭据必须存在于后台服务自身的环境中。`systemd --user` 服务在干净的环境中启动，不会继承你在登录 shell
+中导出的变量，因此请用 drop-in 在服务上设置它们，然后重启：
+
+```sh
+# ~/.config/systemd/user/chorus-daemon.service.d/provider-env.conf
+[Service]
+Environment=EXAMPLE_PROVIDER_API_KEY=…
+```
+
+```sh
+systemctl --user daemon-reload && systemctl --user restart chorus-daemon
+```
+
+从文件读取提供方认证的后端（例如 Claude Code 和 Codex，位于 `~/.claude` / `~/.codex`）只需正确设置
+后台服务的 `HOME`，已安装的服务单元已经做到了这一点。
 
 :::caution[确认运行权限]
 不使用 `--chorus-only` 时，后台智能体可以调用所选平台提供的完整工具，包括执行终端命令。仅在受控主机和可信代码目录中启用这种模式。

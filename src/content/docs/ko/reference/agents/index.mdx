@@ -18,15 +18,15 @@ route: /ko/reference/agents/
 | [OpenClaw](./openclaw/) | Chorus 팀 | 이미 게이트웨이를 운영 중인 OpenClaw 사용자 | 지원(OpenClaw 사용) | OpenClaw 게이트웨이 |
 | [DeepSeek Harness](./dsh/) | Chorus 팀 | Chorus 워크플로를 원하는 DeepSeek Harness 사용자 | 미지원 | 미지원 |
 | [OpenCode](./opencode/) | 커뮤니티 | 커뮤니티 지원에 익숙한 OpenCode 사용자 | 미지원 | 미지원 |
-| [Pi](./pi/) | Chorus 팀(고급 설정) | 소스 체크아웃에서 Chorus를 평가하는 기여자 | 미지원 | 미지원 |
+| [Pi](./pi/) | Chorus 팀 | 완전한 Chorus 워크플로를 원하는 Pi 사용자 | 지원(Chorus 데몬 사용) | Chorus 데몬 |
 | [Generic MCP client](./generic-mcp/) | MCP 호환만 | 다른 MCP 클라이언트에서 Chorus 도구 호출 | 미지원 | 미지원 |
 
-Claude Code, Codex, Kiro가 지원되는 Chorus 데몬 백엔드입니다. OpenClaw는 자체 게이트웨이와
-플러그인을 통해 온라인 상태를 유지합니다. OpenCode, Pi, DeepSeek Harness, 그리고 범용 MCP 클라이언트는 대화식으로
+Claude Code, Codex, Kiro, Pi가 지원되는 Chorus 데몬 백엔드입니다. OpenClaw는 자체 게이트웨이와
+플러그인을 통해 온라인 상태를 유지합니다. OpenCode, DeepSeek Harness, 그리고 범용 MCP 클라이언트는 대화식으로
 연결하며 Chorus 데몬 백엔드로 선택할 수 없습니다.
 
 액세스 키와 권한은 [에이전트 액세스 준비](/ko/guides/administrator-setup/)부터 확인하세요.
-Claude Code, Codex, Kiro를 원격으로 사용할 수 있게 하려면 플랫폼 설정을 마친 뒤
+Claude Code, Codex, Kiro, Pi를 원격으로 사용할 수 있게 하려면 플랫폼 설정을 마친 뒤
 [데몬 운영](/ko/guides/daemon-operations/)으로 이어서 진행하세요.
 
 ## 플러그인이 포함하는 것
@@ -88,8 +88,10 @@ Codex의 MCP 서버는 플러그인에 포함되지 **않습니다**. Codex는 �
   [OpenClaw](/ko/reference/agents/openclaw/)를 참고하세요.
 - **Kiro**: 도구, 워크플로 스킬, 검토 에이전트, 훅을 갖춘 통합으로, 워크스페이스 단위 또는
   사용자 전체로 설치할 수 있습니다. [Kiro](/ko/reference/agents/kiro/)를 참고하세요.
-- **Pi**: 고급 평가용 소스 전용 통합으로, 도구, 워크플로 스킬, 검토 에이전트, Pi 훅을 갖춥니다.
-  Pi는 Chorus 데몬 백엔드가 아니며 원격으로 시작, 중단, 재개할 수 없습니다.
+- **Pi**: 게시된 `@chorus-aidlc/chorus-pi` npm 패키지(`pi install npm:@chorus-aidlc/chorus-pi`)로,
+  Chorus MCP 도구(`pi-mcp-adapter`를 통해), 워크플로 스킬, 패키지 상대 경로 검토 에이전트, 공식
+  pi `subagent` 도구, 그리고 Pi 기본 이벤트 훅을 갖춥니다. Pi는 **깨울 수 있는 Chorus 데몬
+  백엔드**(`chorus daemon --agent pi`)이지만, 자체적인 기본 MCP나 권한 시스템은 없습니다.
   [Pi](/ko/reference/agents/pi/)를 참고하세요.
 
 ## 플러그인 업그레이드

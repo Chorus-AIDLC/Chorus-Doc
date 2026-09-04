@@ -7,7 +7,7 @@ sidebar:
   order: 10
 ---
 
-フォアグラウンドのデーモン接続を確認した後に、このガイドを使ってください。コマンドは対応する常駐バックエンド、つまり Claude Code、Codex、Kiro に適用されます。
+フォアグラウンドのデーモン接続を確認した後に、このガイドを使ってください。コマンドは対応する常駐バックエンド、つまり Claude Code、Codex、Kiro、Pi に適用されます。
 
 ## デーモンがアクセスできる範囲を選ぶ
 
@@ -43,7 +43,7 @@ chorus daemon \
 | `agentName` | string | 認証済みエージェントの名前（参考情報）。 |
 | `cwds` | string[] | このデーモンが提供する作業ディレクトリ。各パスは一つの独立したオンライン接続です。 |
 | `browseRoots` | string[] | リモートの作業ディレクトリ探索に公開するルート。browse root は接続を作りません。 |
-| `agent` | string | 起こすローカルバックエンド：`"claude-code"`、`"codex"`、`"kiro"`。 |
+| `agent` | string | 起こすローカルバックエンド：`"claude-code"`、`"codex"`、`"kiro"`、`"pi"`。 |
 | `sigintTimeoutMs` | number | `SIGINT` の後、起こされたエージェントが強制終了されるまでの猶予時間（ミリ秒）。既定値は `10000`。 |
 | `agents` | object[] | *任意。* 1 つのデーモンで複数の独立したエージェントを動かします。各エントリはそのエージェントについて上位フィールドを上書きします。後述の「1 つのデーモンで複数のエージェントを動かす」を参照。 |
 
@@ -116,7 +116,7 @@ chorus daemon \
 | --- | --- |
 | `apiKey`（必須） | エージェントの `cho_` キー。そのアイデンティティを決めます。 |
 | `url` | Chorus サーバー（エージェントごとに異なってよい。別のサーバーや会社）。 |
-| `agentType` | `claude-code`、`codex`、`kiro`（バックエンドは混在可）。 |
+| `agentType` | `claude-code`、`codex`、`kiro`、`pi`（バックエンドは混在可）。 |
 | `cwds` | このエージェントが提供する作業ディレクトリ（それぞれ 1 接続）。 |
 | `permissionMode` | `yolo` または `chorus`。 |
 | `maxConcurrency` | このエージェント自身の起動同時実行数の上限（既定値 `4`）。 |
@@ -138,6 +138,7 @@ chorus daemon \
 - **Claude Code** — 自動です。デーモンは起動ごとに、そのエージェントの URL とキーを含む MCP 設定を書き出します。設定は不要です。
 - **Kiro** — 環境変数を通じて自動です。インストールされた `mcp.json` は `${CHORUS_URL}` と `${env:CHORUS_API_KEY}` を参照し、デーモンが起動ごとにそれらをエクスポートするため、各 Kiro エージェントは自分のキーで認証します。
 - **Codex** — 環境変数を通じて自動です。`chorus agents add` は Codex をキーレスに設定します。`CHORUS_URL` / `CHORUS_API_KEY` / `CHORUS_AGENT_PROFILE` を `~/.codex/.env`（Codex が起動時に読み込む）に書き込み、`config.toml` に `bearer_token_env_var = "CHORUS_API_KEY"` を設定するため、Codex はリテラルを埋め込む代わりに環境変数からキーを読みます。デーモンは起動ごとに各エージェント自身のキーを注入するため、1 つのデーモン内の複数の Codex エージェントがそれぞれ自分自身として認証します。
+- **Pi** — 環境変数を通じて自動です。デーモンは起動ごとに各エージェント自身の `CHORUS_URL` / `CHORUS_API_KEY` / `CHORUS_AGENT_PROFILE` を、起こされた pi セッションにエクスポートし、`chorus-pi` 拡張がそれらを読み取るため、各 pi エージェントは自分のキーで認証します。
 
 ## Linux サービスをインストールする
 
@@ -155,6 +156,22 @@ chorus daemon install \
 :::note[なぜ認証情報がファイルに置かれるのか]
 `systemd --user` ユニットはクリーンな起動環境で始まり、シェルでエクスポートした `CHORUS_URL` / `CHORUS_API_KEY` を継承**しません**。そのため `chorus daemon install` は、ユニットを書き込む前に、認証情報を解決・検証し、`~/.chorus/daemon.json`（`0600`）に永続化します。ユニットはファイルパスも認証情報も参照せず、`HOME` を設定するだけで、デーモンが起動時に `~/.chorus/daemon.json` を見つけられるようにします。提供する `cwds` と選んだ `agent` は同じファイルにあります。ユニットに取り込まれるのは `--chorus-only` だけです。
 :::
+
+### 起動されるエージェントに必要な資格情報を渡す
+
+デーモンが起こされたエージェントに注入するのは Chorus 接続（`CHORUS_URL`、`CHORUS_API_KEY`、`CHORUS_AGENT_PROFILE`）だけで、モデルプロバイダーのキーは決して注入しません。バックエンドがモデルプロバイダーの資格情報を環境変数から読み取る場合、それらはデーモン自身の環境に存在している必要があります。`systemd --user` サービスはクリーンな環境で始まり、ログインシェルでエクスポートした変数を継承しないため、ドロップインでサービスに設定してから再起動してください。
+
+```sh
+# ~/.config/systemd/user/chorus-daemon.service.d/provider-env.conf
+[Service]
+Environment=EXAMPLE_PROVIDER_API_KEY=…
+```
+
+```sh
+systemctl --user daemon-reload && systemctl --user restart chorus-daemon
+```
+
+プロバイダー認証をファイルから読み取るバックエンド（例えば `~/.claude` / `~/.codex` の Claude Code や Codex）は、デーモンの `HOME` が正しく設定されていればよく、インストールされたユニットが既にそれを行っています。
 
 日常の運用には次のコマンドを使います。
 

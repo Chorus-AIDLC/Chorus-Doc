@@ -12,7 +12,7 @@ route: /ko/reference/cli/
 
 ```sh
 npm install --global @chorus-aidlc/chorus
-chorus --version   # 0.17.0 or later provides `chorus agents` and `chorus mcp`
+chorus --version   # 0.17.2 or later provides `chorus agents` and `chorus mcp`
 ```
 
 전체 플래그 목록은 `chorus --help` 또는 `chorus <command> --help`를 실행하세요.
@@ -22,7 +22,7 @@ chorus --version   # 0.17.0 or later provides `chorus agents` and `chorus mcp`
 | 명령 | 하는 일 |
 | --- | --- |
 | `chorus` | Chorus 서버를 시작합니다(서브커맨드가 없을 때의 기본값). [Docker로 배포](/ko/guides/deploy-docker/)를 참고하세요. |
-| `chorus agents` | 이 컴퓨터의 에이전트를 구성합니다 — `list`(기본), `add`, `remove`. |
+| `chorus agents` | 이 컴퓨터의 에이전트를 구성합니다 — `list`(기본), `add`, `remove`, 그리고 `run`(하나 실행). |
 | `chorus mcp` | 네이티브 MCP 클라이언트 — 도구를 `call`하거나, 자신의 UUID를 출력하거나(`whoami`), 호출 가능한 도구를 `list`합니다. |
 | `chorus login` | 에이전트로 인증하고 연결을 `~/.chorus/daemon.json`에 저장합니다. |
 | `chorus daemon` | Chorus가 깨울 수 있도록 런타임을 온라인으로 유지합니다. [Chorus 데몬 운영](/ko/guides/daemon-operations/)을 참고하세요. |
@@ -69,6 +69,30 @@ chorus agents remove <name|uuid>  # remove one (match by name or UUID)
 
 `chorus agents`는 API 키를 절대 출력하지 않습니다. 나열된 이름이나 UUID는 `chorus mcp --agent` 또는
 `CHORUS_AGENT_PROFILE` 환경 변수에 쓸 수 있는 유효한 값입니다.
+
+## 에이전트 실행하기 — `chorus agents run`
+
+`chorus agents run`은 구성된 에이전트를 Chorus 연결이 이미 연결된 상태로 터미널에서 실행합니다 —
+데몬 웨이크의 포그라운드 짝입니다. 자식 프로세스는 부모 셸의 환경을 바꿀 수 없으므로, 이 명령은
+연결을 실행되는 에이전트 프로세스에 직접 주입합니다. 따라서 무엇도 수동으로 내보낼 필요가 없습니다.
+
+```sh
+chorus agents run --name work -- --model opus        # 에이전트 "work"를 실행하고 --model opus를 전달
+chorus agents run                                    # 구성된 에이전트가 하나뿐이면 그것을 실행
+chorus agents run --name work --type codex -- resume # 백엔드를 재정의하고 `resume`을 그대로 전달
+```
+
+- **어느 에이전트인가** — `--name <name|uuid>`가 `~/.chorus/daemon.json`에서 고릅니다. 에이전트가
+  하나뿐이면 생략할 수 있고, 여러 개면 `--name`을 전달(또는 `CHORUS_AGENT_PROFILE` 설정)해야 하며,
+  그러지 않으면 명령은 추측하지 않고 오류를 냅니다.
+- **무엇이 주입되는가**(실행되는 프로세스에만 주입되며, 셸에는 들어가지 않고 출력되지도 않습니다):
+  `CHORUS_URL`, `CHORUS_API_KEY`, `CHORUS_AGENT_PROFILE`.
+- **어느 바이너리인가** — 기본값은 에이전트에 저장된 백엔드이고 `--type`으로 재정의합니다. 종류는 각각
+  `claude`, `codex`, `kiro-cli`, `pi`, `opencode`, `openclaw`, `dsh-jsonrpc-agent`에 매핑됩니다.
+  opencode / OpenClaw / DeepSeek Harness로 추가한 에이전트는 `offline`로 저장되므로(데몬이 자동으로
+  깨우지 않음), 실행하려면 `--type`을 명시하세요.
+- **패스스루** — `--` 뒤의 모든 것은 에이전트에 그대로 전달되어 전체 플래그 표면을 쓸 수 있습니다.
+  에이전트는 당신의 터미널을 이어받고, `chorus agents run`은 그 종료 코드로 종료합니다.
 
 ## 셸에서 MCP 도구 호출하기 — `chorus mcp`
 

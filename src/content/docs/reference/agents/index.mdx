@@ -18,15 +18,15 @@ on that agent remotely.
 | [OpenClaw](./openclaw/) | Chorus team | OpenClaw users who already run its gateway | Yes, through OpenClaw | OpenClaw gateway |
 | [DeepSeek Harness](./dsh/) | Chorus team | DeepSeek Harness users who want the Chorus workflow | No | No |
 | [OpenCode](./opencode/) | Community | OpenCode users comfortable with community support | No | No |
-| [Pi](./pi/) | Chorus team, advanced setup | Contributors evaluating Chorus from a source checkout | No | No |
+| [Pi](./pi/) | Chorus team | Pi users who want the complete Chorus workflow | Yes, with the Chorus daemon | Chorus daemon |
 | [Generic MCP client](./generic-mcp/) | MCP compatibility only | Calling Chorus tools from another MCP client | No | No |
 
-Claude Code, Codex, and Kiro are the supported Chorus daemon backends. OpenClaw stays
-online through its own gateway and plugin. OpenCode, Pi, DeepSeek Harness, and generic MCP clients connect
+Claude Code, Codex, Kiro, and Pi are the supported Chorus daemon backends. OpenClaw stays
+online through its own gateway and plugin. OpenCode, DeepSeek Harness, and generic MCP clients connect
 interactively and cannot be selected as a Chorus daemon backend.
 
 For access keys and permissions, start with [Prepare agent access](/guides/administrator-setup/).
-For a remotely available Claude Code, Codex, or Kiro installation, continue with
+For a remotely available Claude Code, Codex, Kiro, or Pi installation, continue with
 [Daemon operations](/guides/daemon-operations/) after completing the platform setup.
 
 ## What the plugin packages
@@ -92,9 +92,11 @@ Code and Codex. Treat the notes below as pointers, not a parity claim.
   workflow lifecycle hooks. See [OpenClaw](/reference/agents/openclaw/).
 - **Kiro** — an integration with tools, workflow skills, reviewer agents, and hooks,
   installable per workspace or user-wide. See [Kiro](/reference/agents/kiro/).
-- **Pi** — a source-only integration for advanced evaluation, with tools, workflow skills,
-  reviewer agents, and Pi hooks. Pi is not a Chorus daemon backend and cannot be started,
-  interrupted, or resumed remotely. See [Pi](/reference/agents/pi/).
+- **Pi** — the published `@chorus-aidlc/chorus-pi` npm package (`pi install npm:@chorus-aidlc/chorus-pi`),
+  with Chorus MCP tools (via `pi-mcp-adapter`), workflow skills, package-relative reviewer agents,
+  the official pi `subagent` tool, and Pi-native event hooks. Pi is a **wakeable Chorus daemon
+  backend** (`chorus daemon --agent pi`), though it has no native MCP or permission system of its
+  own. See [Pi](/reference/agents/pi/).
 
 ## Upgrade the plugin
 

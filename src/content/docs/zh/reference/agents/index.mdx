@@ -17,12 +17,12 @@ route: /zh/reference/agents/
 | [OpenClaw](./openclaw/) | Chorus 第一方 | 已经运行 OpenClaw，希望在其原生服务中接入 Chorus 的用户 | 支持 | 支持，通过 OpenClaw 原生服务 |
 | [DeepSeek Harness](./dsh/) | Chorus 第一方 | 使用 DeepSeek Harness，希望获得 Chorus 工作流的用户 | 不支持 | 不支持 |
 | [OpenCode](./opencode/) | 社区维护 | 接受社区集成支持范围的 OpenCode 用户 | 不支持 | 不支持 |
-| [Pi](./pi/) | Chorus 第一方，源码安装 | 能够从 Chorus 仓库安装本地包的高级用户 | 不支持 | 不支持 |
+| [Pi](./pi/) | Chorus 第一方 | 使用 Pi，希望获得完整 Chorus 工作流和远程会话控制的用户 | 支持 | 支持，通过 Chorus 后台服务 |
 | [通用 MCP 客户端](./generic-mcp/) | 协议级接入 | 只需要直接调用 Chorus MCP 工具的用户 | 不支持 | 不支持 |
 
-如果你需要从 Chorus 页面启动智能体并持续管理会话，请选择 Claude Code、Codex、Kiro 或 OpenClaw。只需要在本地交互式使用 Chorus 工具时，可以选择 OpenCode、Pi、DeepSeek Harness 或通用 MCP 客户端。
+如果你需要从 Chorus 页面启动智能体并持续管理会话，请选择 Claude Code、Codex、Kiro、Pi 或 OpenClaw。只需要在本地交互式使用 Chorus 工具时，可以选择 OpenCode、DeepSeek Harness 或通用 MCP 客户端。
 
-创建密钥前请阅读[为智能体创建访问权限](/zh/guides/administrator-setup/)。使用 Claude Code、Codex 或 Kiro 远程执行工作时，请在完成平台安装后继续[连接智能体运行环境](/zh/guides/operator-onboarding/)和[管理后台服务](/zh/guides/daemon-operations/)。
+创建密钥前请阅读[为智能体创建访问权限](/zh/guides/administrator-setup/)。使用 Claude Code、Codex、Kiro 或 Pi 远程执行工作时，请在完成平台安装后继续[连接智能体运行环境](/zh/guides/operator-onboarding/)和[管理后台服务](/zh/guides/daemon-operations/)。
 
 ## 插件打包了什么
 
@@ -79,8 +79,10 @@ Codex 的 MCP 服务器**不**随插件打包。Codex 不会在插件 MCP 配置
   [OpenClaw](/zh/reference/agents/openclaw/)。
 - **Kiro**：一个提供工具、工作流技能、评审智能体与 Hook 的集成，可按工作区或用户级安装。
   参见 [Kiro](/zh/reference/agents/kiro/)。
-- **Pi**：面向高级评估的仅源码集成，提供工具、工作流技能、评审智能体与 Pi Hook。Pi 不是
-  Chorus 后台服务后端，无法远程启动、中断或恢复。参见 [Pi](/zh/reference/agents/pi/)。
+- **Pi**：已发布的 `@chorus-aidlc/chorus-pi` npm 包（`pi install npm:@chorus-aidlc/chorus-pi`），
+  提供 Chorus MCP 工具（通过 `pi-mcp-adapter`）、工作流技能、包相对的评审智能体、官方 pi `subagent`
+  工具，以及 Pi 原生事件钩子。Pi 是**可唤醒的 Chorus 后台服务后端**（`chorus daemon --agent pi`），
+  尽管它自身没有原生 MCP 或权限系统。参见 [Pi](/zh/reference/agents/pi/)。
 
 ## 升级插件
 

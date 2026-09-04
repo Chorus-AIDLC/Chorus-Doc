@@ -7,7 +7,7 @@ sidebar:
   order: 10
 ---
 
-포그라운드 데몬 연결을 확인한 뒤에 이 가이드를 사용하세요. 명령은 지원되는 상주 백엔드, 즉 Claude Code, Codex, Kiro에 적용됩니다.
+포그라운드 데몬 연결을 확인한 뒤에 이 가이드를 사용하세요. 명령은 지원되는 상주 백엔드, 즉 Claude Code, Codex, Kiro, Pi에 적용됩니다.
 
 ## 데몬이 접근할 수 있는 범위 정하기
 
@@ -43,7 +43,7 @@ chorus daemon \
 | `agentName` | string | 인증된 에이전트 이름(참고용). |
 | `cwds` | string[] | 이 데몬이 제공하는 작업 디렉터리. 각 경로는 하나의 독립된 온라인 연결입니다. |
 | `browseRoots` | string[] | 원격 작업 디렉터리 탐색에 노출하는 루트. browse root는 연결을 만들지 않습니다. |
-| `agent` | string | 깨울 로컬 백엔드: `"claude-code"`, `"codex"`, `"kiro"`. |
+| `agent` | string | 깨울 로컬 백엔드: `"claude-code"`, `"codex"`, `"kiro"`, `"pi"`. |
 | `sigintTimeoutMs` | number | `SIGINT` 이후 깨어난 에이전트를 강제 종료하기 전까지의 유예 시간(밀리초). 기본값 `10000`. |
 | `agents` | object[] | *선택.* 하나의 데몬으로 여러 독립 에이전트를 서비스합니다. 각 항목은 해당 에이전트에 대해 상위 필드를 재정의합니다. 아래 「하나의 데몬에서 여러 에이전트 실행하기」 참조. |
 
@@ -116,7 +116,7 @@ chorus daemon \
 | --- | --- |
 | `apiKey`(필수) | 에이전트의 `cho_` 키 — 그 아이덴티티를 결정합니다. |
 | `url` | Chorus 서버(에이전트마다 다를 수 있음 — 다른 서버나 회사). |
-| `agentType` | `claude-code`, `codex`, `kiro`(백엔드는 혼합 가능). |
+| `agentType` | `claude-code`, `codex`, `kiro`, `pi`(백엔드는 혼합 가능). |
 | `cwds` | 이 에이전트가 제공하는 작업 디렉터리(각각 하나의 연결). |
 | `permissionMode` | `yolo` 또는 `chorus`. |
 | `maxConcurrency` | 이 에이전트 자신의 깨우기 동시 실행 상한(기본값 `4`). |
@@ -138,6 +138,7 @@ chorus daemon \
 - **Claude Code** — 자동. 데몬은 깨울 때마다 해당 에이전트의 URL과 키를 담은 MCP 설정을 씁니다. 구성할 것이 없습니다.
 - **Kiro** — 환경 변수를 통해 자동. 설치된 `mcp.json`은 `${CHORUS_URL}`과 `${env:CHORUS_API_KEY}`를 참조하고, 데몬이 깨울 때마다 이를 내보내므로, 각 Kiro 에이전트는 자신의 키로 인증합니다.
 - **Codex** — 환경 변수를 통해 자동. `chorus agents add`는 Codex를 keyless로 구성합니다. `CHORUS_URL` / `CHORUS_API_KEY` / `CHORUS_AGENT_PROFILE`를 `~/.codex/.env`(Codex가 시작할 때 로드함)에 쓰고 `config.toml`에 `bearer_token_env_var = "CHORUS_API_KEY"`를 설정하므로, Codex는 리터럴 키가 아니라 환경 변수에서 자신의 키를 읽습니다. 데몬이 깨울 때마다 각 에이전트 자신의 키를 주입하므로, 하나의 데몬에 있는 여러 Codex 에이전트가 각자 자기 자신으로 인증합니다.
+- **Pi** — 환경 변수를 통해 자동. 데몬은 깨울 때마다 각 에이전트 자신의 `CHORUS_URL` / `CHORUS_API_KEY` / `CHORUS_AGENT_PROFILE`를 깨워진 pi 세션으로 내보내고, `chorus-pi` 확장이 이를 읽으므로, 각 pi 에이전트는 자신의 키로 인증합니다.
 
 ## Linux 서비스 설치하기
 
@@ -155,6 +156,22 @@ chorus daemon install \
 :::note[왜 인증 정보가 파일에 담기는가]
 `systemd --user` 유닛은 깨끗한 부팅 환경에서 시작하며, 당신이 셸에서 내보낸 `CHORUS_URL` / `CHORUS_API_KEY`를 상속하지 **않습니다**. 그래서 `chorus daemon install`은 유닛을 쓰기 전에 인증 정보를 해석·검증하고 `~/.chorus/daemon.json`(`0600`)에 저장합니다. 유닛은 파일 경로도 인증 정보도 참조하지 않으며, `HOME`만 설정해 데몬이 부팅 시 `~/.chorus/daemon.json`을 찾을 수 있게 합니다. 제공하는 `cwds`와 선택한 `agent`는 같은 파일에 있습니다. 유닛에 담기는 것은 `--chorus-only`뿐입니다.
 :::
+
+### 깨워진 에이전트가 필요로 하는 자격 증명 제공
+
+데몬은 깨워진 에이전트에 Chorus 연결(`CHORUS_URL`, `CHORUS_API_KEY`, `CHORUS_AGENT_PROFILE`)만 주입하며, 모델 제공자 키는 절대 주입하지 않습니다. 어떤 백엔드가 모델 제공자 자격 증명을 환경에서 읽는다면, 그 자격 증명은 데몬 자신의 환경에 존재해야 합니다. `systemd --user` 서비스는 깨끗한 환경에서 시작하며 당신이 로그인 셸에서 내보낸 변수를 상속하지 않으므로, 드롭인으로 서비스에 설정한 뒤 재시작하세요.
+
+```sh
+# ~/.config/systemd/user/chorus-daemon.service.d/provider-env.conf
+[Service]
+Environment=EXAMPLE_PROVIDER_API_KEY=…
+```
+
+```sh
+systemctl --user daemon-reload && systemctl --user restart chorus-daemon
+```
+
+제공자 인증을 파일에서 읽는 백엔드(예: `~/.claude` / `~/.codex` 아래의 Claude Code와 Codex)는 데몬의 `HOME`만 올바르게 설정되면 되며, 설치된 유닛이 이미 이를 처리합니다.
 
 일상적인 운영에는 다음 명령을 사용합니다.
 

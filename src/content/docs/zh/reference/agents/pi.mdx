@@ -1,53 +1,135 @@
 ---
 title: Pi
-description: 从 Chorus 源码安装并验证 Pi 集成。
+description: 通过已发布的 chorus-pi 包将 Pi 编码智能体接入 Chorus，包括可唤醒的后台服务后端。
 docsLocale: zh
 route: /zh/reference/agents/pi/
 ---
 
 # Pi
 
-Pi 集成目前需要从 Chorus 仓库的本地目录安装，适合能够管理源码检出和本地包的高级用户。它不是面向普通用户的一键安装方式。
+[Pi 编码智能体](https://pi.dev)是 Chorus 的第一方集成，以已发布的 npm 包 **`@chorus-aidlc/chorus-pi`**
+形式分发。它通过 Pi 原生的扩展 + 技能 + 智能体机制，提供 Chorus 工作流技能、只读评审子智能体、
+官方 pi `subagent` 工具，以及会话感知的扩展钩子，只需一条 `pi install` 即可安装。
 
-## 从源码安装
+Pi 还可以作为**可唤醒的 `--agent pi` 后台服务后端**运行：Chorus 后台服务会在收到远程派发时唤醒一个
+无头 pi 会话，因此 Pi 能像 Claude Code、Codex 和 Kiro 一样参与反向对话循环。
 
-先检出 Chorus 仓库，并在仓库根目录运行：
+安装前，请按照[为智能体创建访问权限](/zh/guides/administrator-setup/)创建一个智能体密钥。
+
+## 前置条件
+
+- 已安装 `pi` CLI（参见 [pi.dev](https://pi.dev)）。
+- `pi-mcp-adapter` 包，唯一的运行时依赖，用于把 Chorus 的 `chorus_*` MCP 工具暴露给 Pi（Pi 没有
+  原生 MCP）：
+  ```bash
+  pi install npm:pi-mcp-adapter
+  ```
+  **无需**安装单独的子智能体包，`chorus-pi` 自身已捆绑 pi 官方的 `subagent` 工具。
+- 一个 Chorus **API 密钥**（以 `cho_` 开头）。
+
+## 步骤 1：导出环境变量
 
 ```bash
-pi install npm:pi-mcp-adapter
-pi install npm:@narumitw/pi-subagents
-pi install ./packages/chorus-pi
-mkdir -p ~/.pi/agent/agents
-cp packages/chorus-pi/agents/*.md ~/.pi/agent/agents/
+export CHORUS_URL="http://localhost:8637"
+export CHORUS_API_KEY="cho_REDACTED"
 ```
 
-在项目根目录的 `.mcp.json` 中添加 Chorus MCP 服务器：
+把它们添加到 `~/.bashrc` / `~/.zshrc`，以便 Pi 在启动时读取。`CHORUS_URL` 可以是根 URL，也可以是完整
+的 `/api/mcp` 端点。如果未设置，扩展会回退到从 `.mcp.json` 读取 `chorus` 服务器条目。
 
-```text
-URL: https://chorus.example.com/api/mcp
-Authorization: Bearer cho_REDACTED
+## 步骤 2：配置 MCP 服务器
+
+Pi 的 `pi-mcp-adapter` 会自动发现标准 MCP 配置文件。在项目根目录放置一个 `.mcp.json`（或全局的
+`~/.pi/agent/mcp.json`），让主智能体获得 `chorus_*` 工具：
+
+```json
+{
+  "mcpServers": {
+    "chorus": {
+      "type": "http",
+      "url": "http://localhost:8637/api/mcp",
+      "headers": { "Authorization": "Bearer cho_REDACTED" }
+    }
+  }
+}
 ```
 
-连接类型使用 Streamable HTTP。`.mcp.json` 含有 API 密钥，不应提交到版本控制。
+字面量 URL + 字面量 Bearer 开箱即用，Pi 不需要在 `.mcp.json` 中展开 `${VAR}`。由于 `.mcp.json`
+包含智能体密钥，请不要将其提交到版本控制。
+
+## 步骤 3：安装 chorus-pi 包
+
+```bash
+pi install npm:@chorus-aidlc/chorus-pi
+```
+
+这就是全部安装步骤。`subagent` 工具随包内置，三个评审智能体直接从包自带的 `agents/` 目录中发现，
+既**无需**单独的子智能体依赖，也**无需**手动把智能体文件复制到 `~/.pi/agent/agents/`。重启 Pi
+（`/reload` 或开启新会话），以便加载扩展、技能和评审智能体。
+
+在本地开发 `chorus-pi`？改从仓库检出安装：`pi install ./packages/chorus-pi`。
 
 ## 验证连接
 
-1. 重新启动 Pi，运行 `/mcp`，确认 Chorus 服务器已连接。
-2. 请求调用 `chorus_checkin`，确认返回正确的智能体身份和权限。
-3. 确认首次响应显示 `# Chorus Plugin — Active`。
+重启 Pi，查看 `/mcp`，并请求 Pi 调用 `chorus_checkin`。确认返回结果显示预期的智能体身份和权限，并且
+首个回合报告了包含你签到信息的 `# Chorus Plugin — Active` 上下文。输入 `/skill:chorus` 确认技能已加载，
+并在 `/subagents` 中查看是否有 `chorus-proposal-reviewer`。
 
-通过 MCP 网关连接时，工具名为 `chorus_chorus_checkin`；直接连接时为 `chorus_checkin`。
+## 能力
 
-## 能力与限制
+- **12 个技能**，驱动每个 AI-DLC 阶段：`/skill:chorus`、`/skill:idea`、`/skill:proposal`、
+  `/skill:develop`、`/skill:review`、`/skill:quick-dev`、`/skill:yolo`、`/skill:brainstorm`、
+  `/skill:orchestrate`、`/skill:docs`、`/skill:chorus-cli`，外加 `openspec-aware` 子流程。
+- **3 个只读评审子智能体**：`chorus-proposal-reviewer`、`chorus-task-reviewer`、
+  `chorus-code-reviewer`，以包相对方式发现（无需复制），通过阻塞式的 `subagent` 工具派生；
+  它们发布一条 `VERDICT` 评论后停止。
+- **官方 pi `subagent` 工具**，内置于 `extensions/subagent/`（pi 的参考实现），取代了以前的第三方
+  `@narumitw/pi-subagents` 依赖。
+- **会话感知扩展**，订阅 Pi 的原生事件（`session_start` → `chorus_checkin` + OpenSpec 检测，
+  `subagent` 上的 `tool_call` → 每个 worker 的 Chorus 会话，`tool_result` → 关闭 worker 会话 + 评审
+  提示，`session_shutdown` → 清理）。
 
-- Chorus 官方维护 Pi 的 MCP 工具、工作流技能、审查智能体和生命周期钩子。
-- 当前安装依赖 Chorus 仓库的本地源码目录，升级时需要同步仓库并重新安装。
-- Pi 只支持本地交互式使用，不支持从 Chorus 远程启动或控制会话。
-- 本地会话的保存和恢复由 Pi 自身负责。
+该扩展通过环境变量配置（Pi 没有插件设置界面）：`CHORUS_OPENSPEC_MODE`（设为 `off` 可停用）和
+`CHORUS_ENABLE_{PROPOSAL,TASK,CODE}_REVIEWER`（默认 `true`）。
+
+## 将 pi 作为可唤醒的后台服务后端运行
+
+Pi 是一等的**可唤醒后台服务后端**，Chorus 后台服务会在收到远程派发时（分配给你智能体的想法/任务、
+一次 `@mention`、一个方案决策）唤醒一个无头 pi 会话。
+
+最简单的方式是 `chorus init`（即 `chorus agents add`）：在智能体清单中选择 **Pi**，它会安装该包
+（`pi install npm:@chorus-aidlc/chorus-pi`），在 `~/.chorus/daemon.json` 中把 pi 登记为**可唤醒**
+智能体，并且（如果你选择启用）安装开机唤醒它的后台服务。若要手动配置，请以 pi 后端运行后台服务：
+
+```bash
+chorus daemon --agent pi
+```
+
+- 后台服务从 PATH 解析 `pi` 可执行文件（可用 `CHORUS_PI_PATH` 覆盖），并以无头模式运行它
+  （`pi --mode json -p`），把 `CHORUS_URL` / `CHORUS_API_KEY` / `CHORUS_AGENT_PROFILE` 导出到被唤醒
+  的会话中。
+- Pi **没有权限系统**，因此不涉及沙箱 / 跳过权限的标志，`chorus` 与 `yolo` 两种后台服务模式运行
+  pi 的方式完全一致。
+- 被唤醒的 pi 只能通过本包的扩展 / `pi-mcp-adapter` 访问 Chorus MCP 工具，因此请在后台服务唤醒的环境
+  中保持安装 `chorus-pi`（npm 安装能让这一点更可靠）。
+
+**后台服务只注入你的 Chorus 连接，绝不注入模型提供方密钥。** 它只把
+`CHORUS_URL` / `CHORUS_API_KEY` / `CHORUS_AGENT_PROFILE` 导出到被唤醒的会话中，除此以外别无其他。
+如果你的 pi 模型提供方需要它自己的凭据，这些凭据必须已经存在于后台服务启动 pi 的那个环境中。这一点
+并非 pi 独有：由后台服务启动的智能体只继承后台服务的环境，而 `systemd --user` 服务看不到你在登录
+shell 中导出的凭据。关于如何在服务上设置它们，参见[管理后台服务](/zh/guides/daemon-operations/)中的
+「为被唤醒的智能体提供所需凭据」一节。
 
 ## 常见问题
 
-- **找不到 MCP 服务器**：确认 `.mcp.json` 位于当前项目根目录，或使用 `/mcp setup` 重新配置。
-- **技能未加载**：运行 `/reload`，必要时重新启动 Pi。
-- **审查智能体不可用**：确认已安装 `@narumitw/pi-subagents`，并已复制 `packages/chorus-pi/agents/*.md`。
-- **不希望维护源码检出**：请选择有正式用户安装方式的 Claude Code、Codex、Kiro 或 OpenClaw。
+- **找不到 MCP 服务器：** 把 `.mcp.json` 放在项目根目录（或 `~/.pi/agent/mcp.json`），或运行
+  `/mcp setup`。
+- **技能未加载：** 重启会话（`/reload`），技能在会话启动时加载。
+- **评审智能体不可用：** 确认已安装 `chorus-pi` 且已重启 Pi；评审智能体随包内置（无需单独安装子
+  智能体，也无需手动复制）。
+- **连接未授权：** 重新检查 `CHORUS_URL` / `CHORUS_API_KEY`（或 `.mcp.json` 中的 Bearer），然后重启 Pi。
+- **工具名看起来重复了**（`chorus_chorus_checkin`）：`pi-mcp-adapter` 在网关模式下会给工具名加上服务器
+  名前缀。可调用 `mcp({ tool: "chorus_chorus_checkin" })`，或在 chorus 服务器上设置
+  `"toolPrefix": "none"` 以使用原生的 `chorus_*` 名称。
+
+关于一般的连接问题，参见[故障排查](/zh/guides/troubleshooting/)。

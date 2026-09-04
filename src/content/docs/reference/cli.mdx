@@ -13,7 +13,7 @@ endpoint from the shell. Install it globally:
 
 ```sh
 npm install --global @chorus-aidlc/chorus
-chorus --version   # 0.17.0 or later provides `chorus agents` and `chorus mcp`
+chorus --version   # 0.17.2 or later provides `chorus agents` and `chorus mcp`
 ```
 
 Run `chorus --help`, or `chorus <command> --help`, for the complete flag list.
@@ -23,7 +23,7 @@ Run `chorus --help`, or `chorus <command> --help`, for the complete flag list.
 | Command | What it does |
 | --- | --- |
 | `chorus` | Start the Chorus server (the default with no subcommand). See [Deploy with Docker](/guides/deploy-docker/). |
-| `chorus agents` | Configure this machine's agents — `list` (default), `add`, `remove`. |
+| `chorus agents` | Configure this machine's agents — `list` (default), `add`, `remove`, and `run` (launch one). |
 | `chorus mcp` | Native MCP client — `call` a tool, print your UUID (`whoami`), or `list` callable tools. |
 | `chorus login` | Authenticate as an agent and save the connection to `~/.chorus/daemon.json`. |
 | `chorus daemon` | Keep a runtime online so Chorus can wake it. See [Operate the Chorus daemon](/guides/daemon-operations/). |
@@ -74,6 +74,31 @@ chorus agents remove <name|uuid>  # remove one (match by name or UUID)
 
 `chorus agents` never prints an API key. A listed name or UUID is a valid value for
 `chorus mcp --agent` or the `CHORUS_AGENT_PROFILE` environment variable.
+
+## Launch an agent — `chorus agents run`
+
+`chorus agents run` starts a configured agent in your terminal with its Chorus connection
+already wired in — the foreground counterpart to daemon waking. Because a child process
+cannot change its parent shell's environment, the command injects the connection into the
+launched agent process directly, so you never hand-export anything.
+
+```sh
+chorus agents run --name work -- --model opus        # launch agent "work"; pass --model opus to it
+chorus agents run                                    # launch the only configured agent
+chorus agents run --name work --type codex -- resume # override the backend, then pass `resume` through
+```
+
+- **Which agent** — `--name <name|uuid>` picks from `~/.chorus/daemon.json`. Optional when one
+  agent is configured; with several, pass `--name` (or set `CHORUS_AGENT_PROFILE`), or the
+  command errors rather than guess.
+- **What's injected** (into the launched process only — never your shell, never printed):
+  `CHORUS_URL`, `CHORUS_API_KEY`, and `CHORUS_AGENT_PROFILE`.
+- **Which binary** — defaults to the agent's stored backend; `--type` overrides it. Types map to
+  `claude`, `codex`, `kiro-cli`, `pi`, `opencode`, `openclaw`, and `dsh-jsonrpc-agent`. Agents
+  added as opencode / OpenClaw / DeepSeek Harness are stored as `offline` (the daemon will not
+  auto-wake them), so pass `--type` explicitly to launch those.
+- **Passthrough** — everything after `--` goes to the agent verbatim, so its full flag surface is
+  available. The agent inherits your terminal, and `chorus agents run` exits with its exit code.
 
 ## Call MCP tools from the shell — `chorus mcp`
 

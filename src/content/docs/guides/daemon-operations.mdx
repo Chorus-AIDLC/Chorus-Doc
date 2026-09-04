@@ -8,7 +8,7 @@ sidebar:
 ---
 
 Use this guide after you have verified a foreground daemon connection. The commands apply
-to the supported resident backends: Claude Code, Codex, and Kiro.
+to the supported resident backends: Claude Code, Codex, Kiro, and Pi.
 
 ## Choose what the daemon can access
 
@@ -57,7 +57,7 @@ itself.
 | `agentName` | string | Authenticated agent name (informational). |
 | `cwds` | string[] | Working directories this daemon serves. Each path is one independent online connection. |
 | `browseRoots` | string[] | Roots exposed to remote working-directory discovery. A browse root does not create a connection. |
-| `agent` | string | Local backend to wake: `"claude-code"`, `"codex"`, or `"kiro"`. |
+| `agent` | string | Local backend to wake: `"claude-code"`, `"codex"`, `"kiro"`, or `"pi"`. |
 | `sigintTimeoutMs` | number | Grace window (ms) after `SIGINT` before a woken agent is force-killed. Default `10000`. |
 | `agents` | object[] | *Optional.* Serve several independent agents from one daemon; each entry overrides the top-level fields for that agent. See [Run several agents in one daemon](#run-several-agents-in-one-daemon). |
 
@@ -152,7 +152,7 @@ agent — existing single-agent installs run unchanged.
 | --- | --- |
 | `apiKey` *(required)* | The agent's `cho_` key — determines its identity. |
 | `url` | Chorus server (may differ per agent — a different server or company). |
-| `agentType` | `claude-code`, `codex`, or `kiro` (backends may be mixed). |
+| `agentType` | `claude-code`, `codex`, `kiro`, or `pi` (backends may be mixed). |
 | `cwds` | Working directories this agent serves (one connection each). |
 | `permissionMode` | `yolo` or `chorus`. |
 | `maxConcurrency` | This agent's own wake-concurrency cap (default `4`). |
@@ -186,6 +186,9 @@ depends on the backend:
   Codex loads at startup) and sets `bearer_token_env_var = "CHORUS_API_KEY"` in `config.toml`, so
   Codex reads its key from the environment rather than a baked literal. The daemon injects each
   agent's own key per wake, so several Codex agents in one daemon each authenticate as themselves.
+- **Pi** — automatic, via the environment. The daemon exports each agent's `CHORUS_URL` /
+  `CHORUS_API_KEY` / `CHORUS_AGENT_PROFILE` into the woken pi session, which the `chorus-pi`
+  extension reads, so each pi agent authenticates with its own key.
 
 ## Install the Linux service
 
@@ -212,6 +215,28 @@ it only sets `HOME` so the daemon can locate `~/.chorus/daemon.json` at boot. Th
 `cwds` and chosen `agent` live in the same file; only `--chorus-only` is captured in the
 unit.
 :::
+
+### Provide credentials a woken agent needs
+
+The daemon injects only the Chorus connection into a woken agent — `CHORUS_URL`,
+`CHORUS_API_KEY`, and `CHORUS_AGENT_PROFILE` — never a model-provider key. When a backend reads
+its model-provider credentials from the environment, those must be present in the daemon's own
+environment. A `systemd --user` service starts in a clean environment and does not inherit what
+you export in your login shell, so set them on the service with a drop-in and restart:
+
+```sh
+# ~/.config/systemd/user/chorus-daemon.service.d/provider-env.conf
+[Service]
+Environment=EXAMPLE_PROVIDER_API_KEY=…
+```
+
+```sh
+systemctl --user daemon-reload && systemctl --user restart chorus-daemon
+```
+
+Backends that read provider auth from a file instead (for example Claude Code and Codex under
+`~/.claude` / `~/.codex`) only need the daemon's `HOME` set correctly, which the installed unit
+already does.
 
 Use these commands for routine operation:
 

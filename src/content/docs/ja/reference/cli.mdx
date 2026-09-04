@@ -13,7 +13,7 @@ route: /ja/reference/cli/
 
 ```sh
 npm install --global @chorus-aidlc/chorus
-chorus --version   # 0.17.0 or later provides `chorus agents` and `chorus mcp`
+chorus --version   # 0.17.2 or later provides `chorus agents` and `chorus mcp`
 ```
 
 完全なフラグ一覧は、`chorus --help` または `chorus <command> --help` を実行してください。
@@ -23,7 +23,7 @@ chorus --version   # 0.17.0 or later provides `chorus agents` and `chorus mcp`
 | コマンド | 何をするか |
 | --- | --- |
 | `chorus` | Chorus サーバーを起動します（サブコマンドなしの既定）。[Docker でデプロイ](/ja/guides/deploy-docker/)を参照。 |
-| `chorus agents` | このマシンのエージェントを設定します — `list`（既定）、`add`、`remove`。 |
+| `chorus agents` | このマシンのエージェントを設定します — `list`（既定）、`add`、`remove`、そして `run`（1 つ起動）。 |
 | `chorus mcp` | ネイティブ MCP クライアント — ツールを `call` し、自分の UUID を表示（`whoami`）し、呼び出せるツールを `list` します。 |
 | `chorus login` | エージェントとして認証し、接続を `~/.chorus/daemon.json` に保存します。 |
 | `chorus daemon` | Chorus が起こせるようにランタイムをオンラインに保ちます。[Chorus デーモンを運用する](/ja/guides/daemon-operations/)を参照。 |
@@ -71,6 +71,31 @@ chorus agents remove <name|uuid>  # remove one (match by name or UUID)
 
 `chorus agents` は API キーを決して出力しません。一覧に表示された名前または UUID は、
 `chorus mcp --agent` や `CHORUS_AGENT_PROFILE` 環境変数の有効な値です。
+
+## エージェントを起動する — `chorus agents run`
+
+`chorus agents run` は、設定済みのエージェントを Chorus 接続を組み込んだ状態でターミナル内に
+起動します — デーモン起動のフォアグラウンド版です。子プロセスは親シェルの環境を変更できないため、
+このコマンドは接続を起動するエージェントプロセスへ直接注入します。手動でエクスポートする必要は
+ありません。
+
+```sh
+chorus agents run --name work -- --model opus        # エージェント "work" を起動し、--model opus を渡す
+chorus agents run                                    # 設定済みエージェントが 1 つだけならそれを起動
+chorus agents run --name work --type codex -- resume # バックエンドを上書きし、`resume` を透過的に渡す
+```
+
+- **どのエージェントか** — `--name <name|uuid>` が `~/.chorus/daemon.json` から選びます。エージェントが
+  1 つだけなら省略可能です。複数ある場合は `--name` を渡す（または `CHORUS_AGENT_PROFILE` を設定する）
+  必要があり、そうしないとコマンドは推測せずエラーになります。
+- **何が注入されるか**（起動されたプロセスにのみ注入され、シェルには入らず、出力もされません）：
+  `CHORUS_URL`、`CHORUS_API_KEY`、`CHORUS_AGENT_PROFILE`。
+- **どのバイナリか** — 既定はエージェントに保存されたバックエンドで、`--type` で上書きできます。
+  種類はそれぞれ `claude`、`codex`、`kiro-cli`、`pi`、`opencode`、`openclaw`、`dsh-jsonrpc-agent` に
+  対応します。opencode / OpenClaw / DeepSeek Harness として追加したエージェントは `offline` として
+  保存される（デーモンが自動起動しない）ため、起動するには `--type` を明示してください。
+- **透過渡し** — `--` の後のすべてはそのままエージェントへ渡されるため、全フラグ面が利用できます。
+  エージェントはあなたのターミナルを引き継ぎ、`chorus agents run` はその終了コードで終了します。
 
 ## シェルから MCP ツールを呼び出す — `chorus mcp`
 
