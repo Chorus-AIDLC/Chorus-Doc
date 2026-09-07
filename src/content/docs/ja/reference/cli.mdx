@@ -91,7 +91,7 @@ chorus agents run --name work --type codex -- resume # バックエンドを上�
 - **何が注入されるか**（起動されたプロセスにのみ注入され、シェルには入らず、出力もされません）：
   `CHORUS_URL`、`CHORUS_API_KEY`、`CHORUS_AGENT_PROFILE`。
 - **どのバイナリか** — 既定はエージェントに保存されたバックエンドで、`--type` で上書きできます。
-  種類はそれぞれ `claude`、`codex`、`kiro-cli`、`pi`、`opencode`、`openclaw`、`dsh-jsonrpc-agent` に
+  種類はそれぞれ `claude`、`codex`、`kiro-cli`、`pi`、`opencode`、`openclaw`、`dsh` に
   対応します。opencode / OpenClaw / DeepSeek Harness として追加したエージェントは `offline` として
   保存される（デーモンが自動起動しない）ため、起動するには `--type` を明示してください。
 - **透過渡し** — `--` の後のすべてはそのままエージェントへ渡されるため、全フラグ面が利用できます。

@@ -90,8 +90,12 @@ loaded, and inspect `/subagents` for `chorus-proposal-reviewer`.
 - **3 read-only reviewer sub-agents** — `chorus-proposal-reviewer`, `chorus-task-reviewer`,
   `chorus-code-reviewer` — discovered package-relative (no copy) and spawned via the blocking
   `subagent` tool; they post a `VERDICT` comment and stop.
-- **The official pi `subagent` tool**, bundled at `extensions/subagent/` (pi's reference pattern),
-  replacing the former third-party `@narumitw/pi-subagents` dependency.
+- **The official pi `subagent` tool**, bundled at `extensions/subagent/` (pi's reference pattern) —
+  no third-party sub-agents package required. It also **coexists with the community `pi-subagents`
+  package** (nicobailon): both register a `subagent` tool, so exclude the bundled one via a
+  `settings.packages` filter, and `chorus-pi`'s session lifecycle handles that package's
+  **async / detached** subagent runs alongside the bundled blocking runs. See the
+  [`chorus-pi` README](https://www.npmjs.com/package/@chorus-aidlc/chorus-pi) for the filter and setup.
 - **Session-aware extension** subscribing to Pi's native events (`session_start` → `chorus_checkin`
   + OpenSpec detection, `tool_call` on `subagent` → per-worker Chorus session, `tool_result` →
   close the worker session + reviewer nudges, `session_shutdown` → cleanup).

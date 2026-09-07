@@ -94,7 +94,7 @@ chorus agents run --name work --type codex -- resume # override the backend, the
 - **What's injected** (into the launched process only — never your shell, never printed):
   `CHORUS_URL`, `CHORUS_API_KEY`, and `CHORUS_AGENT_PROFILE`.
 - **Which binary** — defaults to the agent's stored backend; `--type` overrides it. Types map to
-  `claude`, `codex`, `kiro-cli`, `pi`, `opencode`, `openclaw`, and `dsh-jsonrpc-agent`. Agents
+  `claude`, `codex`, `kiro-cli`, `pi`, `opencode`, `openclaw`, and `dsh`. Agents
   added as opencode / OpenClaw / DeepSeek Harness are stored as `offline` (the daemon will not
   auto-wake them), so pass `--type` explicitly to launch those.
 - **Passthrough** — everything after `--` goes to the agent verbatim, so its full flag surface is

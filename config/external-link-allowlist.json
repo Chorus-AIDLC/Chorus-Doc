@@ -2,5 +2,6 @@
   "https://github.com/Chorus-AIDLC/Chorus": "GitHub intermittently rejects automated HEAD requests; this canonical repository URL is maintained by the project.",
   "https://www.postgresql.org/docs/current/backup.html": "Authoritative PostgreSQL backup documentation linked from the operations guide's back-up-before-upgrade reminder instead of re-teaching per-engine restore recipes.",
   "https://aws.amazon.com/certificate-manager/": "AWS Certificate Manager product page linked from the production guide's AWS CDK prerequisites for obtaining the ACM certificate the load balancer requires.",
-  "https://github.com/Fission-AI/OpenSpec": "OpenSpec upstream repository linked from the OpenSpec mode guide as the canonical home of the openspec CLI that the mode depends on; GitHub intermittently rejects automated HEAD requests."
+  "https://github.com/Fission-AI/OpenSpec": "OpenSpec upstream repository linked from the OpenSpec mode guide as the canonical home of the openspec CLI that the mode depends on; GitHub intermittently rejects automated HEAD requests.",
+  "https://www.npmjs.com/package/@chorus-aidlc/chorus-pi": "Canonical npm page for the published @chorus-aidlc/chorus-pi package, linked from the Pi reference for the subagent coexistence filter and setup; the package is public (registry.npmjs.org returns 200) but npmjs.com's web page rejects automated HEAD requests with 403."
 }

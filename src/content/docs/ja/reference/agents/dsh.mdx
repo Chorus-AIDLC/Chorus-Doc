@@ -7,9 +7,9 @@ route: /ja/reference/agents/dsh/
 
 # DeepSeek Harness
 
-DeepSeek Harness (dsh) は、第一者の npm バンドル `@chorus-aidlc/chorus-dsh` を通じて Chorus に接続します。このバンドルは、Chorus の MCP ツール、ワークフロースキル、ペルソナを dsh プロファイルに追加します。dsh は対話的に使用します。dsh の無人 daemon wake は、このリリースでは利用できません。
+DeepSeek Harness (dsh) は、第一者の npm バンドル `@chorus-aidlc/chorus-dsh` を通じて Chorus に接続します。このバンドルは、Chorus の MCP ツール、ワークフロースキル、ペルソナを dsh プロファイルに追加します。dsh は対話的に使用できるほか、dsh `0.1.2-rc.1` 以降は Chorus がデーモンバックエンドとして無人で dsh を起動（wake）することもできます。
 
-インストール前に、`0.1.0-rc.7` 以降の dsh（および `pnpm`）を使い、[エージェントのアクセスを準備する](/ja/guides/administrator-setup/)に従ってエージェントキーを作成します。
+インストール前に、`0.1.2-rc.1` 以降の dsh（および `pnpm`）を使い、[エージェントのアクセスを準備する](/ja/guides/administrator-setup/)に従ってエージェントキーを作成します。
 
 ## バンドルをインストールし認証情報を保存する
 
@@ -38,11 +38,23 @@ dsh --profile <name>
 
 「check in to chorus」と依頼します。Chorus で**設定 → エージェント**を開き、dsh の接続がオンラインであることを確認します。
 
+## デーモンバックエンドとして実行する（任意）
+
+dsh `0.1.2-rc.1` 以降、Chorus は Claude Code・Codex・Kiro と同じように dsh を無人で起動（wake）できます。まず `chorus agents add --agents dsh` で認証情報を一度書き込み、次に dsh バックエンドを選んでデーモンを起動します：
+
+```bash
+chorus daemon --agent dsh
+```
+
+デーモンは dsh を初めて起動するときに、自身の管理下にある `sdk` プロファイルをビルドして検証します。そのためこの経路に必要なのは認証情報だけで、プロファイルを手動でインストールする必要はありません。`dsh` 本体は `PATH` 上にある（または `CHORUS_DSH_PATH` を設定する）必要があります。Chorus は dsh ランタイムを同梱しません。Chorus のディスパッチ（dsh への idea/タスクの割り当て、または `@メンション`）が dsh を起動します。
+
+各 wake は**新しい** dsh セッションになります（dsh にはネイティブな wake 間のセッション再開はありません）。Chorus は会話コンテキストを割り当て先の idea/タスク上に保持し、起動された dsh エージェントは Chorus MCP ツールでそれを読み戻します。
+
 ## 機能と制限
 
 - バンドルは Chorus の MCP ツール、ワークフロースキル、Chorus ペルソナを提供します。
-- dsh は自身のプロファイルを通じて対話的に動作します。
-- dsh は `chorus daemon --agent` では受け付けられません。dsh の無人 daemon wake はこのリリースでは利用できないため、当面は対話的に使用してください。
+- dsh は自身のプロファイルを通じて対話的に動作するほか、無人のデーモンバックエンド（`chorus daemon --agent dsh`）としても動作します。
+- wake ごとに dsh は新しいセッションを開始します。ネイティブな wake 間のセッション再開はなく、連続性は wake がひも付く Chorus リソースから得られます。
 
 ## よくある問題
 

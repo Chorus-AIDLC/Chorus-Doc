@@ -86,7 +86,7 @@ chorus agents run --name work --type codex -- resume # 覆盖后端，再把 `re
 - **注入了什么**（只注入被启动的进程，绝不进入你的 shell，也绝不打印）：`CHORUS_URL`、
   `CHORUS_API_KEY` 和 `CHORUS_AGENT_PROFILE`。
 - **启动哪个二进制**：默认取该智能体存储的后端，`--type` 可覆盖。类型分别映射到 `claude`、`codex`、
-  `kiro-cli`、`pi`、`opencode`、`openclaw` 和 `dsh-jsonrpc-agent`。以 opencode / OpenClaw /
+  `kiro-cli`、`pi`、`opencode`、`openclaw` 和 `dsh`。以 opencode / OpenClaw /
   DeepSeek Harness 添加的智能体会被存储为 `offline`（daemon 不会自动唤起它们），启动它们时需显式传 `--type`。
 - **透传**：`--` 之后的一切都会原样交给智能体，因此其完整参数面均可用。智能体继承你的终端，
   `chorus agents run` 以它的退出码退出。

@@ -83,8 +83,11 @@ pi install npm:@chorus-aidlc/chorus-pi
 - **3 个只读评审子智能体**：`chorus-proposal-reviewer`、`chorus-task-reviewer`、
   `chorus-code-reviewer`，以包相对方式发现（无需复制），通过阻塞式的 `subagent` 工具派生；
   它们发布一条 `VERDICT` 评论后停止。
-- **官方 pi `subagent` 工具**，内置于 `extensions/subagent/`（pi 的参考实现），取代了以前的第三方
-  `@narumitw/pi-subagents` 依赖。
+- **官方 pi `subagent` 工具**，内置于 `extensions/subagent/`（pi 的参考实现）——无需任何第三方
+  子智能体包。它同时**与社区的 `pi-subagents` 包（nicobailon）共存**：两者都注册名为 `subagent`
+  的工具，因此需通过 `settings.packages` 过滤器排除内置的那一个；`chorus-pi` 的会话生命周期既支持
+  该包的**异步 / detached** subagent 运行，也支持内置的阻塞式运行。过滤器与配置详见
+  [`chorus-pi` README](https://www.npmjs.com/package/@chorus-aidlc/chorus-pi)。
 - **会话感知扩展**，订阅 Pi 的原生事件（`session_start` → `chorus_checkin` + OpenSpec 检测，
   `subagent` 上的 `tool_call` → 每个 worker 的 Chorus 会话，`tool_result` → 关闭 worker 会话 + 评审
   提示，`session_shutdown` → 清理）。

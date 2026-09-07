@@ -92,8 +92,12 @@ Pi를 재시작하고 `/mcp`를 확인한 뒤 Pi에 `chorus_checkin` 호출을 �
 - **3개의 읽기 전용 검토용 서브 에이전트** — `chorus-proposal-reviewer`, `chorus-task-reviewer`,
   `chorus-code-reviewer` — 패키지 상대 경로로 검색되며(복사 없음) 블로킹 `subagent` 도구를
   통해 생성됩니다. 이들은 `VERDICT` 코멘트를 남기고 멈춥니다.
-- **공식 pi `subagent` 도구**, `extensions/subagent/`에 번들됨(pi의 참조 패턴). 이전의
-  서드파티 `@narumitw/pi-subagents` 종속성을 대체합니다.
+- **공식 pi `subagent` 도구**, `extensions/subagent/`에 번들됨(pi의 참조 패턴) — 서드파티
+  서브에이전트 패키지가 필요 없습니다. 또한 커뮤니티 **`pi-subagents` 패키지(nicobailon)와
+  공존**합니다. 둘 다 `subagent` 라는 도구를 등록하므로 `settings.packages` 필터로 번들된 것을
+  제외하세요. `chorus-pi`의 세션 라이프사이클은 해당 패키지의 **비동기 / detached** subagent
+  실행과 번들된 블로킹 실행을 모두 처리합니다. 필터와 설정은
+  [`chorus-pi` README](https://www.npmjs.com/package/@chorus-aidlc/chorus-pi)를 참조하세요.
 - **세션 인식 확장**으로 Pi의 기본 이벤트를 구독합니다(`session_start` → `chorus_checkin`
   + OpenSpec 감지, `subagent`에 대한 `tool_call` → 워커별 Chorus 세션, `tool_result` → 워커
   세션 종료 + 검토자 알림, `session_shutdown` → 정리).

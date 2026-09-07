@@ -97,7 +97,11 @@ Pi を再起動し、`/mcp` を確認して、Pi に `chorus_checkin` の呼び�
   ブロッキングする `subagent` ツールを介して起動されます。これらは `VERDICT` コメントを投稿して
   停止します。
 - **公式の pi `subagent` ツール**は `extensions/subagent/`（pi のリファレンスパターン）に同梱され、
-  かつての第三者依存関係 `@narumitw/pi-subagents` を置き換えます。
+  第三者のサブエージェントパッケージは不要です。さらにコミュニティの **`pi-subagents` パッケージ
+  （nicobailon）と共存**します。両者とも `subagent` という名前のツールを登録するため、
+  `settings.packages` フィルタで同梱版を除外します。`chorus-pi` のセッションライフサイクルは、
+  そのパッケージの**非同期 / detached** な subagent 実行も、同梱のブロッキング実行も扱います。
+  フィルタと設定は [`chorus-pi` README](https://www.npmjs.com/package/@chorus-aidlc/chorus-pi) を参照。
 - **セッション対応の拡張**が Pi ネイティブのイベントを購読します（`session_start` →
   `chorus_checkin` + OpenSpec 検出、`subagent` に対する `tool_call` → ワーカーごとの Chorus
   セッション、`tool_result` → ワーカーセッションのクローズ + レビュアーの促し、`session_shutdown`
