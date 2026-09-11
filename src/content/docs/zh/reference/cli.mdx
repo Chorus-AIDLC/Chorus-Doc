@@ -47,15 +47,16 @@ chorus agents add --agents claude,codex \
 ```
 
 它是幂等的：可以安全地重新运行，以添加智能体、刷新插件或轮换密钥。已检测到但尚未安装的智能体
-仍可选择。支持的智能体有 Claude Code、Codex、Kiro、opencode、OpenClaw 和 DeepSeek Harness；Pi
-仅提供引导式（手动）安装。
+仍可选择。支持的智能体有 Claude Code、Codex、Kiro、Pi、opencode、OpenClaw 和 DeepSeek Harness。
+`pi` 在 PATH 中时会自动安装 `pi-mcp-adapter` 和 `chorus-pi`；否则给出手动安装指引。
 
 常用参数（`chorus agents add --help` 会列出全部）：
 
 - `--agents <a,b>` / `--all`：要配置哪些智能体。
 - `--url` / `--api-key`：以非交互方式提供凭据（环境变量：`CHORUS_URL` / `CHORUS_API_KEY`）。
+- `--update-installed`：更新已安装的集成。Pi 会运行 `pi update --extensions`；仅重复 `pi install` 不会升级已安装的包。
 - `--dsh-profile <name>`：把 bundle 安装进哪个 DeepSeek Harness profile。
-- `--daemon-wake <a,b>` / `--daemon-wake-all`：把指定的（或全部可唤起的）智能体选入 daemon 唤起范围。可唤起的智能体（Claude Code、Codex、Kiro）默认以「停靠」状态添加：`chorus mcp` 可以访问它，但在你于此显式选入（或在 TTY 下逐个应答提示）之前，daemon 不会唤起它。
+- `--daemon-wake <a,b>` / `--daemon-wake-all`：把指定的（或全部可唤起的）智能体选入 daemon 唤起范围。可唤起的智能体（Claude Code、Codex、Kiro、Pi）默认以「停靠」状态添加：`chorus mcp` 可以访问它，但在你于此显式选入（或在 TTY 下逐个应答提示）之前，daemon 不会唤起它。
 - `--daemon-autostart`：同时安装并启用 daemon 开机服务（Linux systemd / macOS launchd）。
 - `-y, --yes`：跳过确认（非 TTY 环境下自动生效，此时必须传入 `--agents` 或 `--all`）。
 
@@ -81,7 +82,7 @@ chorus agents run                                    # 启动唯一一个已配�
 chorus agents run --name work --type codex -- resume # 覆盖后端，再把 `resume` 透传过去
 ```
 
-- **选哪个智能体**：`--name <name|uuid>` 从 `~/.chorus/daemon.json` 中选取。只有一个智能体时可省略；
+- **选哪个智能体**：`--name <name|uuid>` 从 `~/.chorus/daemon.json` 的 `agents[]` 中选取。只有一个智能体时可省略；
   有多个时请传 `--name`（或设置 `CHORUS_AGENT_PROFILE`），否则命令会报错而不擅自猜测。
 - **注入了什么**（只注入被启动的进程，绝不进入你的 shell，也绝不打印）：`CHORUS_URL`、
   `CHORUS_API_KEY` 和 `CHORUS_AGENT_PROFILE`。
@@ -90,6 +91,35 @@ chorus agents run --name work --type codex -- resume # 覆盖后端，再把 `re
   DeepSeek Harness 添加的智能体会被存储为 `offline`（daemon 不会自动唤起它们），启动它们时需显式传 `--type`。
 - **透传**：`--` 之后的一切都会原样交给智能体，因此其完整参数面均可用。智能体继承你的终端，
   `chorus agents run` 以它的退出码退出。
+
+### 持久化 args/env 与一次性覆盖
+
+选中的 `agents[]` 条目可设置 `args`（字符串数组，默认 `[]`）和 `env`（字符串到字符串的对象，默认 `{}`），daemon 唤起与前台启动都会使用。存在非空 `agents[]` 时不继承顶层设置，字段放错位置会报错。[daemon 指南](/zh/guides/daemon-operations/)提供可复制的模型/思考/env 示例、扁平文件迁移、校验和密钥保护说明。值按字面传递，不展开 shell、不加载 dotenv、不查询密钥服务。Env 仅影响子进程；`CHORUS_*` 和嵌套 Claude 上下文名称 `CLAUDECODE` / `CLAUDE_CODE_ENTRYPOINT` 均保留，不区分大小写；配置这些名称会报错，而不是被静默删除。持久化参数不能覆盖已知的会话、提示词、协议、工作目录、MCP 或权限控制，也不能包含 `--` / `-` 标记或帮助/检查退出选项。显式前台参数保持原样，包括原生恢复命令。这些规则只防止已知冲突，不是沙箱。
+
+每次新的 `chorus agents run` 都会重读文件。daemon 更改需要 `chorus daemon restart`；两种方式都不会更新已运行的子进程。`--type` 选择用于校验和覆盖匹配的后端，不会翻译后端参数。
+
+仅对下表中的选项，在选定命令作用域中显式传入时，才会移除配置中对应的选项及其值：
+
+| 实际后端 | 可识别的覆盖项 |
+| --- | --- |
+| `claude-code` / `claude` | `--model`、`--effort` |
+| `codex` | `--model` / `-m` / 配置键 `model`；配置键 `model_reasoning_effort` |
+| `kiro` | `--model`、`--effort` |
+| `pi` | `--model`、`--thinking`、`--provider` |
+| `opencode` | `--model` / `-m` |
+| `openclaw` | `agent` 的 `--model`、`--thinking`（`-m` 是消息，不是模型） |
+| `dsh` | 无；改用 `DSH_PROVIDER` / `DSH_MODEL` 环境变量 |
+
+匹配支持 `--option value`、`--option=value`，以及表中列有 `-m` 时的 `-mVALUE` / `-m=VALUE`。Codex 支持 `-c key=value`、`-ckey=value`、`-c=key=value`、`--config key=value` 和 `--config=key=value`；仅表中的两个键参与优先级处理，其他配置条目保留。后端自身也必须支持该写法：Pi 0.85.1 的 `--model`、`--thinking`、`--provider` 请将值分开传递，不要用等号形式。
+
+```sh
+chorus agents run --name pi-worker -- --model anthropic/claude-sonnet-4-6 --thinking medium
+chorus agents run --name codex-worker -- exec --model gpt-5.4 -c model_reasoning_effort=high
+```
+
+**子命令**：持久化参数插入最深的已识别命令之后：Codex 的 `exec`、`exec resume` 或 `resume`，Kiro 的 `chat`，OpenClaw 的 `agent`。显式覆盖也应放在同一作用域，如 `exec --model chosen`，而非 `--model chosen exec`。根命令或父命令的模型选项不会移除子命令中配置的模型；Codex 的 `-c`/`--config` 键跨作用域生效。未识别到命令时，配置参数放在最前面。不推断其他命令路径；对这些路径，请去掉不兼容的持久化参数，改用原生透传。
+
+**未知选项**：持久化 `args` 允许普通未知选项，但无法猜测下一项是值还是提示词。后端支持时用 `["--future=value"]`，不要用 `["--future", "value"]`。已知选项必须提供其要求的值。未知或可重复选项在选定作用域内保持先配置、后显式的顺序，不保证后者覆盖前者。遇到有歧义的显式选项（未知且无内联值）后，Chorus 停止推断覆盖关系；请将已知覆盖项放在它之前，或使用受支持的内联值。移除外层 Chorus 分隔符后，分析也会在智能体参数中的第一个单独 `--` 处停止。命令识别遇到位置提示词、未知命令或有歧义的选项时停止，并跳过已知选项的值。所有显式参数仍原样透传；请自行确认后端参数及版本兼容性。Windows `.cmd`/`.bat` 限制见 daemon 指南。
 
 ## 从 shell 调用 MCP 工具：`chorus mcp`
 

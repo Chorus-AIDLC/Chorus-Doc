@@ -102,11 +102,11 @@ Code and Codex. Treat the notes below as pointers, not a parity claim.
 
 Upgrade in place; your agent key and Chorus URL are unaffected.
 
-- **Any agent** — re-run `chorus agents add`. It is idempotent and refreshes each configured
-  agent's plugin and credential in one pass:
+- **Any agent** — run setup with `--update-installed` and select the agents to refresh.
+  Without that flag, a complete existing installation may be skipped:
 
   ```bash
-  chorus agents add
+  chorus agents add --update-installed
   ```
 
 - **Claude Code** — you can also manage the plugin from the `/plugin` menu, or re-run the
@@ -119,10 +119,10 @@ Upgrade in place; your agent key and Chorus URL are unaffected.
 
   Restart Claude Code, then run `/plugin list` and confirm the new version is enabled.
 
-- **Codex** — re-running `chorus agents add` refreshes the plugin and the `~/.codex/.env`
+- **Codex** — re-running `chorus agents add --update-installed` refreshes the plugin and the `~/.codex/.env`
   credential, and is also how you rotate the agent key. Finish with `/plugins` inside Codex.
 
-For OpenClaw, Kiro, and Pi, re-run `chorus agents add` or upgrade through the same mechanism
+For OpenClaw, Kiro, and Pi, re-run `chorus agents add --update-installed` or upgrade through the same mechanism
 you installed with, described on each platform page above.
 
 ## Uninstall the plugin
@@ -156,7 +156,10 @@ There is no independent skill install to keep in sync.
   stage, and what it produces.
 - [Automation behaviors](/guides/plugin-automation/) — how reviewer sub-agents, session
   hooks, and headless constraints behave.
-- [OpenSpec mode](/guides/openspec-mode/) — the optional spec-driven authoring path.
+- [OpenSpec mode](/guides/openspec-mode/) — how a session's spec mode is chosen, and the
+  OpenSpec authoring path.
+- [Spec-lite mode](/guides/spec-lite-mode/) — the Chorus-native lightweight spec trail used
+  when OpenSpec is not in play.
 
 For the workflow these commands drive, see [The AI-DLC workflow](/guides/ai-dlc-workflow/);
 for running a runtime as a background service, see

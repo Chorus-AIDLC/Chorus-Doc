@@ -40,6 +40,30 @@ Open a document to read its Markdown body on its page. Select **Edit** to change
 details, its **Source Proposal** (with a link to the proposal it came from, when set), and its
 **Version History**. Comments below the content let you discuss it.
 
+## Metadata at the top of a document
+
+A document whose Markdown begins with a supported YAML frontmatter block shows those fields
+in a metadata card above the body. For example:
+
+```markdown
+---
+title: CSV export
+status: draft
+---
+
+## Requirements
+Users can export the current result set.
+```
+
+Use a flat list of `key: value` pairs, with `---` as the very first line and `---` or `...`
+as the closing line. Blank lines and `#` comments inside the block are allowed. This is not
+full YAML support: nested objects, lists, and multiline values are not supported. If the
+block is not recognized, Chorus renders the original Markdown instead.
+
+The card changes only how the content is displayed; it does not change the document's type,
+workflow state, stored body, or export. [Spec-lite](/guides/spec-lite-mode/) uses frontmatter
+to keep each change document linked to its proposal and persistent document.
+
 ## How documents and reports surface here
 
 Documents reach this list two ways:

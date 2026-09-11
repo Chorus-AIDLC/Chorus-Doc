@@ -51,15 +51,18 @@ chorus agents add --agents claude,codex \
 
 It is idempotent — safe to re-run to add an agent, refresh a plugin, or rotate a key.
 Detected but not-yet-installed agents stay selectable. Supported agents are Claude Code,
-Codex, Kiro, opencode, OpenClaw, and the DeepSeek Harness; Pi is guided (manual) only.
+Codex, Kiro, Pi, opencode, OpenClaw, and the DeepSeek Harness. With `pi` on PATH, setup installs
+both `pi-mcp-adapter` and `chorus-pi`; otherwise it provides manual instructions.
 
 Useful flags (`chorus agents add --help` lists them all):
 
 - `--agents <a,b>` / `--all` — which agents to configure.
 - `--url` / `--api-key` — supply the credential non-interactively (env: `CHORUS_URL` / `CHORUS_API_KEY`).
+- `--update-installed` — refresh existing installations. For Pi, this runs `pi update --extensions`;
+  simply repeating `pi install` does not update an already-installed package.
 - `--dsh-profile <name>` — the DeepSeek Harness profile to install the bundle into.
 - `--daemon-wake <a,b>` / `--daemon-wake-all` — opt the named (or every) wakeable agent into
-  daemon waking. Wakeable agents (Claude Code, Codex, Kiro) are added *parked* by default —
+  daemon waking. Wakeable agents (Claude Code, Codex, Kiro, Pi) are added *parked* by default —
   reachable by `chorus mcp` but not woken by the daemon until opted in here or at the
   per-agent TTY prompt.
 - `--daemon-autostart` — also install and enable the daemon boot service (Linux systemd / macOS launchd).
@@ -88,7 +91,7 @@ chorus agents run                                    # launch the only configure
 chorus agents run --name work --type codex -- resume # override the backend, then pass `resume` through
 ```
 
-- **Which agent** — `--name <name|uuid>` picks from `~/.chorus/daemon.json`. Optional when one
+- **Which agent** — `--name <name|uuid>` picks from `agents[]` in `~/.chorus/daemon.json`. Optional when one
   agent is configured; with several, pass `--name` (or set `CHORUS_AGENT_PROFILE`), or the
   command errors rather than guess.
 - **What's injected** (into the launched process only — never your shell, never printed):
@@ -99,6 +102,68 @@ chorus agents run --name work --type codex -- resume # override the backend, the
   auto-wake them), so pass `--type` explicitly to launch those.
 - **Passthrough** — everything after `--` goes to the agent verbatim, so its full flag surface is
   available. The agent inherits your terminal, and `chorus agents run` exits with its exit code.
+
+### Persistent args/env and one-off overrides
+
+Each selected `agents[]` entry can hold `args` (string array, default `[]`) and `env`
+(string-to-string object, default `{}`). Both daemon wakes and foreground launches use them.
+There is no top-level inheritance with nonempty `agents[]`; misplaced fields cause an error.
+See the [daemon guide](/guides/daemon-operations/) for a copyable model/thinking/env example,
+flat-file migration, validation, and secret-handling precautions. Values are literal, with no
+shell expansion, dotenv loading, or secret lookup. Env affects only the child; `CHORUS_*`
+and the nested-Claude context names `CLAUDECODE` / `CLAUDE_CODE_ENTRYPOINT` are reserved
+case-insensitively. Configuring them causes an error instead of silently discarding them.
+Persistent args cannot override known managed
+session, prompt, protocol, cwd, MCP, or permission controls, or contain `--` / `-` sentinels
+or help/inspection exits. Explicit foreground tokens remain unchanged, including native
+resume commands. This guards known conflicts; it is not a sandbox.
+
+Every new `chorus agents run` rereads the file. Daemon changes require
+`chorus daemon restart`; neither path updates already-running children. `--type` selects
+the backend used for validation and override matching; it does not translate backend flags.
+
+For these options only, an explicit occurrence in the selected command scope removes the
+configured equivalent and its value:
+
+| Effective backend | Recognized overrides |
+| --- | --- |
+| `claude-code` / `claude` | `--model`, `--effort` |
+| `codex` | `--model` / `-m` / config key `model`; config key `model_reasoning_effort` |
+| `kiro` | `--model`, `--effort` |
+| `pi` | `--model`, `--thinking`, `--provider` |
+| `opencode` | `--model` / `-m` |
+| `openclaw` | `--model`, `--thinking` on `agent` (`-m` means message, not model) |
+| `dsh` | None; use `DSH_PROVIDER` / `DSH_MODEL` env instead |
+
+Matching recognizes `--option value`, `--option=value`, and, where listed, `-mVALUE` /
+`-m=VALUE`. Codex supports `-c key=value`, `-ckey=value`, `-c=key=value`,
+`--config key=value`, and `--config=key=value`; only the two listed keys participate in
+precedence, leaving unrelated config entries intact. The backend must support the spelling:
+for Pi 0.85.1, use separated `--model`, `--thinking`, and `--provider` values, not equals forms.
+
+```sh
+chorus agents run --name pi-worker -- --model anthropic/claude-sonnet-4-6 --thinking medium
+chorus agents run --name codex-worker -- exec --model gpt-5.4 -c model_reasoning_effort=high
+```
+
+**Subcommands:** persistent args go after the deepest recognized command: Codex `exec`,
+`exec resume`, or `resume`; Kiro `chat`; OpenClaw `agent`. Put the explicit override in that
+same scope: `exec --model chosen`, not `--model chosen exec`. Root/parent model options do
+not remove the child's configured model; Codex `-c`/`--config` keys apply across scopes.
+Without a recognized command, configured args are prefixed. Other command paths are not
+inferred; omit incompatible persistent args and use native passthrough for those paths.
+
+**Unknown options:** persistent `args` accepts ordinary unknown flags, but cannot guess
+whether the next token is a value or a prompt. Use `["--future=value"]` if the backend
+supports it, not `["--future", "value"]`. Known options require their expected values.
+Unknown/repeatable options keep configured-then-explicit order within the selected scope,
+with no general last-wins guarantee. After an ambiguous explicit option (unknown without an
+inline value), Chorus stops inferring overrides; put known overrides before it or use a
+supported inline value. Analysis also stops at the first bare `--` inside agent arguments
+(after removing the outer Chorus delimiter). Command discovery stops at a positional
+prompt, unknown command, or ambiguous option, and skips known option values. All explicit
+tokens are still forwarded unchanged; backend flag and version compatibility remain yours
+to check. For Windows `.cmd`/`.bat` limits, see the daemon guide.
 
 ## Call MCP tools from the shell — `chorus mcp`
 

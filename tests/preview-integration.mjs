@@ -70,7 +70,19 @@ try {
         );
         const wideContent = [...document.querySelectorAll('pre, table, img')].some((element) => {
           const rect = element.getBoundingClientRect();
-          return rect.right > document.documentElement.clientWidth + 1 || rect.left < -1;
+          const viewportWidth = document.documentElement.clientWidth;
+          if (rect.right <= viewportWidth + 1 && rect.left >= -1) return false;
+          // A wide table inside the site's keyboard-focusable scroll region is
+          // intentional. Its own bounding box exceeds the viewport even though
+          // the visible region is clipped correctly (e.g. zh/reference/workflow).
+          const scroller = element.tagName === 'TABLE' ? element.closest('.table-scroll') : null;
+          if (scroller instanceof HTMLElement) {
+            const bounds = scroller.getBoundingClientRect();
+            const scrollable = /^(auto|scroll)$/.test(getComputedStyle(scroller).overflowX);
+            if (scrollable && scroller.tabIndex >= 0 && bounds.left >= -1 &&
+                bounds.right <= viewportWidth + 1) return false;
+          }
+          return true;
         });
         return {
           hasMain: Boolean(document.querySelector('main')),

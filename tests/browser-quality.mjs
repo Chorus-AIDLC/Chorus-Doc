@@ -44,6 +44,14 @@ try {
       '/zh/guides/getting-started/',
       '/ja/guides/getting-started/',
       '/ko/guides/getting-started/',
+      '/guides/openspec-mode/',
+      '/zh/guides/openspec-mode/',
+      '/ja/guides/openspec-mode/',
+      '/ko/guides/openspec-mode/',
+      '/guides/spec-lite-mode/',
+      '/zh/guides/spec-lite-mode/',
+      '/ja/guides/spec-lite-mode/',
+      '/ko/guides/spec-lite-mode/',
     ]) {
       const page = await context.newPage();
       await page.goto(`http://127.0.0.1:${address.port}${route}`, {

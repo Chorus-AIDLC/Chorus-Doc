@@ -89,9 +89,9 @@ Pi を再起動し、`/mcp` を確認して、Pi に `chorus_checkin` の呼び�
 
 ## 機能
 
-- **12 のスキル**が AI-DLC の全段階を駆動します。`/skill:chorus`、`/skill:idea`、`/skill:proposal`、
+- **13 のスキル**が AI-DLC の全段階を駆動します。`/skill:chorus`、`/skill:idea`、`/skill:proposal`、
   `/skill:develop`、`/skill:review`、`/skill:quick-dev`、`/skill:yolo`、`/skill:brainstorm`、
-  `/skill:orchestrate`、`/skill:docs`、`/skill:chorus-cli`、加えて `openspec-aware` サブ手順。
+  `/skill:orchestrate`、`/skill:docs`、`/skill:chorus-cli`、加えて `openspec-aware` と `spec-lite` サブ手順。
 - **3 つの読み取り専用レビュー用サブエージェント** — `chorus-proposal-reviewer`、
   `chorus-task-reviewer`、`chorus-code-reviewer` — はパッケージ相対で検出され（コピー不要）、
   ブロッキングする `subagent` ツールを介して起動されます。これらは `VERDICT` コメントを投稿して
@@ -103,12 +103,16 @@ Pi を再起動し、`/mcp` を確認して、Pi に `chorus_checkin` の呼び�
   そのパッケージの**非同期 / detached** な subagent 実行も、同梱のブロッキング実行も扱います。
   フィルタと設定は [`chorus-pi` README](https://www.npmjs.com/package/@chorus-aidlc/chorus-pi) を参照。
 - **セッション対応の拡張**が Pi ネイティブのイベントを購読します（`session_start` →
-  `chorus_checkin` + OpenSpec 検出、`subagent` に対する `tool_call` → ワーカーごとの Chorus
+  `chorus_checkin` + 仕様モードの解決、`subagent` に対する `tool_call` → ワーカーごとの Chorus
   セッション、`tool_result` → ワーカーセッションのクローズ + レビュアーの促し、`session_shutdown`
   → クリーンアップ）。
 
-拡張は環境変数で設定します（Pi にはプラグイン設定 UI がありません）。`CHORUS_OPENSPEC_MODE`
-（オプトアウトするには `off`）と `CHORUS_ENABLE_{PROPOSAL,TASK,CODE}_REVIEWER`（既定は `true`）です。
+拡張は環境変数で設定します（Pi にはプラグイン設定 UI がありません）。`CHORUS_SPEC_MODE` で `openspec`、
+`lite`、`off` を選べます。未設定なら使用可能な OpenSpec が優先され、それ以外は spec-lite です。従来の
+`CHORUS_OPENSPEC_MODE=off` は OpenSpec だけを無効にし、自由形式ではなく `lite` にフォールバックします。
+ローカル仕様ファイルが不要なら `CHORUS_SPEC_MODE=off` を使ってください。
+[OpenSpec モード](/ja/guides/openspec-mode/)と [Spec-lite モード](/ja/guides/spec-lite-mode/)を参照。
+レビューのトグルは引き続き `CHORUS_ENABLE_{PROPOSAL,TASK,CODE}_REVIEWER`（既定 `true`）です。
 
 ## pi を wakeable なデーモンバックエンドとして実行する
 
@@ -116,8 +120,8 @@ Pi は第一級の **wakeable なデーモンバックエンド**です。Chorus
 （エージェントに割り当てられた着想・課題、`@mention`、提案の決定）に、ヘッドレスな pi セッションを
 起動します。
 
-最も簡単な経路は `chorus init`（別名 `chorus agents add`）です。エージェントのチェックリストで
-**Pi** を選ぶと、パッケージ（`pi install npm:@chorus-aidlc/chorus-pi`）がインストールされ、pi が
+最も簡単な経路は `chorus agents add` です。エージェントのチェックリストで
+**Pi** を選ぶと、`pi install` で `pi-mcp-adapter` と `chorus-pi` がインストールされ、pi が
 `~/.chorus/daemon.json` に **wakeable** なエージェントとしてシードされます。さらに、オプトイン
 すれば、それを起動するブートデーモンがインストールされます。手動で設定するには、pi バックエンドで
 デーモンを実行します。
@@ -135,12 +139,11 @@ chorus daemon --agent pi
   通じてのみです。したがって、デーモンが起動する環境に `chorus-pi` をインストールしたままに
   してください（npm インストールにより、これが確実になります）。
 
-**デーモンが注入するのは Chorus 接続だけで、モデルプロバイダーのキーは決して注入しません。** デーモンは
-起動されたセッションに `CHORUS_URL` / `CHORUS_API_KEY` / `CHORUS_AGENT_PROFILE` だけをエクスポートし、
-それ以外は何も渡しません。pi のモデルプロバイダーが独自の資格情報を必要とする場合、それらはデーモンが
-pi を起動する環境にあらかじめ存在している必要があります。これは pi 固有の話ではありません。デーモンが
-起動するエージェントはデーモンの環境しか継承せず、`systemd --user` サービスはあなたがログインシェルで
-エクスポートした資格情報を見ることはできません。サービス側での設定方法は、[デーモンを運用する](/ja/guides/daemon-operations/)の「起動されるエージェントに必要な資格情報を渡す」節を参照してください。
+デーモンは Chorus 接続（`CHORUS_URL`、`CHORUS_API_KEY`、`CHORUS_AGENT_PROFILE`）を提供しますが、
+モデルプロバイダーの資格情報を取得してくれるわけではありません。そのエージェントの `env`、
+またはデーモンの継承環境やプロバイダーが対応する資格情報ストアで提供してください。`systemd --user` サービスは
+ログインシェルの export を継承しません。[デーモンガイド](/ja/guides/daemon-operations/)にモデル・思考の引数、
+エージェントごとの env、サービスの資格情報と再起動要件を説明しています。
 
 ## よくある問題
 

@@ -84,9 +84,10 @@ loaded, and inspect `/subagents` for `chorus-proposal-reviewer`.
 
 ## Capabilities
 
-- **12 skills** driving every AI-DLC stage — `/skill:chorus`, `/skill:idea`, `/skill:proposal`,
+- **13 skills** driving every AI-DLC stage — `/skill:chorus`, `/skill:idea`, `/skill:proposal`,
   `/skill:develop`, `/skill:review`, `/skill:quick-dev`, `/skill:yolo`, `/skill:brainstorm`,
-  `/skill:orchestrate`, `/skill:docs`, `/skill:chorus-cli`, plus the `openspec-aware` sub-procedure.
+  `/skill:orchestrate`, `/skill:docs`, `/skill:chorus-cli`, plus the `openspec-aware` and
+  `spec-lite` sub-procedures.
 - **3 read-only reviewer sub-agents** — `chorus-proposal-reviewer`, `chorus-task-reviewer`,
   `chorus-code-reviewer` — discovered package-relative (no copy) and spawned via the blocking
   `subagent` tool; they post a `VERDICT` comment and stop.
@@ -97,19 +98,23 @@ loaded, and inspect `/subagents` for `chorus-proposal-reviewer`.
   **async / detached** subagent runs alongside the bundled blocking runs. See the
   [`chorus-pi` README](https://www.npmjs.com/package/@chorus-aidlc/chorus-pi) for the filter and setup.
 - **Session-aware extension** subscribing to Pi's native events (`session_start` → `chorus_checkin`
-  + OpenSpec detection, `tool_call` on `subagent` → per-worker Chorus session, `tool_result` →
+  + spec-mode resolution, `tool_call` on `subagent` → per-worker Chorus session, `tool_result` →
   close the worker session + reviewer nudges, `session_shutdown` → cleanup).
 
-The extension is config-by-env (Pi has no plugin-settings UI): `CHORUS_OPENSPEC_MODE` (`off` to
-opt out) and `CHORUS_ENABLE_{PROPOSAL,TASK,CODE}_REVIEWER` (default `true`).
+The extension is config-by-env (Pi has no plugin-settings UI). `CHORUS_SPEC_MODE` selects
+`openspec`, `lite`, or `off`; without it, usable OpenSpec wins, otherwise the session uses
+spec-lite. The older `CHORUS_OPENSPEC_MODE=off` disables only OpenSpec, so the fallback is
+`lite`, not free-form. Use `CHORUS_SPEC_MODE=off` for no local spec files. See
+[OpenSpec mode](/guides/openspec-mode/) and [Spec-lite mode](/guides/spec-lite-mode/).
+Reviewer toggles remain `CHORUS_ENABLE_{PROPOSAL,TASK,CODE}_REVIEWER` (default `true`).
 
 ## Run pi as a wakeable daemon backend
 
 Pi is a first-class **wakeable daemon backend** — the Chorus daemon wakes a headless pi session on
 remote dispatch (an idea/task assigned to your agent, an `@mention`, a proposal decision).
 
-The simplest path is `chorus init` (a.k.a. `chorus agents add`): select **Pi** in the agent
-checklist and it installs the package (`pi install npm:@chorus-aidlc/chorus-pi`), seeds pi as a
+The simplest path is `chorus agents add`: select **Pi** in the agent
+checklist and it installs `pi-mcp-adapter` and `chorus-pi` through `pi install`, seeds pi as a
 **wakeable** agent in `~/.chorus/daemon.json`, and — if you opt in — installs the boot daemon that
 wakes it. To wire it by hand, run the daemon with the pi backend:
 
@@ -126,14 +131,12 @@ chorus daemon --agent pi
   keep `chorus-pi` installed in the environment the daemon wakes (the npm install makes that
   reliable).
 
-**The daemon injects only your Chorus connection — never a model-provider key.** It exports
-`CHORUS_URL` / `CHORUS_API_KEY` / `CHORUS_AGENT_PROFILE` into the woken session and nothing else.
-If your pi model provider needs its own credentials, those must already be present in the
-environment the daemon launches pi in. This is not pi-specific: a daemon-launched agent inherits
-only the daemon's environment, and a `systemd --user` service does not see credentials you export
-in your login shell. See
-[Provide credentials a woken agent needs](/guides/daemon-operations/#provide-credentials-a-woken-agent-needs)
-for setting them on the service.
+The daemon supplies the Chorus connection (`CHORUS_URL`, `CHORUS_API_KEY`, and
+`CHORUS_AGENT_PROFILE`), but does not obtain model-provider credentials for you. Supply those
+through the agent's `env` in `~/.chorus/daemon.json`, the daemon's inherited environment,
+or the provider's supported credential store. A `systemd --user` service does not inherit
+exports from your login shell. The [daemon guide](/guides/daemon-operations/) covers model and
+thinking args, per-agent env, service credentials, and the required restart.
 
 ## Common issues
 

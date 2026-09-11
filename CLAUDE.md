@@ -81,8 +81,9 @@ intrinsic width/height. See `AUTHORING.md` for the full review checklist.
   by full-width/CJK punctuation AND immediately followed by a non-space CJK char
   is NOT valid right-flanking → it renders as a **literal** `**`. Fix: move the
   punctuation OUTSIDE the bold — write `**文本**。` not `**文本。**`. This is
-  invisible to `content:check`; only a grep of the rendered `dist` HTML for
-  stray `**` catches it. After any CJK bold edit, build and grep `dist`.
+  invisible to `content:check`. `pnpm build` runs `tests/emphasis-rendering.mjs`
+  against rendered prose to reject stray `**`, excluding code examples. After
+  any CJK bold edit, build and inspect the actual output.
 
 ## Verification discipline
 

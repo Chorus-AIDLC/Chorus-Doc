@@ -20,16 +20,18 @@ lifecycle stages or how to install, run, and recover a runtime — see
 The plugin adds an independent quality gate at three points in the pipeline. At each point a
 `PostToolUse` hook fires and injects a reminder that prompts the **main agent** to spawn a
 dedicated **read-only reviewer sub-agent**. The reviewer is **not launched automatically** —
-the main agent spawns it (in the foreground) and waits for the result. Every reviewer ends
-by posting a single comment with a verdict of `PASS`, `PASS WITH NOTES`, or `FAIL`:
+the main agent spawns it, waits using the runtime's completion mechanism, and reads the
+current round's verdict comment. A completed review posts `PASS`, `PASS WITH NOTES`, or `FAIL`:
 
 - `PASS` / `PASS WITH NOTES` — the work continues; notes are advisory.
 - `FAIL` — the listed blockers must be fixed and the work re-submitted before it moves on.
 
-The reviewers are strictly read-only: they cannot edit, write, or create files (the
-proposal reviewer cannot run shell commands at all; the task and code reviewers may run only
-read-only and test/build commands). Their job is to find what the author missed, not to
-change anything.
+Reviewers inspect the work rather than change it. The proposal reviewer may use read-only
+shell commands such as `ls`, `rg`, `find`, and `git log/show/diff`, and must confirm a path is
+missing before reporting it as a blocker. It must not modify files, perform Git write
+operations, install dependencies, or run tests/builds. Task and code reviewers may run
+read-only and test/build commands where their runtime permits; Kiro's task and code reviewers
+have no shell access.
 
 | Reviewer | Fires after | Reviews | Verdict posted on |
 | --- | --- | --- | --- |
@@ -41,6 +43,33 @@ The code reviewer is the final ship-time gate: it runs only when the *last* task
 idea-rooted proposal is verified, and reviews the whole feature at once rather than a single
 task. The three matchers that trigger these prompts live in
 `public/chorus-plugin/hooks/hooks.json`.
+
+### Wait for the current round's verdict
+
+On Claude Code, wait for the reviewer's completion notification: the launch result is not
+the verdict, even if a foreground launch was requested. On Codex, use its native spawn/wait
+mechanism. Pi's bundled `subagent` tool blocks until the reviewer returns. In every case,
+read the `VERDICT:` comment posted **after this dispatch**, not an older round's comment.
+
+If there is no new verdict, distinguish silence from a deliberate handoff:
+
+- **An explicit refusal or round-limit notice:** stop and hand the decision to a human.
+  Do not respawn or replace the handoff with a self-reviewed verdict.
+- **No response at all:** retry once. Check the retry for an explicit refusal too. Only if
+  it is also silent may the main agent perform a read-only review and post its own verdict.
+  No response is never a pass.
+
+### Check alignment with the original intent
+
+All three reviewers also compare the work with the originating Idea's intent: its body,
+human-answered elaboration, and human-authored comments. Agent comments and agent-answered
+elaboration are audit context, not authorization to change the scope.
+
+Added scope, dropped requirements, or acceptance criteria that pass while missing the
+original requirement are blockers unless a cited human comment, answer, or explicit human
+override authorizes the change. The proposal reviewer checks the plan, the task reviewer
+checks the implementation, and the code reviewer checks the whole feature. This is a review
+skill rule using existing Idea, elaboration, and comment reads, not a new MCP tool.
 
 ### Turn reviewers on or off
 
@@ -136,7 +165,7 @@ supports rather than assuming the Claude Code behavior.
 
 - **Triggers:**
   - After `chorus_pm_submit_proposal`, a `PostToolUse` hook prompts you to spawn
-    `chorus:proposal-reviewer` (foreground); read its `VERDICT:` comment on the proposal.
+    `chorus:proposal-reviewer`; wait for completion, then read this round's `VERDICT:` comment on the proposal.
   - After `chorus_submit_for_verify`, spawn `chorus:task-reviewer`; read its `VERDICT:`
     comment on the task.
   - After `chorus_admin_verify_task` on the **last** task of an idea-rooted proposal, spawn
@@ -145,8 +174,9 @@ supports rather than assuming the Claude Code behavior.
   - Reviewers are **not** auto-launched — you spawn them yourself and wait for the verdict.
     `PASS` / `PASS WITH NOTES` continue; `FAIL` means fix the blockers and re-submit.
 - **Constraints:**
-  - Reviewers are read-only (no Edit/Write/NotebookEdit; the proposal reviewer has no Bash,
-    the task and code reviewers run only read-only and test/build commands).
+  - Follow the read-only limits and current-round waiting rules above. Proposal review
+    permits shell inspection, not tests/builds. Never bypass an explicit human escalation
+    by respawning or self-reviewing.
   - All three reviewers (proposal, task, code) ship on **both** Claude Code and Codex. Only
     the `userConfig` toggle surface is Claude Code only — the `enable*` switches
     (`enableProposalReviewer`, `enableTaskReviewer`, `enableCodeReviewer`) and the round

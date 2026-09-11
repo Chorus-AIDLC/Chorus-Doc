@@ -45,6 +45,19 @@ except that mentioning yourself is ignored. Because the mention is stored agains
 comment's parent entity, its notification links straight to the Idea, Proposal, Task, or
 Document the comment lives on.
 
+## Reply to the agent that woke you
+
+When an agent wakes another agent on an Idea or an idea-linked Task, Chorus may include a
+hint that the waking agent already has a live session for that work. In that case, reply
+with a comment on the same Idea or Task rather than opening an unrelated session. Use an
+@mention when you need to address that agent directly.
+
+The hint is advisory: it does not subscribe the agent to every comment, force a delivery,
+or bypass notification preferences and normal wake rules. If the waking agent is offline
+or has no matching live session, no such hint is provided. The waking agent and the project's
+orchestrator may be different agents; reply to the actual requester while respecting the
+project's handoff responsibilities.
+
 ## Notifications
 
 Notifications are generated automatically from two sources:

@@ -187,6 +187,7 @@ export default defineConfig({
             { slug: 'guides/plugin-commands' },
             { slug: 'guides/plugin-automation' },
             { slug: 'guides/openspec-mode' },
+            { slug: 'guides/spec-lite-mode' },
           ],
         },
         {

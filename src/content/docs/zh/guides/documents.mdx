@@ -29,6 +29,26 @@ import Screenshot from '../../../../components/Screenshot.astro';
 
 打开一份文档，在它的页面上阅读 Markdown 正文。选择 **Edit** 修改内容，用 **Save Changes** 保存，每次保存都会推进版本。侧边栏显示文档的详情、它的 **Source Proposal**（设置了来源时带链接指向来源提案）以及 **Version History**。内容下方的评论区供你讨论。
 
+## 文档开头的元数据
+
+如果 Markdown 正文以受支持的 YAML frontmatter 开头，Chorus 会在正文上方用元数据卡片显示这些字段。例如：
+
+```markdown
+---
+title: CSV 导出
+status: draft
+---
+
+## 需求
+用户可以导出当前结果集。
+```
+
+使用扁平的 `key: value` 字段，第一行必须是 `---`，以 `---` 或 `...` 结束。块内允许空行和 `#` 注释。
+这不是完整的 YAML 支持，不支持嵌套对象、列表和多行值。无法识别该块时，Chorus 会按原始 Markdown 渲染。
+
+卡片只改变显示方式，不会改变文档类型、工作流状态、存储的正文或导出内容。[Spec-lite](/zh/guides/spec-lite-mode/)
+用 frontmatter 将每份变更文档关联到方案和持久文档。
+
 ## 文档与报告如何出现在这里
 
 文档以两种方式进入这个列表：

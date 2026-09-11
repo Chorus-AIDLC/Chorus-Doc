@@ -1,45 +1,61 @@
 ---
 title: OpenSpec mode
-description: Turn on spec-driven proposal authoring so Chorus drafts are mirrored from on-disk OpenSpec files.
+description: How the plugin picks a spec mode, and how OpenSpec authoring mirrors on-disk files into your Chorus proposal drafts.
 docsLocale: en
 route: /guides/openspec-mode/
 ---
 
-OpenSpec mode is an opt-in authoring style for the Chorus plugin on Claude Code and Codex.
-When it is active, the [AI-DLC workflow](/guides/ai-dlc-workflow/) still runs exactly as
-usual, but proposal authoring changes shape: instead of free-form Markdown typed straight
-into Chorus, the agent writes structured files on disk with the
-[`openspec`](https://github.com/Fission-AI/OpenSpec) CLI and mirrors them into your
+The spec-enabled Chorus plugins resolve a **spec mode** — the shape proposal authoring takes.
+OpenSpec mode is one of three, and it is the default whenever OpenSpec is usable in the
+repository you are working in. When it is active, the
+[AI-DLC workflow](/guides/ai-dlc-workflow/) still runs exactly as usual, but instead of
+free-form Markdown typed straight into Chorus, the agent writes structured files on disk with
+the [`openspec`](https://github.com/Fission-AI/OpenSpec) CLI and mirrors them into your
 proposal's document drafts. The local files are the working copy; the Chorus drafts are a
 faithful mirror your reviewers read on the proposal page.
 
-When OpenSpec is not present, nothing changes — the plugin authors free-form drafts the
-way it always has. OpenSpec mode ships in the Claude Code and Codex plugins only; the
-standalone skill distribution does not support it.
+## The three spec modes
 
-## When it activates
+| Mode | What the agent writes | When you get it |
+| --- | --- | --- |
+| `openspec` | Structured files under `openspec/changes/<slug>/`, mirrored into drafts | Default when OpenSpec is usable |
+| `lite` | [Chorus-native local specs](/guides/spec-lite-mode/) under `.chorus/specs/<slug>/` | Default when OpenSpec is not usable |
+| `off` | Free-form drafts, no local spec files at all | Only when you ask for it |
 
-Detection runs once, when the session starts. All **three** signals must hold for OpenSpec
-mode to turn on:
+All six spec-enabled plugins use the same resolution rules, but resolve and show the mode
+at different points:
 
-1. `CHORUS_OPENSPEC_MODE` is **not** set to `off` — an explicit opt-out always wins.
-2. An `openspec/` directory exists at the repository root — the "this repo uses OpenSpec"
-   signal, created by `openspec init`.
-3. The `openspec` CLI is on your `PATH` — the mode needs the CLI to scaffold, validate, and
-   archive changes, so the directory alone is not enough.
+| Runtime | When it resolves and where to check |
+| --- | --- |
+| Claude Code, Codex, Kiro, Pi | At session start (Kiro: agent spawn); the injected `## Spec Mode` context states the result. |
+| dsh | At plugin load; the first agent step receives the `## Spec Mode` context. |
+| OpenClaw | When a stage skill reaches its spec-mode step, using the shipped resolver. There is no SessionStart injection. Run `/chorus spec` or `/chorus status` to inspect the mode. |
 
-If all three hold, the connection toast reports that the mode is on:
+For example, a resolved OpenSpec mode is reported as `CHORUS_SPEC_MODE=openspec`.
+Do not infer a mode from the absence of a connection toast.
 
-```text
-Chorus connected at <your Chorus URL> (OpenSpec Enabled)
-```
+## How the mode is chosen
 
-If the `openspec/` directory is present but the CLI is missing, the toast surfaces an
-install hint instead, and the agent stays on the free-form path:
+In precedence order:
 
-```text
-Chorus connected at <your Chorus URL> (OpenSpec repo detected — install with: npm i -g @fission-ai/openspec)
-```
+1. **An explicit `CHORUS_SPEC_MODE` wins.** Set it to `openspec`, `lite`, or `off` to pin the
+   mode for a shell, a repository, or a CI job.
+2. **Otherwise OpenSpec is the default whenever it is usable.** Usable means all three of: an
+   `openspec/` directory at the repository root (created by `openspec init`), the `openspec`
+   CLI on your `PATH`, and OpenSpec not switched off (see
+   [Choose a different mode](#choose-a-different-mode)).
+3. **Otherwise you get `lite`** — the Chorus-native fallback, which needs nothing installed.
+
+If you pin `CHORUS_SPEC_MODE=openspec` in a place where OpenSpec is not usable, the session
+reports that the requested mode cannot be honored, and the workflow **stops** rather than
+quietly authoring something else.
+
+Fix the cause (install the CLI, run `openspec init`, or re-enable OpenSpec) or pick a mode
+that works. A mode you asked for is never silently downgraded.
+
+Unrecognized `CHORUS_SPEC_MODE` values are treated like unset, with an explanation; use one
+of the three exact values above. The standalone skill distribution does not include spec-mode
+routing and continues to author free-form.
 
 ## Install and initialize
 
@@ -52,22 +68,20 @@ openspec init
 ```
 
 `openspec init` creates the `openspec/` working directory (`changes/`, `specs/`, config, and
-instruction files). Restart the agent session afterward so detection picks up both new
-signals — the `openspec/` directory and the CLI.
+instruction files). Restart sessions that resolve at startup; reload the dsh plugin for
+load-time settings. OpenClaw resolves again at the next spec-mode step. The process doing
+the resolution must see both the `openspec/` directory and the CLI.
 
-Installing the plugin itself is covered per runtime on the
-[Claude Code](/reference/agents/claude-code/) and [Codex](/reference/agents/codex/) pages.
+For plugin installation, see the [agent platforms reference](/reference/agents/).
 
 ## What changes in proposal, develop, and yolo
 
 With the mode active, the proposal, develop, and yolo skills author a change on disk under a
 kebab-case slug and mirror three file types into your Chorus proposal's document drafts:
 
-| On-disk file | Mirrored as document |
-| --- | --- |
-| `openspec/changes/<slug>/proposal.md` | PRD |
-| `openspec/changes/<slug>/design.md` | Tech design |
-| `openspec/changes/<slug>/specs/<capability>/spec.md` | Spec (one per capability) |
+- **PRD:** `openspec/changes/<slug>/proposal.md`
+- **Tech design:** `openspec/changes/<slug>/design.md`
+- **Spec (one per capability):** `openspec/changes/<slug>/specs/<capability>/spec.md`
 
 `openspec/changes/<slug>/tasks.md` is **not** mirrored: Chorus task drafts are the source of
 truth for tasks, so the OpenSpec task list is left on disk.
@@ -90,7 +104,7 @@ plugin skill `public/chorus-plugin/skills/openspec-aware/SKILL.md`.
 ## When `openspec archive` runs
 
 `openspec archive` is deferred to the very end of the change. After the **last** task of the
-change is verified, the plugin reminds the agent to run:
+change is verified, the agent follows its runtime's hook reminder or skill instructions to run:
 
 ```bash
 openspec archive <slug>
@@ -102,40 +116,52 @@ long-term specs under `openspec/specs/`. The plugin then mirrors the updated
 that point the change stays in flight and Chorus only ever sees the delta spec, so there is
 no half-merged state to reason about.
 
-## Opt out
+## Choose a different mode
 
-Two switches, in precedence order:
+Three switches, in precedence order:
 
-1. **`enableOpenSpec` userConfig toggle** (Claude Code plugin only, default on). Set it to
-   off in the plugin's install configuration to disable the mode plugin-wide, including the
-   archive reminder. This is equivalent to OpenSpec being uninstalled.
-2. **`CHORUS_OPENSPEC_MODE=off` environment variable** (both plugins). A per-shell,
-   CI-friendly opt-out that forces free-form mode even when the `openspec/` directory and the
-   CLI are both present:
+1. **`CHORUS_SPEC_MODE`** (all runtimes). The direct control — it names the mode you want
+   instead of describing what to avoid:
+
+   ```bash
+   export CHORUS_SPEC_MODE=lite   # Chorus-native local specs
+   export CHORUS_SPEC_MODE=off    # free-form, no local spec files
+   ```
+
+2. **`enableOpenSpec` userConfig toggle** (Claude Code plugin only, default on). Set it to
+   off in the plugin's install configuration to make OpenSpec unusable plugin-wide, including
+   the archive reminder.
+3. **`CHORUS_OPENSPEC_MODE=off` environment variable** (all runtimes). The older, per-shell
+   OpenSpec opt-out, still honored:
 
    ```bash
    export CHORUS_OPENSPEC_MODE=off
    ```
 
-The Codex plugin has no userConfig surface, so only the environment variable applies there.
-Either way, opting out leaves any existing `openspec/` directory on disk untouched and adds
-no slug line to new proposals — behavior is identical to a host without OpenSpec installed.
+Note what the last two now mean: they make OpenSpec *unusable*, which lands the session on
+`lite` rather than on free-form. If you want no local spec files at all, ask for `off`
+explicitly. Either way, an existing `openspec/` directory is left on disk untouched and new
+proposals get no OpenSpec slug line.
 
 ## For agents
 
-- **Triggers.** The proposal, develop, and yolo skills read `CHORUS_OPENSPEC_ACTIVE` from the
-  `## OpenSpec Mode` section of the SessionStart context and branch on it — they do not
-  re-detect. When `CHORUS_OPENSPEC_ACTIVE=1`, author on disk and mirror; when `0`, follow the
-  free-form path. After the last task of the change is verified, a PostToolUse hook injects an
-  `openspec archive <slug>` reminder.
+- **Triggers.** The proposal, develop, and yolo skills consume the runtime's resolved
+  `CHORUS_SPEC_MODE`. Use injected `## Spec Mode` context where provided. OpenClaw instead
+  runs the shipped resolver at each spec-mode step; without injected context on other
+  runtimes, follow that runtime's skill fallback. Never reimplement the resolution rule
+  from prose. `CHORUS_OPENSPEC_ACTIVE=1` indicates a usable `openspec`; on `lite` follow
+  spec-lite, on `off` author inline. If explicit `openspec` cannot be honored, **halt** —
+  do not fall back. After the last task is verified, follow the runtime's hook or skill
+  instructions for `openspec archive <slug>`; do not assume every runtime has PostToolUse.
 - **Constraints.** Every document-draft mirror call must go through
   `chorus mcp call <tool> '<json>' --arg-file content=<file>` (the native MCP client) with the
   file's bytes streamed verbatim — falling back to the legacy `chorus-api.sh mcp-tool` /
   `chorus-mcp-call.sh` wrappers only when `chorus` is not on `PATH`. Never re-type document
   content inline, and halt on any error. Do not mirror `tasks.md`. The proposal description
-  must carry the exact line `OpenSpec change slug: <slug>`. When the mode is off, do not
-  scaffold `openspec/changes/` and do not add the slug line. The standalone `public/skill/`
-  distribution does not support OpenSpec mode.
-- **Cite.** `docs/OPENSPEC_MODE.md` (user-facing summary and detection contract),
-  `public/chorus-plugin/skills/openspec-aware/SKILL.md` (Claude Code authoritative skill), and
-  `plugins/chorus/skills/openspec-aware/SKILL.md` (Codex authoritative skill).
+  must carry the exact line `OpenSpec change slug: <slug>`. When the mode is not `openspec`,
+  do not scaffold `openspec/changes/` and do not add the slug line. The standalone
+  `public/skill/` distribution does not support spec modes.
+- **Cite.** `public/chorus-plugin/bin/resolve-spec-mode.sh` (the single-source resolution
+  contract), `docs/OPENSPEC_MODE.md` (user-facing summary), and the authoritative skills
+  `public/chorus-plugin/skills/openspec-aware/SKILL.md` (Claude Code) and
+  `plugins/chorus/skills/openspec-aware/SKILL.md` (Codex).

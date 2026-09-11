@@ -45,7 +45,7 @@ chorus daemon --browse-root /home/demo/workspace
 
 ## 配置 `daemon.json`
 
-daemon 的设置都读自 `~/.chorus/daemon.json`。常见的单智能体场景下，它是一个扁平的 JSON 对象，同时保存智能体凭据和运行选项；若要用一个 daemon 同时服务多个智能体，则改为在 `agents` 数组中逐一列出（见下文「在一个 daemon 中运行多个智能体」一节）。无论哪种形式，该文件都以 `0600` 权限（仅所有者可读写）写入，采用先写临时文件再原子重命名的方式，因此写入过程中崩溃也不会留下被截断的文件。文件路径固定为 `~/.chorus/daemon.json`（从主目录解析而来），没有用于改变文件位置的环境变量。
+daemon 的设置都读自 `~/.chorus/daemon.json`。常见的单智能体场景下，它是一个扁平的 JSON 对象，同时保存智能体凭据和运行选项；若要用一个 daemon 同时服务多个智能体，则改为在 `agents` 数组中逐一列出（见下文「在一个 daemon 中运行多个智能体」一节）。无论哪种形式，该文件都以 `0600` 权限（仅所有者可读写）写入，采用先写临时文件再原子重命名的方式，因此写入过程中崩溃也不会留下被截断的文件。默认路径为 `~/.chorus/daemon.json`（从主目录解析而来），可用 `CHORUS_DAEMON_CONFIG_PATH` 指定其他文件。使用覆盖路径时，请为 CLI 与 daemon 服务一致地设置该变量；在 shell 中导出它不会改变已运行的服务。
 
 ### 字段
 
@@ -59,7 +59,7 @@ daemon 的设置都读自 `~/.chorus/daemon.json`。常见的单智能体场景�
 | `browseRoots` | string[] | 向远程工作目录发现开放的根目录。浏览根目录不会创建连接。 |
 | `agent` | string | 要唤起的本地运行后端：`"claude-code"`、`"codex"`、`"kiro"` 或 `"pi"`。 |
 | `sigintTimeoutMs` | number | 收到 `SIGINT` 后强制终止已唤起智能体前的宽限时间（毫秒）。默认 `10000`。 |
-| `agents` | object[] | *可选。* 用一个 daemon 服务多个独立智能体；每个条目会针对该智能体覆盖顶层字段。见下文「在一个 daemon 中运行多个智能体」。 |
+| `agents` | object[] | *可选。* 用一个 daemon 服务多个独立智能体；每个条目可覆盖共享运行默认值，但不会继承 `args` 和 `env`。见下文「在一个 daemon 中运行多个智能体」。 |
 
 执行 `chorus login` 加 `chorus daemon install` 后的最简文件：
 
@@ -89,7 +89,7 @@ daemon 的设置都读自 `~/.chorus/daemon.json`。常见的单智能体场景�
 
 ### 字段、命令行参数与环境变量
 
-每个选项都可通过三种方式提供。优先级为命令行参数，其次是环境变量，最后是 `daemon.json`，因此一次性的参数或环境变量覆盖无需写入文件：
+下表中的运行选项可通过三种方式提供。优先级为命令行参数，其次是环境变量，最后是 `daemon.json`，因此一次性的参数或环境变量覆盖无需写入文件：
 
 | 关注点 | `daemon.json` 字段 | 命令行参数 | 环境变量 |
 | --- | --- | --- | --- |
@@ -118,7 +118,7 @@ daemon 的设置都读自 `~/.chorus/daemon.json`。常见的单智能体场景�
 }
 ```
 
-每个**顶层**字段都是**默认值**；在某个智能体上设置的字段只会**覆盖**该智能体自己的取值。每个智能体都有自己的身份（由其密钥决定）、自己的连接（每个 `cwds` 一个）、自己的唤起队列和自己的运行后端，因此它们各自独立地被唤起和运行，一个智能体出错不会影响其他智能体。在服务器端，每个智能体都以 agent、主机、目录为键，作为独立连接显示在**设置 → 智能体**（Settings → Agents）中。多个智能体甚至可以共享同一个工作目录；daemon 不会对它们串行化，因此请避免在同一个 git 工作树中并发地做互相冲突的工作（改用不同的分支或 worktree）。
+`url`、`sigintTimeoutMs` 等共享运行设置提供默认值，智能体自己的设置可覆盖这些默认值。`args` 和 `env` 只属于单个智能体，不是共享默认值。每个智能体都有自己的身份（由其密钥决定）、自己的连接（每个 `cwds` 一个）、自己的唤起队列和自己的运行后端，因此它们各自独立地被唤起和运行，一个智能体出错不会影响其他智能体。在服务器端，每个智能体都以 agent、主机、目录为键，作为独立连接显示在**设置 → 智能体**（Settings → Agents）中。多个智能体甚至可以共享同一个工作目录；daemon 不会对它们串行化，因此请避免在同一个 git 工作树中并发地做互相冲突的工作（改用不同的分支或 worktree）。
 
 :::note[向后兼容]
 若没有 `agents` 数组，扁平的顶层 `url` / `apiKey` / `cwds` 会被当作恰好一个智能体，现有的单智能体安装照旧运行，无需改动。
@@ -136,6 +136,43 @@ daemon 的设置都读自 `~/.chorus/daemon.json`。常见的单智能体场景�
 | `maxConcurrency` | 该智能体自己的唤起并发上限（默认 `4`）。 |
 | `sigintTimeoutMs` | 中断升级的宽限时间（毫秒）。 |
 | `browseRoots` | 目录发现的允许列表。 |
+| `args` | 可选的字符串数组，作为后端 CLI 的额外参数，默认 `[]`。见下文「设置智能体的模型、思考级别和环境变量」。 |
+| `env` | 可选的对象，将环境变量名映射到字符串值，默认 `{}`。 |
+
+### 设置智能体的模型、思考级别和环境变量
+
+在 `~/.chorus/daemon.json` 中为目标智能体添加字段。下面的 Pi 示例使用占位凭据和非敏感环境变量值；请替换为适合你的 URL、密钥和模型，并合并到现有文件中，不要覆盖其他智能体：
+
+```json
+{
+  "url": "https://chorus.example.com",
+  "agents": [
+    {
+      "agentName": "pi-worker",
+      "apiKey": "cho_REDACTED",
+      "agentType": "pi",
+      "args": ["--model", "anthropic/claude-sonnet-4-6", "--thinking", "high"],
+      "env": { "PROVIDER_REGION": "us-east-1" }
+    }
+  ]
+}
+```
+
+模型仅为示例，不是 Chorus 默认值。请使用后端支持的参数和值；没有独立的 `model` 或 `thinking` 字段。daemon 唤起和 `chorus agents run --name pi-worker` 都会使用这个条目。`offline` 智能体仍不会被 daemon 唤起。
+
+- **不继承全局设置**：存在非空 `agents` 数组时，顶层 `args` 或 `env` 会报错。请移入每个需要它们的条目，不会影响其他智能体或你的 shell。
+- **按字面传递**：`args` 的每个元素是一个参数，不要额外加 shell 引号。`$HOME`、`${TOKEN}` 和 shell 命令不会展开。Chorus 不额外加载 dotenv、不插值、不查询密钥服务，也不对 env 值做特殊处理。`env` 覆盖子进程继承的环境，但 Chorus 管理的控制项仍优先。Windows 环境变量名不区分大小写，POSIX 区分。
+- **校验**：`null`、非字符串参数或值、NUL 字符，以及不符合 `[A-Za-z_][A-Za-z0-9_]*` 的变量名会在启动前被拒绝。允许空字符串值。请填写选项，而非位置提示词或子命令。未知选项在后端支持时用 `"--future=value"`；`"--future", "value"` 存在歧义，会被拒绝。
+- **受保护的控制项**：持久化参数不能更改已知的会话/恢复、提示词、传输/输出、工作目录、托管 MCP 或权限控制。帮助/版本、会导致程序直接退出的检查选项、单独的 `--` 和标准输入标记 `-` 也被禁止。所有 `CHORUS_*` 环境变量名以及嵌套 Claude 上下文变量 `CLAUDECODE` / `CLAUDE_CODE_ENTRYPOINT` 均保留，不区分大小写；配置这些名称会报错，而不是被静默删除。请改用专用的 Chorus 设置或显式前台透传。
+- **Windows 命令包装器**：通过 `.cmd`/`.bat` 启动时，配置中的空参数，以及含空白、引号或命令元字符的参数会被拒绝。需要这些值时请用原生可执行文件；通过包装器的显式前台透传不保证 shell 安全。
+
+Env 可包含明文提供方凭据。请保护文件（POSIX 上用 `chmod 600 ~/.chorus/daemon.json`），切勿提交密钥。Chorus 的校验和启动消息不显示配置值，但子程序或操作系统检查仍可能暴露它们；没有加密或密钥库支持。若设置 `CODEX_HOME` 或 `PI_CODING_AGENT_DIR` 等自定义目录，也需在其中配置 Chorus 集成。
+
+**应用更改**：运行 `chorus daemon restart`。daemon 在启动时读取这些设置，而非每次唤起时；编辑文件不会改变运行中的子进程，重启前的后续唤起也仍使用旧设置。每次新的 `chorus agents run` 都会重读配置，但不影响已运行的子进程。删除 `args`/`env` 即可恢复未自定义的行为。
+
+**旧式扁平文件**：没有非空 `agents` 数组时，顶层 `args`/`env` 用于唯一的 daemon 智能体。前台选择要求使用 `agents[]`。要共用设置，请将扁平的 URL、密钥、身份信息、`args` 和 `env` 移入一个条目，并将 `agent` 改名为 `agentType`。通过 `chorus agents add` 或 `chorus login --add` 添加智能体，也会将已有扁平凭据配置及其 args/env 移入 `agents[0]`，删除对应顶层键。缺少密钥的不完整扁平配置需要先补全或手动转换。
+
+一次性覆盖和子命令的具体规则见 [CLI 参考](/zh/reference/cli/)。
 
 ### 添加另一个智能体
 
@@ -181,10 +218,7 @@ chorus daemon uninstall
 
 ### 为被唤醒的智能体提供所需凭据
 
-后台服务只把 Chorus 连接注入被唤醒的智能体（`CHORUS_URL`、`CHORUS_API_KEY` 和
-`CHORUS_AGENT_PROFILE`），绝不注入模型提供方密钥。当某个后端从环境变量读取其模型提供方凭据时，这些
-凭据必须存在于后台服务自身的环境中。`systemd --user` 服务在干净的环境中启动，不会继承你在登录 shell
-中导出的变量，因此请用 drop-in 在服务上设置它们，然后重启：
+daemon 自动提供 Chorus 连接（`CHORUS_URL`、`CHORUS_API_KEY` 和 `CHORUS_AGENT_PROFILE`），不会自动提供模型提供方凭据。若后端从环境变量读取提供方凭据，可通过该智能体的 `env` 提供，也可通过 daemon 继承的环境提供。`systemd --user` 服务不会继承登录 shell 中导出的变量。如需通过服务提供，请用 drop-in 设置后重启：
 
 ```sh
 # ~/.config/systemd/user/chorus-daemon.service.d/provider-env.conf

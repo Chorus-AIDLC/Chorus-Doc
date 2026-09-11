@@ -49,10 +49,18 @@ assert.deepEqual(
   'emitted manifest must cover every built documentation HTML route',
 );
 
+// Authoring frontmatter is a leading block, not every --- line in a mirror.
+// Guides may legitimately show YAML frontmatter inside fenced examples.
+const FRONTMATTER_START = /^\uFEFF?[ \t\r\n]*---[ \t]*(?:\r?\n|$)/;
+assert.match('---\ntitle: leaked\n---\nBody', FRONTMATTER_START);
+assert.match('\r\n---\r\ntitle: leaked\r\n---\r\n', FRONTMATTER_START);
+assert.doesNotMatch('# Guide\n\n```markdown\n---\ntitle: example\n---\n```', FRONTMATTER_START);
+assert.doesNotMatch('```yaml\n---\ntitle: example\n---\n```', FRONTMATTER_START);
+
 for (const entry of emittedManifest) {
   const markdown = await readFile(path.join(dist, entry.markdownRoute.slice(1)), 'utf8');
   assert.ok(markdown.length > 0, `empty Markdown mirror: ${entry.markdownRoute}`);
-  assert.doesNotMatch(markdown, /^---$/m, `frontmatter leaked into ${entry.markdownRoute}`);
+  assert.doesNotMatch(markdown, FRONTMATTER_START, `frontmatter leaked into ${entry.markdownRoute}`);
   assert.match(llms, new RegExp(entry.markdownRoute.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')));
 
   const html = await readFile(path.join(dist, entry.htmlRoute.slice(1), 'index.html'), 'utf8');

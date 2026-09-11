@@ -1,44 +1,56 @@
 ---
 title: OpenSpec モード
-description: 仕様駆動の提案編集を有効にし、Chorus のドラフトをディスク上の OpenSpec ファイルからミラーします。
+description: プラグインが仕様モードをどう選ぶか、そして OpenSpec の編集がディスク上のファイルを Chorus の提案ドラフトへどうミラーするか。
 docsLocale: ja
 route: /ja/guides/openspec-mode/
 ---
 
-OpenSpec モードは、Claude Code と Codex 上の Chorus プラグインにおける任意の編集スタイルです。有効な間も
-[AI-DLC ワークフロー](/ja/guides/ai-dlc-workflow/)はいつも通りに動きますが、提案の編集の形が変わります。
-自由形式の Markdown を Chorus に直接打ち込むのではなく、エージェントが
+仕様モードに対応する Chorus プラグインは、提案の編集がとる形すなわち**仕様モード**を解決します。OpenSpec
+モードはその 3 つのうちの 1 つで、作業中のリポジトリで OpenSpec が使える限り既定のモードです。有効な間も
+[AI-DLC ワークフロー](/ja/guides/ai-dlc-workflow/)はいつも通りに動きますが、自由形式の Markdown を
+Chorus に直接打ち込むのではなく、エージェントが
 [`openspec`](https://github.com/Fission-AI/OpenSpec) CLI でディスク上に構造化ファイルを書き、それらを
 提案の文書ドラフトへミラーします。ディスク上のファイルが作業コピーで、Chorus のドラフトはレビュー担当が
 提案ページで読む忠実なミラーです。
 
-OpenSpec が存在しないときは何も変わりません — プラグインは従来どおり自由形式のドラフトを編集します。
-OpenSpec モードは Claude Code と Codex のプラグインにのみ同梱され、スタンドアロンのスキル配布物では
-サポートされません。
+## 3 つの仕様モード
 
-## いつ有効になるか
+| モード | エージェントが書くもの | どんなときに選ばれるか |
+| --- | --- | --- |
+| `openspec` | `openspec/changes/<slug>/` 下の構造化ファイル。ドラフトへミラーされる | OpenSpec が使えるときの既定 |
+| `lite` | `.chorus/specs/<slug>/` 下の [Chorus 独自の軽量仕様](/ja/guides/spec-lite-mode/) | OpenSpec が使えないときの既定 |
+| `off` | 自由形式のドラフト。ローカルの仕様ファイルは一切書かない | 明示的に指定したときだけ |
 
-検出はセッション開始時に一度だけ走ります。OpenSpec モードがオンになるには、以下の**3 つ**の信号がすべて
-成立する必要があります。
+仕様モードに対応する 6 つのプラグインは同じ解決規則を使いますが、実行時点と確認方法が異なります。
 
-1. `CHORUS_OPENSPEC_MODE` が `off` に設定されて**いない** — 明示的なオプトアウトは常に優先されます。
-2. リポジトリのルートに `openspec/` ディレクトリが存在する — 「このリポジトリは OpenSpec を使う」という
-   信号で、`openspec init` によって作成されます。
-3. `openspec` CLI が `PATH` にある — このモードは変更のスキャフォールド・検証・アーカイブに CLI を必要と
-   するため、ディレクトリだけでは足りません。
+| 実行環境 | 解決時点と確認方法 |
+| --- | --- |
+| Claude Code、Codex、Kiro、Pi | セッション開始時（Kiro はエージェント起動時）に解決し、注入された `## Spec Mode` コンテキストに結果を記載します。 |
+| dsh | プラグインの読み込み時に解決し、最初のエージェントステップで `## Spec Mode` を注入します。 |
+| OpenClaw | ステージスキルの仕様モード手順に到達した時点で同梱リゾルバーを実行します。SessionStart の注入はありません。`/chorus spec` または `/chorus status` で確認できます。 |
 
-3 つとも成立すると、接続トーストがモードのオンを報告します。
+例えば OpenSpec と解決された場合は `CHORUS_SPEC_MODE=openspec` と表示されます。
+接続トーストがないことからモードを推測しないでください。
 
-```text
-Chorus connected at <your Chorus URL> (OpenSpec Enabled)
-```
+## モードの決まり方
 
-`openspec/` ディレクトリは存在するが CLI が見つからない場合、トーストは代わりにインストールのヒントを
-表示し、エージェントは自由形式の経路にとどまります。
+優先順位の順に。
 
-```text
-Chorus connected at <your Chorus URL> (OpenSpec repo detected — install with: npm i -g @fission-ai/openspec)
-```
+1. **明示的な `CHORUS_SPEC_MODE` が最優先。** `openspec`、`lite`、`off` のいずれかを設定すれば、
+   シェル単位・リポジトリ単位・CI ジョブ単位でモードを固定できます。
+2. **設定がなければ、OpenSpec が使える限りそれが既定。** 使えるとは次の 3 つがすべて成立することです。
+   リポジトリのルートに `openspec/` ディレクトリがある（`openspec init` が作成）、`openspec` CLI が
+   `PATH` にある、そして OpenSpec が無効化されていない（[別のモードを選ぶ](#別のモードを選ぶ)を参照）。
+3. **それ以外は `lite`。** Chorus 独自のフォールバックで、何もインストールせずに使えます。
+
+OpenSpec が使えない場所で `CHORUS_SPEC_MODE=openspec` を固定した場合、セッションはそのことを明示し、
+ワークフローは別の形で書き進めるのではなく**停止**します。
+
+原因を解消する（CLI をインストールする、`openspec init` を実行する、OpenSpec を再度有効にする）か、
+使えるモードを選んでください。指定したモードが黙って格下げされることはありません。
+
+認識できない `CHORUS_SPEC_MODE` の値は未設定として扱い、その理由を表示します。上記 3 つの正確な値を
+使ってください。スタンドアロンのスキル配布物には仕様モードのルーティングがなく、引き続き自由形式で編集します。
 
 ## インストールと初期化
 
@@ -51,22 +63,19 @@ openspec init
 ```
 
 `openspec init` は `openspec/` 作業ディレクトリ（`changes/`、`specs/`、設定と説明ファイル）を作成します。
-その後、検出が新しい 2 つの信号 — `openspec/` ディレクトリと CLI — を拾えるよう、エージェントの
-セッションを再起動してください。
+開始時に解決する環境ではセッションを再起動し、dsh ではプラグインを再読み込みしてください。OpenClaw は次の
+仕様モード手順で再解決します。解決するプロセスから `openspec/` ディレクトリと CLI の両方が見える必要があります。
 
-プラグイン自体のインストールは、実行時ごとに [Claude Code](/ja/reference/agents/claude-code/) と
-[Codex](/ja/reference/agents/codex/) のページで扱っています。
+プラグインのインストールは[エージェントプラットフォームのリファレンス](/ja/reference/agents/)を参照してください。
 
 ## proposal、develop、yolo での変化
 
 モードが有効な間、proposal、develop、yolo の各スキルは kebab-case のスラッグでディスク上に変更を編集し、
 3 種類のファイルを Chorus 提案の文書ドラフトへミラーします。
 
-| ディスク上のファイル | ミラー先の文書 |
-| --- | --- |
-| `openspec/changes/<slug>/proposal.md` | PRD |
-| `openspec/changes/<slug>/design.md` | 技術設計 |
-| `openspec/changes/<slug>/specs/<capability>/spec.md` | 仕様（能力ごとに 1 つ） |
+- **PRD**：`openspec/changes/<slug>/proposal.md`
+- **技術設計**：`openspec/changes/<slug>/design.md`
+- **仕様（能力ごとに 1 つ）**：`openspec/changes/<slug>/specs/<capability>/spec.md`
 
 `openspec/changes/<slug>/tasks.md` は**ミラーされません**。Chorus の課題ドラフトが課題の唯一の真実の
 源であるため、OpenSpec の課題リストはディスク上に残されます。
@@ -77,7 +86,7 @@ openspec init
 OpenSpec change slug: <slug>
 ```
 
-ミラーはバイト単位で忠実です — プラグインは各ファイルのバイト列をドラフトへ流し込み、モデルに内容を
+ミラーはバイト単位で忠実です。プラグインは各ファイルのバイト列をドラフトへ流し込み、モデルに内容を
 打ち直させないため、ローカルファイルと Chorus ドラフトは同一に保たれます。これを自分で実行することは
 ありません。プラグインのスキルが、ネイティブ MCP クライアント `chorus mcp call <tool> --arg-file content=<file>`
 を使って処理し、`chorus` CLI が `PATH` にないときにのみ、従来の `chorus-api.sh` / `chorus-mcp-call.sh`
@@ -87,8 +96,8 @@ OpenSpec change slug: <slug>
 
 ## `openspec archive` はいつ走るか
 
-`openspec archive` は変更の一番最後まで先送りされます。変更の**最後の**課題が検証された後、プラグインは
-エージェントに次の実行を促します。
+`openspec archive` は変更の一番最後まで先送りされます。変更の**最後の**課題が検証された後、エージェントは
+実行環境のフック通知またはスキルの手順に従って実行します。
 
 ```bash
 openspec archive <slug>
@@ -99,38 +108,50 @@ openspec archive <slug>
 Chorus 文書へ逆方向にミラーします。それまでは変更は進行中のままで、Chorus はデルタ仕様しか目にしないため、
 半端にマージされた状態を考える必要はありません。
 
-## オプトアウト
+## 別のモードを選ぶ
 
-2 つのスイッチ、優先順位の順に。
+3 つのスイッチ、優先順位の順に。
 
-1. **`enableOpenSpec` userConfig トグル**（Claude Code プラグインのみ、既定でオン）。プラグインの
-   インストール設定でこれをオフにすると、アーカイブのリマインダーを含め、プラグイン全体でモードを無効に
-   できます。これは OpenSpec が未インストールなのと同等です。
-2. **`CHORUS_OPENSPEC_MODE=off` 環境変数**（両方のプラグイン）。シェル単位で効く、CI にやさしい
-   オプトアウトです。`openspec/` ディレクトリと CLI の両方が存在しても、自由形式モードを強制します。
+1. **`CHORUS_SPEC_MODE`**（すべての実行環境）。避けたいものを述べるのではなく、欲しいモードを直接
+   名指しする最も素直な指定方法です。
+
+   ```bash
+   export CHORUS_SPEC_MODE=lite   # Chorus 独自のローカル仕様
+   export CHORUS_SPEC_MODE=off    # 自由形式。ローカルの仕様ファイルなし
+   ```
+
+2. **`enableOpenSpec` userConfig トグル**（Claude Code プラグインのみ、既定でオン）。プラグインの
+   インストール設定でこれをオフにすると、アーカイブのリマインダーを含め、プラグイン全体で OpenSpec を
+   使えない状態にできます。
+3. **`CHORUS_OPENSPEC_MODE=off` 環境変数**（すべての実行環境）。シェル単位で効く従来からの OpenSpec
+   オプトアウトで、現在も有効です。
 
    ```bash
    export CHORUS_OPENSPEC_MODE=off
    ```
 
-Codex プラグインには userConfig の面がないため、そこでは環境変数だけが効きます。どちらの方法でオプト
-アウトしても、ディスク上の既存の `openspec/` ディレクトリはそのまま残され、新しい提案にスラッグ行が
-加わることもありません。挙動は OpenSpec が未インストールのホストと完全に同じです。
+後者 2 つの現在の意味に注意してください。これらは OpenSpec を*使えない*状態にするため、セッションは
+自由形式ではなく `lite` に落ち着きます。ローカルの仕様ファイルを一切望まないなら、明示的に `off` を
+指定してください。いずれの場合も、ディスク上の既存の `openspec/` ディレクトリはそのまま残され、新しい
+提案に OpenSpec のスラッグ行が加わることもありません。
 
 ## エージェント向け
 
-- **トリガー。** proposal、develop、yolo の各スキルは、SessionStart コンテキストの `## OpenSpec Mode`
-  セクションから `CHORUS_OPENSPEC_ACTIVE` を読み、それに応じて分岐します — 再検出はしません。
-  `CHORUS_OPENSPEC_ACTIVE=1` のときはディスク上で編集してミラーし、`0` のときは自由形式の経路をたどります。
-  変更の最後の課題が検証された後、PostToolUse フックが `openspec archive <slug>` のリマインダーを
-  注入します。
+- **トリガー。** proposal、develop、yolo は実行環境が解決した `CHORUS_SPEC_MODE` を使います。
+  `## Spec Mode` が注入されていればそれを読みます。OpenClaw は仕様モード手順ごとに同梱リゾルバーを
+  実行します。他の環境で注入がない場合は、そのスキルの代替手順に従ってください。文章から解決規則を
+  自作してはいけません。`CHORUS_OPENSPEC_ACTIVE=1` は使用可能な `openspec` を示し、`lite` なら spec-lite、
+  `off` ならインライン編集です。明示的な `openspec` を満たせない場合は**停止**し、フォールバックしません。
+  最後の課題の検証後は、実行環境のフックまたはスキルに従って `openspec archive <slug>` を実行します。
+  すべての環境に PostToolUse があるとは仮定しないでください。
 - **制約。** 文書ドラフトのミラー呼び出しはすべて、`chorus mcp call <tool> '<json>' --arg-file content=<file>`
   （ネイティブ MCP クライアント）を通し、ファイルのバイト列をそのままストリームする必要があります。
   `chorus` が `PATH` にないときにのみ、従来の `chorus-api.sh mcp-tool` / `chorus-mcp-call.sh` ラッパーに
   フォールバックします。文書の内容をインラインで打ち直しては決してならず、エラーがあれば停止します。
   `tasks.md` はミラーしないでください。提案の説明には正確な `OpenSpec change slug: <slug>` の 1 行を
-  付ける必要があります。モードがオフのときは、`openspec/changes/` をスキャフォールドせず、スラッグ行も
-  加えないでください。スタンドアロンの `public/skill/` 配布物は OpenSpec モードをサポートしません。
-- **出典。** `docs/OPENSPEC_MODE.md`（ユーザー向けの概要と検出の契約）、
-  `public/chorus-plugin/skills/openspec-aware/SKILL.md`（Claude Code の権威あるスキル）、および
-  `plugins/chorus/skills/openspec-aware/SKILL.md`（Codex の権威あるスキル）。
+  付ける必要があります。モードが `openspec` でないときは、`openspec/changes/` をスキャフォールドせず、
+  スラッグ行も加えないでください。スタンドアロンの `public/skill/` 配布物は仕様モードをサポートしません。
+- **出典。** `public/chorus-plugin/bin/resolve-spec-mode.sh`（モード解決の単一の真実の源）、
+  `docs/OPENSPEC_MODE.md`（ユーザー向けの概要）、および権威あるスキル
+  `public/chorus-plugin/skills/openspec-aware/SKILL.md`（Claude Code）と
+  `plugins/chorus/skills/openspec-aware/SKILL.md`（Codex）。

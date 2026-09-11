@@ -51,14 +51,17 @@ chorus agents add --agents claude,codex \
 
 冪等です — エージェントの追加、プラグインの更新、キーのローテーションのために再実行しても安全です。
 検出されたがまだインストールされていないエージェントも選択可能なままです。サポートされるエージェントは
-Claude Code、Codex、Kiro、opencode、OpenClaw、DeepSeek Harness です。Pi はガイド付き（手動）のみです。
+Claude Code、Codex、Kiro、Pi、opencode、OpenClaw、DeepSeek Harness です。`pi` が PATH にあれば
+`pi-mcp-adapter` と `chorus-pi` を自動インストールし、なければ手動の手順を案内します。
 
 便利なフラグ（`chorus agents add --help` にすべて一覧されます）。
 
 - `--agents <a,b>` / `--all` — どのエージェントを設定するか。
 - `--url` / `--api-key` — 認証情報を非対話的に指定します（環境変数：`CHORUS_URL` / `CHORUS_API_KEY`）。
+- `--update-installed` — 既存のインストールを更新します。Pi では `pi update --extensions` を実行します。
+  `pi install` の繰り返しだけではインストール済みパッケージは更新されません。
 - `--dsh-profile <name>` — バンドルをインストールする DeepSeek Harness のプロファイル。
-- `--daemon-wake <a,b>` / `--daemon-wake-all` — 指定したエージェント（または起こせるすべてのエージェント）をデーモンの起動対象にします。起こせるエージェント（Claude Code、Codex、Kiro）は既定で「パーク」状態で追加されます。`chorus mcp` からは到達できますが、ここで明示的に選ぶ（または TTY で各エージェントのプロンプトに答える）まではデーモンに起こされません。
+- `--daemon-wake <a,b>` / `--daemon-wake-all` — 指定したエージェント（または起こせるすべてのエージェント）をデーモンの起動対象にします。起こせるエージェント（Claude Code、Codex、Kiro、Pi）は既定で「パーク」状態で追加されます。`chorus mcp` からは到達できますが、ここで明示的に選ぶ（または TTY で各エージェントのプロンプトに答える）まではデーモンに起こされません。
 - `--daemon-autostart` — デーモンの起動サービスもインストールして有効化します（Linux systemd / macOS launchd）。
 - `-y, --yes` — 確認をスキップします（TTY でないときは暗黙的に有効になり、その場合は `--agents` または `--all` を渡す必要があります）。
 
@@ -85,7 +88,7 @@ chorus agents run                                    # 設定済みエージェ�
 chorus agents run --name work --type codex -- resume # バックエンドを上書きし、`resume` を透過的に渡す
 ```
 
-- **どのエージェントか** — `--name <name|uuid>` が `~/.chorus/daemon.json` から選びます。エージェントが
+- **どのエージェントか** — `--name <name|uuid>` が `~/.chorus/daemon.json` の `agents[]` から選びます。エージェントが
   1 つだけなら省略可能です。複数ある場合は `--name` を渡す（または `CHORUS_AGENT_PROFILE` を設定する）
   必要があり、そうしないとコマンドは推測せずエラーになります。
 - **何が注入されるか**（起動されたプロセスにのみ注入され、シェルには入らず、出力もされません）：
@@ -96,6 +99,35 @@ chorus agents run --name work --type codex -- resume # バックエンドを上�
   保存される（デーモンが自動起動しない）ため、起動するには `--type` を明示してください。
 - **透過渡し** — `--` の後のすべてはそのままエージェントへ渡されるため、全フラグ面が利用できます。
   エージェントはあなたのターミナルを引き継ぎ、`chorus agents run` はその終了コードで終了します。
+
+### 永続的な args/env と一度きりの上書き
+
+選択した `agents[]` のエントリに `args`（文字列配列、既定値 `[]`）と `env`（文字列から文字列へのオブジェクト、既定値 `{}`）を設定できます。デーモンとフォアグラウンドの両方で使われます。空でない `agents[]` がある場合、トップレベルからは継承せず、そこに置くとエラーになります。[デーモンガイド](/ja/guides/daemon-operations/)にコピー可能なモデル/思考/env の例、フラットファイルの移行、検証、シークレット保護の説明があります。値はリテラルで、シェル展開、dotenv 読み込み、シークレット検索は行いません。Env は子プロセスだけに適用され、`CHORUS_*` と、ネストした Claude コンテキストの `CLAUDECODE` / `CLAUDE_CODE_ENTRYPOINT` は大小文字を問わず予約済みです。設定すると、黙って削除されるのではなくエラーになります。永続引数は既知のセッション、プロンプト、プロトコル、作業ディレクトリ、MCP、権限の制御を上書きできず、`--` / `-` マーカーやヘルプ/検査終了オプションも含められません。明示的なフォアグラウンド引数は、ネイティブの再開コマンドも含めて変更されません。既知の衝突を防ぐもので、サンドボックスではありません。
+
+新しい `chorus agents run` は毎回ファイルを読み直します。デーモンの変更には `chorus daemon restart` が必要です。どちらも実行中の子プロセスは更新しません。`--type` は検証と上書き判定に使うバックエンドを選びますが、バックエンドのフラグを変換しません。
+
+以下のオプションに限り、選択されたコマンドのスコープで明示すると、設定内の対応するオプションと値を削除します。
+
+| 実効バックエンド | 認識する上書き |
+| --- | --- |
+| `claude-code` / `claude` | `--model`、`--effort` |
+| `codex` | `--model` / `-m` / 設定キー `model`、設定キー `model_reasoning_effort` |
+| `kiro` | `--model`、`--effort` |
+| `pi` | `--model`、`--thinking`、`--provider` |
+| `opencode` | `--model` / `-m` |
+| `openclaw` | `agent` の `--model`、`--thinking`（`-m` はメッセージでありモデルではありません） |
+| `dsh` | なし。代わりに env の `DSH_PROVIDER` / `DSH_MODEL` を使います |
+
+判定は `--option value`、`--option=value`、表に `-m` がある場合の `-mVALUE` / `-m=VALUE` に対応します。Codex は `-c key=value`、`-ckey=value`、`-c=key=value`、`--config key=value`、`--config=key=value` に対応します。優先順位処理の対象は表の 2 つのキーだけで、無関係な設定は残ります。バックエンド自身もその表記に対応している必要があります。Pi 0.85.1 の `--model`、`--thinking`、`--provider` では等号形式ではなく値を分けて渡してください。
+
+```sh
+chorus agents run --name pi-worker -- --model anthropic/claude-sonnet-4-6 --thinking medium
+chorus agents run --name codex-worker -- exec --model gpt-5.4 -c model_reasoning_effort=high
+```
+
+**サブコマンド**：永続引数は最も深い認識済みコマンドの後に入ります。対象は Codex の `exec`、`exec resume`、`resume`、Kiro の `chat`、OpenClaw の `agent` です。明示的な上書きも同じスコープに置いてください。`--model chosen exec` ではなく `exec --model chosen` とします。ルート/親コマンドのモデル指定は子コマンドの設定済みモデルを削除しません。Codex の `-c`/`--config` キーはスコープをまたいで適用されます。認識されたコマンドがなければ、設定引数を先頭に置きます。他のコマンドパスは推測しないため、互換性のない永続引数を外し、ネイティブの引数渡しを使ってください。
+
+**未知のオプション**：永続 `args` は通常の未知フラグを受け付けますが、次の要素が値かプロンプトかは推測できません。バックエンドが対応していれば `["--future=value"]` を使い、`["--future", "value"]` は避けてください。既知のオプションには必要な値を指定します。未知/繰り返し可能なオプションは、選択スコープ内で設定、明示の順に並びますが、後勝ちは保証しません。曖昧な明示オプション（未知でインライン値なし）の後では上書きの推測を停止します。既知の上書きをその前に置くか、対応するインライン値を使ってください。外側の Chorus 区切りを除去した後、エージェント引数内の最初の単独 `--` でも解析を停止します。コマンド探索は位置引数のプロンプト、未知コマンド、曖昧なオプションで止まり、既知のオプション値を飛ばします。明示的な引数はすべてそのまま渡されます。バックエンドのフラグとバージョンの互換性は確認してください。Windows `.cmd`/`.bat` の制限はデーモンガイドを参照してください。
 
 ## シェルから MCP ツールを呼び出す — `chorus mcp`
 

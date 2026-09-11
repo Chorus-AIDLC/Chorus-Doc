@@ -1,40 +1,52 @@
 ---
 title: OpenSpec 模式
-description: 开启规格驱动的方案编写，让 Chorus 草稿从磁盘上的 OpenSpec 文件镜像而来。
+description: 插件如何选定规格模式，以及 OpenSpec 写作如何把磁盘文件镜像进 Chorus 方案草稿。
 docsLocale: zh
 route: /zh/guides/openspec-mode/
 ---
 
-OpenSpec 模式是 Chorus 插件在 Claude Code 与 Codex 上的一种可选编写方式。开启后，
-[AI-DLC 工作流](/zh/guides/ai-dlc-workflow/)照常运行，只是方案编写的形态发生了变化：
-不再把自由格式的 Markdown 直接敲进 Chorus，而是由 Agent 用
-[`openspec`](https://github.com/Fission-AI/OpenSpec) CLI 在磁盘上编写结构化文件，再把它们
-镜像进方案的文档草稿。磁盘上的文件是工作副本，Chorus 草稿是审阅者在方案页面上阅读的忠实镜像。
+支持规格模式的 Chorus 插件会解析出一个**规格模式**，也就是方案编写采用的形态。OpenSpec 模式是其中
+一种，只要当前仓库能用 OpenSpec，它就是默认模式。开启后，[AI-DLC 工作流](/zh/guides/ai-dlc-workflow/)
+照常运行，只是不再把自由格式的 Markdown 直接敲进 Chorus，而是由 Agent 用
+[`openspec`](https://github.com/Fission-AI/OpenSpec) CLI 在磁盘上编写结构化文件，再把它们镜像进
+方案的文档草稿。磁盘上的文件是工作副本，Chorus 草稿是审阅者在方案页面上阅读的忠实镜像。
 
-如果本机没有 OpenSpec，则一切不变，插件仍按原有方式编写自由格式草稿。OpenSpec 模式仅随
-Claude Code 与 Codex 插件提供；独立技能分发包不支持它。
+## 三种规格模式
 
-## 何时激活
+| 模式 | Agent 写什么 | 什么时候用到 |
+| --- | --- | --- |
+| `openspec` | `openspec/changes/<slug>/` 下的结构化文件，并镜像进草稿 | 仓库能用 OpenSpec 时的默认模式 |
+| `lite` | `.chorus/specs/<slug>/` 下的 [Chorus 原生轻量规格](/zh/guides/spec-lite-mode/) | 仓库用不了 OpenSpec 时的默认模式 |
+| `off` | 自由格式草稿，完全不写本地规格文件 | 只在你显式要求时 |
 
-检测在会话启动时进行一次。以下**三个**信号必须全部成立，OpenSpec 模式才会开启：
+六种支持规格模式的插件采用相同的解析规则，但解析时机和查看方式不同：
 
-1. `CHORUS_OPENSPEC_MODE` **未**设为 `off`，显式退出始终优先。
-2. 仓库根目录存在 `openspec/` 目录，这是「本仓库使用 OpenSpec」的信号，由 `openspec init`
-   创建。
-3. `openspec` CLI 位于你的 `PATH` 中，该模式需要 CLI 来搭建脚手架、校验与归档变更，仅有目录
-   还不够。
+| 运行时 | 何时解析、在哪里查看 |
+| --- | --- |
+| Claude Code、Codex、Kiro、Pi | 会话启动时（Kiro 为 Agent 启动时）解析，注入的 `## Spec Mode` 上下文会写明结果。 |
+| dsh | 插件加载时解析，在首个 Agent 步骤注入 `## Spec Mode` 上下文。 |
+| OpenClaw | 阶段技能执行到规格模式步骤时运行随插件提供的解析器，没有 SessionStart 注入。用 `/chorus spec` 或 `/chorus status` 查看模式。 |
 
-三者全部成立时，连接提示会显示模式已开启：
+例如，解析为 OpenSpec 时会报告 `CHORUS_SPEC_MODE=openspec`。不要因为没有连接提示就推断模式。
 
-```text
-Chorus connected at <your Chorus URL> (OpenSpec Enabled)
-```
+## 模式如何选定
 
-若 `openspec/` 目录存在但缺少 CLI，提示会改为给出安装提示，Agent 继续走自由格式路径：
+按优先级排列：
 
-```text
-Chorus connected at <your Chorus URL> (OpenSpec repo detected — install with: npm i -g @fission-ai/openspec)
-```
+1. **显式的 `CHORUS_SPEC_MODE` 优先。** 把它设为 `openspec`、`lite` 或 `off`，即可为某个 shell、
+   某个仓库或某个 CI 任务钉死模式。
+2. **否则，只要 OpenSpec 可用，它就是默认模式。** 可用意味着三点同时成立：仓库根目录存在
+   `openspec/` 目录（由 `openspec init` 创建）、`openspec` CLI 在 `PATH` 中、且 OpenSpec 没有被
+   关闭（见[切换到别的模式](#切换到别的模式)）。
+3. **否则就是 `lite`**，这是 Chorus 原生的兜底模式，什么都不用安装。
+
+如果你在用不了 OpenSpec 的地方钉死了 `CHORUS_SPEC_MODE=openspec`，会话会明确说出来，并且工作流
+会**停下**，而不是悄悄换成别的形态。
+
+请先消除原因（安装 CLI、执行 `openspec init`，或重新启用 OpenSpec），或者改选一个能用的模式。你
+要求过的模式绝不会被静默降级。
+
+无法识别的 `CHORUS_SPEC_MODE` 值会按未设置处理，并给出说明；请使用上述三个精确值。独立技能分发包不包含规格模式路由，仍按自由格式编写。
 
 ## 安装与初始化
 
@@ -45,22 +57,20 @@ npm install -g @fission-ai/openspec
 openspec init
 ```
 
-`openspec init` 会创建 `openspec/` 工作目录（`changes/`、`specs/`、配置及说明文件）。之后请
-重启 Agent 会话，让检测重新识别这两个新信号：`openspec/` 目录与 CLI。
+`openspec init` 会创建 `openspec/` 工作目录（`changes/`、`specs/`、配置及说明文件）。启动时解析的
+运行时需要重启会话；dsh 需要重新加载插件；OpenClaw 在下一次规格模式步骤重新解析。解析所在进程必须
+同时能找到 `openspec/` 目录与 CLI。
 
-插件本身的安装按运行时分别记录在 [Claude Code](/zh/reference/agents/claude-code/) 与
-[Codex](/zh/reference/agents/codex/) 页面。
+插件安装见[智能体平台参考](/zh/reference/agents/)。
 
 ## proposal、develop、yolo 中的变化
 
 模式开启后，proposal、develop、yolo 技能会以一个 kebab-case slug 在磁盘上编写变更，并把三类
 文件镜像进 Chorus 方案的文档草稿：
 
-| 磁盘上的文件 | 镜像为文档 |
-| --- | --- |
-| `openspec/changes/<slug>/proposal.md` | PRD |
-| `openspec/changes/<slug>/design.md` | 技术设计 |
-| `openspec/changes/<slug>/specs/<capability>/spec.md` | 规格（每个能力一份） |
+- **PRD**：`openspec/changes/<slug>/proposal.md`
+- **技术设计**：`openspec/changes/<slug>/design.md`
+- **规格（每个能力一份）**：`openspec/changes/<slug>/specs/<capability>/spec.md`
 
 `openspec/changes/<slug>/tasks.md` **不**被镜像：Chorus 的任务草稿才是任务的唯一真实来源，
 因此 OpenSpec 的任务清单留在磁盘上。
@@ -80,8 +90,8 @@ OpenSpec change slug: <slug>
 
 ## `openspec archive` 何时运行
 
-`openspec archive` 被推迟到变更的最后一步。当该变更的**最后一个**任务通过验证后，插件会提醒
-Agent 运行：
+`openspec archive` 被推迟到变更的最后一步。当该变更的**最后一个**任务通过验证后，Agent 按所在运行时的
+钩子提醒或技能说明运行：
 
 ```bash
 openspec archive <slug>
@@ -91,34 +101,46 @@ openspec archive <slug>
 随后插件会把更新后的 `openspec/specs/<capability>/spec.md` 文件反向镜像回对应的 Chorus 文档，
 在此之前变更一直在进行中，Chorus 只会看到增量规格，因此不存在需要处理的半合并状态。
 
-## 如何退出
+## 切换到别的模式
 
-两个开关，按优先级排列：
+三个开关，按优先级排列：
 
-1. **`enableOpenSpec` userConfig 开关**（仅 Claude Code 插件，默认开启）。在插件的安装配置中把
-   它关掉，即可在插件层面禁用该模式，包括归档提醒。这等同于未安装 OpenSpec。
-2. **`CHORUS_OPENSPEC_MODE=off` 环境变量**（两个插件均适用）。这是一个按 shell 生效、对 CI
-   友好的退出方式；即便 `openspec/` 目录与 CLI 都存在，也会强制走自由格式模式：
+1. **`CHORUS_SPEC_MODE`**（所有运行时）。最直接的控制方式，它直接说出你想要哪个模式，而不是描述
+   你想避开什么：
+
+   ```bash
+   export CHORUS_SPEC_MODE=lite   # Chorus 原生本地规格
+   export CHORUS_SPEC_MODE=off    # 自由格式，不写本地规格文件
+   ```
+
+2. **`enableOpenSpec` userConfig 开关**（仅 Claude Code 插件，默认开启）。在插件的安装配置中把
+   它关掉，即可在插件层面让 OpenSpec 变为不可用，包括归档提醒。
+3. **`CHORUS_OPENSPEC_MODE=off` 环境变量**（所有运行时）。这是更早期的、按 shell 生效的 OpenSpec
+   退出方式，目前仍然有效：
 
    ```bash
    export CHORUS_OPENSPEC_MODE=off
    ```
 
-Codex 插件没有 userConfig 界面，因此那里只有环境变量生效。无论用哪种方式退出，磁盘上已有的
-`openspec/` 目录都保持不动，新方案也不会加上 slug 行，行为与未安装 OpenSpec 的主机完全一致。
+请注意后两者现在的含义：它们让 OpenSpec *不可用*，于是会话落到 `lite`，而不是落到自由格式。如果
+你完全不想要本地规格文件，请显式选择 `off`。无论用哪种方式，磁盘上已有的 `openspec/` 目录都保持
+不动，新方案也不会加上 OpenSpec 的 slug 行。
 
 ## 面向 Agent
 
-- **触发条件。** proposal、develop、yolo 技能从 SessionStart 上下文的 `## OpenSpec Mode`
-  小节读取 `CHORUS_OPENSPEC_ACTIVE` 并据此分支，它们不重新检测。当 `CHORUS_OPENSPEC_ACTIVE=1`
-  时，在磁盘上编写并镜像；为 `0` 时走自由格式路径。变更的最后一个任务通过验证后，一个 PostToolUse
-  钩子会注入 `openspec archive <slug>` 提醒。
+- **触发条件。** proposal、develop、yolo 技能使用运行时已解析的 `CHORUS_SPEC_MODE`。有注入的
+  `## Spec Mode` 时读取该上下文；OpenClaw 则在每次规格模式步骤运行随插件提供的解析器。其他运行时
+  缺少注入上下文时，按其技能的备用流程处理，不要根据文字说明自行重写解析规则。
+  `CHORUS_OPENSPEC_ACTIVE=1` 表示可用的 `openspec`；`lite` 遵循 spec-lite，`off` 内联编写。
+  显式要求的 `openspec` 无法满足时必须**停止**，不能回退。最后一个任务通过验证后，按运行时的钩子
+  或技能说明执行 `openspec archive <slug>`，不要假定所有运行时都有 PostToolUse。
 - **约束。** 每一次文档草稿的镜像调用都必须经由
   `chorus mcp call <tool> '<json>' --arg-file content=<file>`（原生 MCP 客户端），并把文件字节
   逐字节流式写入；仅当 `chorus` 不在 `PATH` 中时，才回退到旧版 `chorus-api.sh mcp-tool` /
   `chorus-mcp-call.sh` 封装脚本。切勿把文档内容内联重敲，且遇到任何错误都要停止。不要镜像
-  `tasks.md`。方案描述必须带上精确的 `OpenSpec change slug: <slug>` 一行。模式关闭时，不要搭建
-  `openspec/changes/`，也不要加 slug 行。独立的 `public/skill/` 分发包不支持 OpenSpec 模式。
-- **引用来源。** `docs/OPENSPEC_MODE.md`（面向用户的概述与检测契约）、
-  `public/chorus-plugin/skills/openspec-aware/SKILL.md`（Claude Code 权威技能）、以及
-  `plugins/chorus/skills/openspec-aware/SKILL.md`（Codex 权威技能）。
+  `tasks.md`。方案描述必须带上精确的 `OpenSpec change slug: <slug>` 一行。模式不是 `openspec`
+  时，不要搭建 `openspec/changes/`，也不要加 slug 行。独立的 `public/skill/` 分发包不支持规格模式。
+- **引用来源。** `public/chorus-plugin/bin/resolve-spec-mode.sh`（模式解析的唯一真实来源）、
+  `docs/OPENSPEC_MODE.md`（面向用户的概述），以及权威技能
+  `public/chorus-plugin/skills/openspec-aware/SKILL.md`（Claude Code）与
+  `plugins/chorus/skills/openspec-aware/SKILL.md`（Codex）。

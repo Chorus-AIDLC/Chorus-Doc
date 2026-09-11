@@ -101,11 +101,11 @@ Codex の MCP サーバーはプラグインに同梱**されません**。Codex
 
 その場でアップグレードできます。エージェントキーと Chorus URL は影響を受けません。
 
-- **どのエージェントでも**：`chorus agents add` を再実行します。冪等であり、設定された各
-  エージェントのプラグインと認証情報を一度にまとめて更新します。
+- **どのエージェントでも**：`--update-installed` を付けてセットアップを実行し、更新するエージェントを
+  選びます。このフラグがないと、完了済みのインストールはスキップされる場合があります。
 
   ```bash
-  chorus agents add
+  chorus agents add --update-installed
   ```
 
 - **Claude Code**：`/plugin` メニューからプラグインを管理するか、marketplace add と install を
@@ -119,11 +119,11 @@ Codex の MCP サーバーはプラグインに同梱**されません**。Codex
   Claude Code を再起動し、`/plugin list` を実行して新しいバージョンが有効になっていることを
   確認します。
 
-- **Codex**：`chorus agents add` を再実行すると、プラグインと `~/.codex/.env` の認証情報が更新
+- **Codex**：`chorus agents add --update-installed` を再実行すると、プラグインと `~/.codex/.env` の認証情報が更新
   されます。これはエージェントキーをローテーションする方法でもあります。最後に Codex 内で
   `/plugins` を実行します。
 
-OpenClaw、Kiro、Pi は、`chorus agents add` を再実行するか、インストール時と同じ仕組みで
+OpenClaw、Kiro、Pi は、`chorus agents add --update-installed` を再実行するか、インストール時と同じ仕組みで
 アップグレードします。手順は上記の各プラットフォームページに記載しています。
 
 ## プラグインをアンインストールする
@@ -157,7 +157,10 @@ OpenClaw、Kiro、Pi は、上記の各プラットフォームページで説�
   実行し、何を生み出すか。
 - [自動化の挙動](/ja/guides/plugin-automation/)：レビュー用サブエージェント、セッションフック、
   ヘッドレスの制約がどのように動作するか。
-- [OpenSpec モード](/ja/guides/openspec-mode/)：任意の仕様駆動オーサリングの経路。
+- [OpenSpec モード](/ja/guides/openspec-mode/)：セッションの仕様モードがどう決まるか、および
+  OpenSpec でのオーサリング経路。
+- [Spec-lite モード](/ja/guides/spec-lite-mode/)：OpenSpec を使わないときに用いる Chorus 独自の
+  軽量な仕様の記録。
 
 これらのコマンドが駆動するワークフローについては [AI-DLC ワークフロー](/ja/guides/ai-dlc-workflow/)を、
 ランタイムをバックグラウンドサービスとして実行する方法については[デーモンの運用](/ja/guides/daemon-operations/)を

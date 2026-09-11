@@ -1,0 +1,113 @@
+---
+title: Spec-lite 模式
+description: Chorus 原生的轻量规格模式，每个能力一份长期本地规格，加上每次变更一个带日期的同步文档目录。
+docsLocale: zh
+route: /zh/guides/spec-lite-mode/
+---
+
+Spec-lite 是 Chorus 原生的轻量规格模式：一份小而受 git 管理的规格留痕，不需要额外安装任何东西。
+当仓库里用不了 [OpenSpec](/zh/guides/openspec-mode/) 时，会话就用它；你也可以用
+`CHORUS_SPEC_MODE=lite` 主动指定。相比 OpenSpec 路径，它刻意做得更小：没有 CLI、没有校验步骤、
+没有归档步骤、没有增量语法，因此更省时间也更省 token，同时仍然留下一份可以用 `git log` 读的记录。
+
+[AI-DLC 工作流](/zh/guides/ai-dlc-workflow/)本身不变，变的只是本地规格文件的形态。
+
+## 什么时候会用到它
+
+查看运行时的规格模式结果是否为 `CHORUS_SPEC_MODE=lite`。Claude Code、Codex、Kiro 和 Pi 在启动
+上下文中报告，dsh 在插件加载后的首个 Agent 步骤提供。OpenClaw 不注入启动上下文，而是在阶段技能
+执行时解析；可用 `/chorus spec` 或 `/chorus status` 查看。
+
+你会落到 `lite`，要么是因为当前仓库用不了 OpenSpec（这是常见情况，毕竟它需要 `openspec/` 目录和
+`openspec` CLI），要么是因为你主动要求：
+
+```bash
+export CHORUS_SPEC_MODE=lite
+```
+
+这样钉死之后，即使在 OpenSpec 本可以工作的仓库里，你也会得到 spec-lite。完整优先级见
+[模式如何选定](/zh/guides/openspec-mode/#模式如何选定)。
+
+## 磁盘上会留下什么
+
+所有内容都在 `.chorus/specs/` 下，这也是 `.chorus/` 中唯一预期要提交进版本库的部分：
+
+```text
+.chorus/specs/<capability-slug>/
+├── spec.md                              # 长期存在，从不同步
+└── 2026-09-08-add-csv-export/           # 每次变更一个目录
+    ├── prd.md                           # → Chorus PRD 文档
+    └── tech_design.md                   # → Chorus 技术设计文档
+```
+
+**长期规格 `<capability-slug>/spec.md`。** 每个能力或特性一份，*不是*每次变更一份。它是累积的
+「当前真相」：意图、带验收要点的需求，以及非目标。每次变更都就地修改它，它的 git 历史就是全部
+记录，无需维护变更日志小节。它**从不**被复制进 Chorus，也不携带任何 Chorus 标识。它的 `status`
+（`draft`、`active`、`done`）描述的是**能力**，而非单次变更：有变更在进行时为 `active`，交付且
+没有未完成变更时为 `done`，新的变更会重新把它打开。
+
+**每次变更一个带日期的目录 `<capability-slug>/<YYYY-MM-DD>-<change-slug>/`。** 日期用于按时间
+排序；同一天的不同变更应使用不同的 change slug。目录里的每个文件对应一种 Chorus 文档类型：`prd.md`
+必需，`tech_design.md`、`adr.md`、`guide.md` 或一份变更范围内的 `spec.md` 则只在确有必要时才加。
+这些文件**会**被镜像进 Chorus，一个文件对应一份持久文档，且是逐字节写入而非由模型重敲，因此本地
+文件与 Chorus 文档始终一致。审批通过后，每次编辑的镜像都会让该文档的版本号递增，这就是这次变更在 Chorus
+一侧的记录，与 git 并行。
+
+这里没有 `tasks.md`。任务以任务草稿的形式存在于 Chorus，而 `spec.md` 里的验收要点表达的是意图，
+不是进度跟踪器。
+
+为了让后续会话能找到这次变更，方案描述里会带上一行精确内容：
+
+```text
+Spec-lite: .chorus/specs/<capability-slug>/<YYYY-MM-DD>-<change-slug>/
+```
+
+## 从本地文件到草稿，再到文档
+
+Agent 分阶段完成同步：
+
+1. **审批前**：在每份变更文档的 frontmatter 中填写 `proposalUuid`，将 `documentUuid` 留空。
+   先镜像为方案中的文档草稿，后续编辑更新该草稿。
+2. **审批通过时**：草稿成为持久文档。按 `(proposalUuid, type)` 找到它，将 `documentUuid` 写回
+   本地文件，再镜像一次，让 Chorus 中的内容也包含该标识。
+3. **审批后**：编辑本地文件，通过 `documentUuid` 更新同一份文档，每次更新递增版本。能力级的长期
+   `spec.md` 从不参与此流程。
+
+查不到文档或查到多份时，同步会停止等待排查，不能创建替代文档或按标题猜测。这是 Agent 执行的镜像，
+不是后台文件监听。阅读文档时，frontmatter 会显示为[元数据卡片](/zh/guides/documents/#文档开头的元数据)。
+
+## 两个都叫 `spec.md` 的文件
+
+`<capability-slug>/spec.md` 是那份长期规格，只在本地，不带 Chorus 标识。而位于
+`<capability-slug>/<带日期的目录>/spec.md` 的是另一回事：那是一份变更范围内的规格文档，它*会*被
+同步到 Chorus。把 `prd.md` 作为每次变更的主文档，就不会碰到这层歧义。
+
+## 变更进行期间
+
+当前变更的带日期目录保持可编辑：随着工作落地，Agent 会持续更新它和那份长期 `spec.md`，每次都重新
+镜像变更文档，并勾掉已达成的验收要点。**已交付**变更的目录则不再触碰，新的变更是一个新的带日期
+目录，而不是去改写过去的那一个。
+
+当多个任务并行推进时，只有主 Agent 写这些文件，工作者通过 Chorus 汇报进展。这样一来，共享目录就
+不会被两个会话同时覆盖。
+
+## 覆盖哪些运行时
+
+Spec-lite 随 Chorus 插件在 Claude Code、Codex、Kiro、Pi、OpenClaw 与 dsh 上提供。它们共享模式
+规则，但启动机制不同，详见 [OpenSpec 指南](/zh/guides/openspec-mode/)。独立技能分发包不包含规格
+模式路由，仍按自由格式编写。
+
+## 面向 Agent
+
+- **触发条件。** 仅当运行时解析出 `CHORUS_SPEC_MODE=lite` 时使用 spec-lite。有注入的
+  `## Spec Mode` 时读取该上下文；OpenClaw 在阶段技能的规格模式步骤运行随插件提供的解析器。其他
+  运行时缺少上下文时，遵循其技能的备用流程，不要自行编造检测规则。其他模式下该技能为空操作。
+- **约束。** 绝不要镜像那份长期的 `<slug>/spec.md`。镜像带日期目录里的文档时，必须用
+  `chorus mcp call <tool> '<json>' --arg-file content=<file>`，让正文从文件流式写入而不是重敲；
+  仅当 `chorus` 不在 `PATH` 中时，才回退到 `chorus-api.sh` / `chorus-mcp-call.sh` 封装脚本。文档
+  身份只能由 `documentUuid` 或 `(proposalUuid, type)` 解析，查到 0 条或多于 1 条时必须**停止**，
+  绝不要仅凭标题匹配。任何镜像出错都要停止。不要创建 `tasks.md`，也不要搭建 `openspec/changes/`。
+  方案描述必须带上精确的 `Spec-lite: .chorus/specs/<slug>/<YYYY-MM-DD>-<change-slug>/` 定位行，
+  独占一行且结尾不带标点。
+- **引用来源。** `public/chorus-plugin/skills/spec-lite/SKILL.md`（权威技能，两个起始模板均内联在该文件中）
+  与 `public/chorus-plugin/bin/resolve-spec-mode.sh`（模式解析的唯一真实来源）。
