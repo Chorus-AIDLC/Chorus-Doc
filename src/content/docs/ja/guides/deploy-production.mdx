@@ -36,7 +36,7 @@ Chorus が本番実行で読み取る変数：
 | 変数 | 必須 | 説明 |
 | --- | --- | --- |
 | `DATABASE_URL` | はい | PostgreSQL 接続文字列、`postgresql://user:password@host:port/dbname`。 |
-| `NEXTAUTH_SECRET` | はい | セッショントークンの署名に使う秘密鍵。ランダムな値を生成してください。例：`openssl rand -base64 32`。 |
+| `NEXTAUTH_SECRET` | はい | セッショントークンの署名に使う秘密鍵。ランダムな値を生成してください。例：`openssl rand -base64 32`。未設定の場合、`chorus` コマンドが初回起動時に生成して `~/.chorus/.secret` に保存します（単一インスタンスのみ）。既知のサンプル用プレースホルダー値は拒否されます。 |
 | `SUPER_ADMIN_EMAIL` | はい | `/admin` の SuperAdmin パネルをブートストラップするメール。 |
 | `SUPER_ADMIN_PASSWORD_HASH` | はい | SuperAdmin パスワードの bcrypt ハッシュ。 |
 | `DEFAULT_USER` | 任意 | 初回アクセス用の組み込みメール／パスワードログインを有効にします。 |

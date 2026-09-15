@@ -43,7 +43,7 @@ The variables Chorus reads in a production run:
 | Variable | Required | Description |
 | --- | --- | --- |
 | `DATABASE_URL` | Yes | PostgreSQL connection string, `postgresql://user:password@host:port/dbname`. |
-| `NEXTAUTH_SECRET` | Yes | Secret used to sign session tokens. Generate a random value, for example with `openssl rand -base64 32`. |
+| `NEXTAUTH_SECRET` | Yes | Secret used to sign session tokens. Generate a random value, for example with `openssl rand -base64 32`. If left unset, the `chorus` command generates one and stores it in `~/.chorus/.secret` on first start (single instance only); known example placeholder values are rejected. |
 | `SUPER_ADMIN_EMAIL` | Yes | Email that bootstraps the `/admin` SuperAdmin panel. |
 | `SUPER_ADMIN_PASSWORD_HASH` | Yes | Bcrypt hash of the SuperAdmin password. |
 | `DEFAULT_USER` | Optional | Enables a built-in email/password login for first access. |

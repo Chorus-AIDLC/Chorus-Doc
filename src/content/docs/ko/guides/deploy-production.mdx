@@ -36,7 +36,7 @@ Chorus가 프로덕션 실행에서 읽는 변수:
 | 변수 | 필수 | 설명 |
 | --- | --- | --- |
 | `DATABASE_URL` | 예 | PostgreSQL 연결 문자열, `postgresql://user:password@host:port/dbname`. |
-| `NEXTAUTH_SECRET` | 예 | 세션 토큰에 서명하는 데 사용하는 비밀 키. 무작위 값을 생성하세요. 예: `openssl rand -base64 32`. |
+| `NEXTAUTH_SECRET` | 예 | 세션 토큰에 서명하는 데 사용하는 비밀 키. 무작위 값을 생성하세요. 예: `openssl rand -base64 32`. 설정하지 않으면 `chorus` 명령이 첫 시작 시 생성해 `~/.chorus/.secret`에 저장합니다(단일 인스턴스만). 알려진 예제 자리 표시자 값은 거부됩니다. |
 | `SUPER_ADMIN_EMAIL` | 예 | `/admin` SuperAdmin 패널을 부트스트랩하는 이메일. |
 | `SUPER_ADMIN_PASSWORD_HASH` | 예 | SuperAdmin 비밀번호의 bcrypt 해시. |
 | `DEFAULT_USER` | 선택 | 첫 접근을 위한 내장 이메일/비밀번호 로그인을 활성화합니다. |
