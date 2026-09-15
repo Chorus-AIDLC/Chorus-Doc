@@ -39,7 +39,10 @@ services:
     environment:
       # No DATABASE_URL — entrypoint auto-starts embedded PGlite
       - REDIS_URL=
-      - NEXTAUTH_SECRET=${NEXTAUTH_SECRET:-chorus-local-secret}
+      # Leave empty: the container generates a random session secret on first
+      # start and keeps it in the chorus-local-data volume. Set it explicitly
+      # (openssl rand -base64 32) if you prefer to manage it yourself.
+      - NEXTAUTH_SECRET=${NEXTAUTH_SECRET:-}
       - COOKIE_SECURE=false
       - DEFAULT_USER=${DEFAULT_USER:-admin@example.com}
       - DEFAULT_PASSWORD=${DEFAULT_PASSWORD:-changeme}
@@ -63,6 +66,8 @@ In standalone mode the container:
 
 - Starts PGlite on an internal port (`5433`), not exposed externally.
 - Stores data in the `chorus-local-data` Docker volume, so it persists across restarts.
+- Generates a random session-signing secret on first start and stores it in the same volume
+  when `NEXTAUTH_SECRET` is left empty (see [Session secret](#session-secret-nextauth_secret)).
 - Disables Redis (falls back to the in-memory EventBus — single-instance only).
 - Runs Prisma migrations automatically on startup.
 
@@ -80,9 +85,16 @@ services:
     environment:
       - DATABASE_URL=postgresql://chorus:chorus@db:5432/chorus
       - REDIS_URL=redis://default:chorus-redis@redis:6379
-      - NEXTAUTH_SECRET=change-me-to-a-random-secret
+      # Session-signing secret. Leave empty and the container generates one on
+      # first start and persists it in the chorus-app-data volume (single
+      # replica only). For production, or more than one app container, set it
+      # explicitly in .env or the environment:  openssl rand -base64 32
+      # Changing the secret logs every user out.
+      - NEXTAUTH_SECRET=${NEXTAUTH_SECRET:-}
       - DEFAULT_USER=admin@example.com
       - DEFAULT_PASSWORD=your-password
+    volumes:
+      - chorus-app-data:/app/data
     depends_on:
       db:
         condition: service_healthy
@@ -115,6 +127,7 @@ services:
       retries: 5
 
 volumes:
+  chorus-app-data:
   chorus-data:
   redis-data:
 ```
@@ -123,6 +136,12 @@ Then run:
 
 ```bash
 docker compose up -d
+```
+
+To supply your own session secret, put it in a `.env` file next to the compose file:
+
+```bash
+echo "NEXTAUTH_SECRET=$(openssl rand -base64 32)" >> .env
 ```
 
 Open `http://localhost:8637` and log in with the credentials you set in `DEFAULT_USER` /
@@ -144,12 +163,16 @@ docker run -d \
   -p 8637:8637 \
   -e DATABASE_URL=postgresql://user:pass@your-db-host:5432/chorus \
   -e REDIS_URL=redis://default:password@your-redis-host:6379 \
-  -e NEXTAUTH_SECRET=change-me-to-a-random-secret \
+  -e NEXTAUTH_SECRET="$(openssl rand -base64 32)" \
   -e COOKIE_SECURE=false \
   -e DEFAULT_USER=admin@example.com \
   -e DEFAULT_PASSWORD=your-password \
   chorusaidlc/chorus-app:latest
 ```
+
+Generate the secret once and reuse the same value on every start; a new value on each start
+logs every user out. If you omit `NEXTAUTH_SECRET`, also mount a volume at `/app/data`
+(`-v chorus-app-data:/app/data`) so the auto-generated secret survives container recreates.
 
 ## Environment variables
 
@@ -158,7 +181,7 @@ docker run -d \
 | Variable | Description |
 | --- | --- |
 | `DATABASE_URL` | PostgreSQL connection string. Format: `postgresql://user:password@host:port/dbname`. Alternatively, set individual `DB_*` variables (see below). **If omitted**, the entrypoint starts an embedded PGlite instance automatically. |
-| `NEXTAUTH_SECRET` | Secret key for signing JWT session tokens. Use a random string (for example, `openssl rand -base64 32`). |
+| `NEXTAUTH_SECRET` | Secret key for signing session tokens. Use a random string (for example, `openssl rand -base64 32`). **In Docker it may be left empty:** the container then generates one on first start and keeps it in `/app/data/.secret`. Must be set explicitly, to the same value, on every replica when running more than one app container. See [Session secret](#session-secret-nextauth_secret). |
 
 ### Database (alternative to `DATABASE_URL`)
 
@@ -212,13 +235,17 @@ pretty output is only available in local development.
 
 The container's entrypoint runs the same sequence every time it starts:
 
-1. If `DATABASE_URL` is not set and no `DB_*` variables are provided, the entrypoint starts an
+1. It checks `NEXTAUTH_SECRET`. If it is empty, or set to one of the placeholder values that
+   used to appear in the shipped examples, the container reads or generates the secret in
+   `/app/data/.secret` and logs what it did (never the value itself). An explicit secret of
+   your own is used as-is.
+2. If `DATABASE_URL` is not set and no `DB_*` variables are provided, the entrypoint starts an
    embedded PGlite instance on an internal port (`5433`). When an external database **is**
    configured, PGlite is not started.
-2. It runs `prisma migrate deploy` to apply any pending database migrations.
-3. If the database is not ready, it retries every 10 seconds (up to 30 attempts, roughly five
+3. It runs `prisma migrate deploy` to apply any pending database migrations.
+4. If the database is not ready, it retries every 10 seconds (up to 30 attempts, roughly five
    minutes).
-4. Once migrations succeed, the Next.js server starts on port `8637`.
+5. Once migrations succeed, the Next.js server starts on port `8637`.
 
 :::note[Migrations run automatically]
 You do not run migrations yourself. Applying pending migrations at startup is part of the
@@ -226,6 +253,63 @@ entrypoint, so upgrading is just starting a newer image against the same databas
 new image can migrate your schema on first boot, back up the database or data volume before
 upgrading — see [Operations](/guides/deploy-operations/).
 :::
+
+## Session secret (`NEXTAUTH_SECRET`)
+
+`NEXTAUTH_SECRET` signs every Chorus session cookie, for normal users **and** for the super
+admin. Anyone who knows the value can mint a valid session for any account without a
+password, so it must never be a value that appears in public.
+
+:::caution[Upgrading from 0.18.0 or earlier]
+Earlier example Compose files filled in a public default when `NEXTAUTH_SECRET` was not set.
+Since 0.18.1 the container refuses to use those known placeholder values and generates a real
+secret instead. The first start on 0.18.1 therefore issues a new secret and **every user has to
+log in again once**. If you run the production Compose shape with an **old** compose file that
+has no `/app/data` volume on the `app` service, the secret is regenerated on every container
+recreate, so users are logged out at each upgrade until you add the volume shown above or set
+`NEXTAUTH_SECRET` explicitly.
+:::
+
+### What the container does
+
+| `NEXTAUTH_SECRET` at start | Behaviour |
+| --- | --- |
+| Your own value | Used as-is. Nothing is read from or written to disk. |
+| Empty | The container reuses `/app/data/.secret` if it holds a value, otherwise generates a 64-character random secret, stores it there with owner-only permissions, and logs `generated a new random secret` or `reusing the persisted secret`. |
+| One of the old public placeholders | Treated exactly like empty, with a `WARNING` line in the log explaining why. |
+
+The container never prints the secret and never falls back to a public value. If the secret
+file cannot be read or written, the container stops with an error before running migrations.
+The application additionally logs an `error`-level `security` entry at startup if a public
+placeholder is somehow still in effect, in every deployment mode, not just Docker.
+
+### Keep `/app/data` on a volume
+
+The generated secret lives in `/app/data/.secret`, so `/app/data` must be a persistent volume.
+Both Compose examples on this page mount one (`chorus-local-data`, `chorus-app-data`). Without
+it, every container recreate or image upgrade produces a fresh secret and logs everyone out. The
+startup log reminds you of this whenever a secret is generated or reused.
+
+### Running more than one app container
+
+Auto-generation is for a **single** app container. With several replicas, each one would end up
+with its own secret and sessions would fail whenever a request lands on a different replica. Set
+the **same** `NEXTAUTH_SECRET` explicitly on every replica from your deployment layer (Compose
+`.env`, Kubernetes Secret, ECS task definition). The
+[AWS CDK deployment](/guides/deploy-production/) already does this through AWS Secrets Manager.
+
+### Setting and rotating the secret
+
+Generate a value once and configure it explicitly:
+
+```bash
+openssl rand -base64 32
+```
+
+Put it in `.env` next to your compose file, pass it with `-e` to `docker run`, or inject it from
+your secret store. An explicit value always wins and disables auto-generation. Rotating the
+secret, deliberately or by deleting `/app/data/.secret`, invalidates every existing session, and
+all users including the super admin must log in again.
 
 ## Image details
 

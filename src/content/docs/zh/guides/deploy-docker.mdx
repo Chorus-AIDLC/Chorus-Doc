@@ -36,7 +36,10 @@ services:
     environment:
       # No DATABASE_URL — entrypoint auto-starts embedded PGlite
       - REDIS_URL=
-      - NEXTAUTH_SECRET=${NEXTAUTH_SECRET:-chorus-local-secret}
+      # Leave empty: the container generates a random session secret on first
+      # start and keeps it in the chorus-local-data volume. Set it explicitly
+      # (openssl rand -base64 32) if you prefer to manage it yourself.
+      - NEXTAUTH_SECRET=${NEXTAUTH_SECRET:-}
       - COOKIE_SECURE=false
       - DEFAULT_USER=${DEFAULT_USER:-admin@example.com}
       - DEFAULT_PASSWORD=${DEFAULT_PASSWORD:-changeme}
@@ -60,6 +63,8 @@ docker compose -f docker-compose.local.yml up -d
 
 - 在内部端口（`5433`）上启动 PGlite，不对外暴露。
 - 将数据存放在 `chorus-local-data` Docker 卷中，因此可在重启后持久保留。
+- 当 `NEXTAUTH_SECRET` 留空时，在首次启动生成一个随机的会话签名密钥并保存在同一个卷中（参见
+  [会话密钥](#会话密钥nextauth_secret)）。
 - 禁用 Redis（回退到内存 EventBus，仅支持单实例）。
 - 在启动时自动执行 Prisma 迁移。
 
@@ -77,9 +82,16 @@ services:
     environment:
       - DATABASE_URL=postgresql://chorus:chorus@db:5432/chorus
       - REDIS_URL=redis://default:chorus-redis@redis:6379
-      - NEXTAUTH_SECRET=change-me-to-a-random-secret
+      # Session-signing secret. Leave empty and the container generates one on
+      # first start and persists it in the chorus-app-data volume (single
+      # replica only). For production, or more than one app container, set it
+      # explicitly in .env or the environment:  openssl rand -base64 32
+      # Changing the secret logs every user out.
+      - NEXTAUTH_SECRET=${NEXTAUTH_SECRET:-}
       - DEFAULT_USER=admin@example.com
       - DEFAULT_PASSWORD=your-password
+    volumes:
+      - chorus-app-data:/app/data
     depends_on:
       db:
         condition: service_healthy
@@ -112,6 +124,7 @@ services:
       retries: 5
 
 volumes:
+  chorus-app-data:
   chorus-data:
   redis-data:
 ```
@@ -120,6 +133,12 @@ volumes:
 
 ```bash
 docker compose up -d
+```
+
+如果想自己提供会话密钥，把它写进 compose 文件旁边的 `.env`：
+
+```bash
+echo "NEXTAUTH_SECRET=$(openssl rand -base64 32)" >> .env
 ```
 
 打开 `http://localhost:8637`，使用你在 `DEFAULT_USER` / `DEFAULT_PASSWORD` 中设置的凭据
@@ -140,12 +159,16 @@ docker run -d \
   -p 8637:8637 \
   -e DATABASE_URL=postgresql://user:pass@your-db-host:5432/chorus \
   -e REDIS_URL=redis://default:password@your-redis-host:6379 \
-  -e NEXTAUTH_SECRET=change-me-to-a-random-secret \
+  -e NEXTAUTH_SECRET="$(openssl rand -base64 32)" \
   -e COOKIE_SECURE=false \
   -e DEFAULT_USER=admin@example.com \
   -e DEFAULT_PASSWORD=your-password \
   chorusaidlc/chorus-app:latest
 ```
+
+密钥只需生成一次，之后每次启动都复用同一个值；每次启动换新值会让所有用户被登出。如果省略
+`NEXTAUTH_SECRET`，请同时把一个卷挂到 `/app/data`（`-v chorus-app-data:/app/data`），这样自动
+生成的密钥才能在容器重建后保留。
 
 ## 环境变量
 
@@ -156,7 +179,7 @@ docker run -d \
   | 变量 | 说明 |
   | --- | --- |
   | `DATABASE_URL` | PostgreSQL 连接字符串。格式：`postgresql://user:password@host:port/dbname`。也可以改为设置单独的 `DB_*` 变量（见下文）。**若省略**，入口脚本会自动启动一个嵌入式 PGlite 实例。 |
-  | `NEXTAUTH_SECRET` | 用于签发 JWT 会话令牌的密钥。请使用随机字符串（例如 `openssl rand -base64 32`）。 |
+  | `NEXTAUTH_SECRET` | 用于签发会话令牌的密钥。请使用随机字符串（例如 `openssl rand -base64 32`）。**在 Docker 中可以留空**：容器会在首次启动时生成一个并保存在 `/app/data/.secret`。运行多个应用容器时，必须在每个副本上显式设置同一个值。参见[会话密钥](#会话密钥nextauth_secret)。 |
 
 </div>
 
@@ -232,17 +255,74 @@ docker run -d \
 
 容器的入口脚本每次启动都会执行相同的流程：
 
-1. 若未设置 `DATABASE_URL` 且未提供任何 `DB_*` 变量，入口脚本会在内部端口（`5433`）上启动
+1. 检查 `NEXTAUTH_SECRET`。若为空，或等于以前示例文件中出现过的占位值，容器会在
+   `/app/data/.secret` 中读取或生成密钥，并在日志中说明做了什么（但绝不打印密钥本身）。你自己
+   显式设置的密钥会原样使用。
+2. 若未设置 `DATABASE_URL` 且未提供任何 `DB_*` 变量，入口脚本会在内部端口（`5433`）上启动
    一个嵌入式 PGlite 实例。当**已配置**外部数据库时，不会启动 PGlite。
-2. 执行 `prisma migrate deploy`，应用任何待处理的数据库迁移。
-3. 若数据库尚未就绪，每 10 秒重试一次（最多 30 次，约五分钟）。
-4. 迁移成功后，Next.js 服务在 `8637` 端口启动。
+3. 执行 `prisma migrate deploy`，应用任何待处理的数据库迁移。
+4. 若数据库尚未就绪，每 10 秒重试一次（最多 30 次，约五分钟）。
+5. 迁移成功后，Next.js 服务在 `8637` 端口启动。
 
 :::note[迁移自动执行]
 你无需自行执行迁移。在启动时应用待处理的迁移是入口脚本的一部分，因此升级就是用新版镜像对接
 同一个数据库并启动它。由于新镜像可能在首次启动时迁移你的数据库结构，请在升级前备份数据库或
 数据卷，参见[运维](/zh/guides/deploy-operations/)。
 :::
+
+## 会话密钥（`NEXTAUTH_SECRET`）
+
+`NEXTAUTH_SECRET` 用于签发 Chorus 的每一个会话 Cookie，既包括普通用户，也包括超级管理员。任何
+知道这个值的人都可以不经密码为任意账号伪造有效会话，因此它绝不能是公开出现过的值。
+
+:::caution[从 0.18.0 或更早版本升级]
+以前的示例 Compose 文件在未设置 `NEXTAUTH_SECRET` 时会填入一个公开的默认值。从 0.18.1 起，
+容器拒绝使用这些已知占位值，改为生成真正的随机密钥。因此升级到 0.18.1 后的首次启动会签发新密钥，
+**所有用户需要重新登录一次**。如果你使用的是生产形态的**旧** compose 文件，且 `app` 服务没有挂载
+`/app/data` 卷，那么每次容器重建都会重新生成密钥，用户会在每次升级时被登出，直到你按上文加上
+该卷，或显式设置 `NEXTAUTH_SECRET`。
+:::
+
+### 容器的行为
+
+<div class="table-scroll" role="region" aria-label="启动时 NEXTAUTH_SECRET 的处理" tabindex="0">
+
+  | 启动时的 `NEXTAUTH_SECRET` | 行为 |
+  | --- | --- |
+  | 你自己设置的值 | 原样使用，不读写磁盘。 |
+  | 空 | 若 `/app/data/.secret` 已有值则复用；否则生成一个 64 位随机密钥，以仅属主可读的权限保存到该文件，并在日志中输出 `generated a new random secret` 或 `reusing the persisted secret`。 |
+  | 以前的公开占位值之一 | 视为空值处理，并在日志中输出一行 `WARNING` 说明原因。 |
+
+</div>
+
+容器绝不打印密钥，也绝不回退到公开值。如果密钥文件无法读取或写入，容器会在执行迁移之前报错退出。
+此外，无论以哪种方式部署（不限于 Docker），应用在启动时若发现仍在使用公开占位值，都会记录一条
+`error` 级别的 `security` 日志。
+
+### 让 `/app/data` 落在卷上
+
+生成的密钥保存在 `/app/data/.secret`，因此 `/app/data` 必须是持久卷。本页的两个 Compose 示例都
+已挂载（`chorus-local-data`、`chorus-app-data`）。没有卷的话，每次容器重建或镜像升级都会产生新
+密钥并登出所有人。每当生成或复用密钥时，启动日志都会提醒这一点。
+
+### 运行多个应用容器
+
+自动生成只面向**单个**应用容器。多副本时每个副本会各自拿到不同的密钥，请求一旦落到另一个副本上会
+话就会失效。请从部署层（Compose 的 `.env`、Kubernetes Secret、ECS 任务定义）在每个副本上显式设置
+**同一个** `NEXTAUTH_SECRET`。[AWS CDK 部署](/zh/guides/deploy-production/)已经通过 AWS Secrets
+Manager 做到了这一点。
+
+### 设置与轮换密钥
+
+生成一次并显式配置：
+
+```bash
+openssl rand -base64 32
+```
+
+写进 compose 文件旁的 `.env`，用 `-e` 传给 `docker run`，或从你的密钥库注入。显式值总是优先，并
+会关闭自动生成。轮换密钥（无论是主动更换，还是删除了 `/app/data/.secret`）会使所有现有会话失效，
+包括超级管理员在内的所有用户都需要重新登录。
 
 ## 镜像细节
 
