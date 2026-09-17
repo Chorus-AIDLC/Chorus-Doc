@@ -29,8 +29,7 @@ SUPER_ADMIN_PASSWORD_HASH="$2b$10$..."   # 你的密码的 bcrypt 哈希
 node -e "console.log(require('bcryptjs').hashSync('your-password', 10))"
 ```
 
-把哈希存进部署的密钥库，绝不要存明文密码。签发管理员会话还需要设置 `NEXTAUTH_SECRET`
-（它本就是应用运行的必需项）。
+把 bcrypt 哈希存入部署的密钥库。管理员会话还需要安全的 `NEXTAUTH_SECRET`：npm `chorus` 启动器和 Docker 入口脚本可为单实例生成并持久保存。多副本必须显式配置同一值。参见 [Docker 会话密钥](/zh/guides/deploy-docker/#会话密钥nextauth_secret)。
 
 ## 以超级管理员身份登录
 

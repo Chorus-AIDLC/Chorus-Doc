@@ -39,7 +39,7 @@ Agent 的授权完全来自它的 `permissions[]`，即扁平的有效权限集�
    ├─ RS*/ES* JWT   → OIDC token 校验          → User 上下文
    └─ HS256 JWT     → Chorus JWT 校验           → User 上下文
 2. 会话 Cookie
-   └─ user_session | admin_session            → User | Super Admin 上下文
+   └─ user_session                         → User
 3. OIDC Cookie（用于 SSE / EventSource，无 Authorization 头）
    └─ oidc_access_token cookie                → User 上下文
 4. 无匹配 → 未认证
@@ -47,6 +47,18 @@ Agent 的授权完全来自它的 `permissions[]`，即扁平的有效权限集�
 
 步骤 1 中的 token 按形态分类：`cho_` 前缀即 API key；否则一个三段式 JWT，头部算法为非对称
 （`RS*`/`ES*`）时是 OIDC，为 `HS256` 时是 Chorus 自签名会话 token。
+
+## 会话签名密钥
+
+`NEXTAUTH_SECRET` 签发内置登录的 `user_session` 和超级管理员的 `admin_session` JWT。
+超级管理员路由单独校验 `admin_session`，不属于普通用户认证的回退分支。
+OIDC token 使用身份提供方的密钥校验，Agent API key 使用数据库中的哈希校验。
+轮换 `NEXTAUTH_SECRET` 只会使 Chorus 自签名会话失效，不会使 API key 或 OIDC token 失效。
+
+npm 启动器默认将生成的密钥保存在 `~/.chorus-data/.secret`，Docker 则使用 `/app/data/.secret`。
+两者都会忽略环境变量中的已知公开占位值；若已保存的密钥是公开占位值，则停止启动。
+直接启动应用时需自行提供密钥。0.18.1 升级、持久化与多副本设置参见
+[Docker 会话密钥](/zh/guides/deploy-docker/#会话密钥nextauth_secret)。
 
 ## Agent API key
 

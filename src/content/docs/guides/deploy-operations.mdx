@@ -92,6 +92,17 @@ safe rollback point. Follow the standard
 your setup rather than improvising a per-engine procedure.
 :::
 
+### Session secrets when upgrading to 0.18.1
+
+Keep the signing secret stable alongside your database backups. To retain an auto-generated
+secret, Docker needs a persistent `/app/data` volume even with external PostgreSQL; the npm
+launcher uses `~/.chorus-data/.secret` by default. If you previously used a public placeholder,
+the replacement secret requires Default Auth users and the Super Admin to sign in again.
+The bootstrap preserves secure explicit secrets. For CDK redeployments, supply the same
+`nextAuthSecret`: omitting it generates a new value at each synth. API keys and OIDC tokens
+are unaffected by this rotation.
+See [Docker migration guidance](/guides/deploy-docker/#session-secret-nextauth_secret).
+
 ## Cookies and reverse proxies
 
 Two settings matter when Chorus runs behind TLS termination or a reverse proxy:

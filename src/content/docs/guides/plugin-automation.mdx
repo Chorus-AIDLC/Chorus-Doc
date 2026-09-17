@@ -107,10 +107,8 @@ judgment or prompting involved:
 
 - **`SessionStart`** — checks connectivity, checks the agent in, and discovers any session
   the plugin pre-created for it.
-- **`SubagentStart`** — synchronously creates a Chorus session for a spawned worker before
-  it begins, so its work is attributed correctly.
-- **`SubagentStop`** — checks the worker out of every task it held and closes its session,
-  so no worker leaves a dangling checkin or open session.
+- **`SubagentStart`** — creates or reuses a Chorus session named for the worker's agent type before it starts. Same-type workers can share it.
+- **`SubagentStop`** — releases the exiting worker's hold. Automatic task checkout, session closure, and eligible automatic verification wait until the last worker sharing that session exits.
 - **Heartbeat and reminders** — an idle worker sends a heartbeat so its session is not
   marked inactive during long runs, and `PostToolUse` reminders nudge the main agent at the
   review points described above.

@@ -96,3 +96,9 @@ the full flow.
   [Troubleshooting](/guides/troubleshooting/).
 - **Wrong project is available:** reinstall the daemon with the intended absolute
   `--cwd` value.
+
+## Subagent sessions
+
+Plugin-managed subagent sessions use the agent type as their name. Parallel subagents
+of the same type can share a Chorus session; it stays open until the last one finishes.
+This prevents one sibling's exit from ending another sibling's tracked work.

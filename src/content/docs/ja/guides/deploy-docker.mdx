@@ -33,7 +33,10 @@ services:
     environment:
       # No DATABASE_URL — entrypoint auto-starts embedded PGlite
       - REDIS_URL=
-      - NEXTAUTH_SECRET=${NEXTAUTH_SECRET:-chorus-local-secret}
+      # Leave empty: the container generates a random session secret on first
+      # start and keeps it in the chorus-local-data volume. Set it explicitly
+      # (openssl rand -base64 32) if you prefer to manage it yourself.
+      - NEXTAUTH_SECRET=${NEXTAUTH_SECRET:-}
       - COOKIE_SECURE=false
       - DEFAULT_USER=${DEFAULT_USER:-admin@example.com}
       - DEFAULT_PASSWORD=${DEFAULT_PASSWORD:-changeme}
@@ -56,6 +59,7 @@ docker compose -f docker-compose.local.yml up -d
 
 - PGlite を内部ポート（`5433`）で起動し、外部には公開しません。
 - データを `chorus-local-data` Docker ボリュームに保存するため、再起動をまたいで永続します。
+- `NEXTAUTH_SECRET` を空のままにした場合、初回起動時にランダムなセッション署名用の秘密鍵を生成し、同じボリュームに保存します（[セッションの秘密鍵](#セッションの秘密鍵nextauth_secret)を参照）。
 - Redis を無効化します（メモリ内 EventBus にフォールバック。単一インスタンスのみ）。
 - 起動時に Prisma マイグレーションを自動的に実行します。
 
@@ -72,9 +76,17 @@ services:
     environment:
       - DATABASE_URL=postgresql://chorus:chorus@db:5432/chorus
       - REDIS_URL=redis://default:chorus-redis@redis:6379
-      - NEXTAUTH_SECRET=change-me-to-a-random-secret
+      # Session-signing secret. Leave empty and the container generates one on
+      # first start and persists it in the chorus-app-data volume (single
+      # replica only). For production, or more than one app container, set it
+      # explicitly in .env or the environment:  openssl rand -base64 32
+      # Changing the secret invalidates Default Auth and Super Admin sessions.
+      - NEXTAUTH_SECRET=${NEXTAUTH_SECRET:-}
+      - COOKIE_SECURE=${COOKIE_SECURE:-false}
       - DEFAULT_USER=admin@example.com
       - DEFAULT_PASSWORD=your-password
+    volumes:
+      - chorus-app-data:/app/data
     depends_on:
       db:
         condition: service_healthy
@@ -107,8 +119,15 @@ services:
       retries: 5
 
 volumes:
+  chorus-app-data:
   chorus-data:
   redis-data:
+```
+
+セッションの秘密鍵を自分で用意する場合は、起動前に一度だけ生成し、compose ファイルと同じ場所の `.env` に書き込みます。
+
+```bash
+echo "NEXTAUTH_SECRET=$(openssl rand -base64 32)" >> .env
 ```
 
 そして実行します。
@@ -132,23 +151,26 @@ docker run -d \
   -p 8637:8637 \
   -e DATABASE_URL=postgresql://user:pass@your-db-host:5432/chorus \
   -e REDIS_URL=redis://default:password@your-redis-host:6379 \
-  -e NEXTAUTH_SECRET=change-me-to-a-random-secret \
+  -v chorus-app-data:/app/data \
   -e COOKIE_SECURE=false \
   -e DEFAULT_USER=admin@example.com \
   -e DEFAULT_PASSWORD=your-password \
   chorusaidlc/chorus-app:latest
 ```
 
+この例は生成した秘密鍵を `chorus-app-data` に保存し、コンテナの再作成後も再利用します。
+自分で管理する場合は、永続的な `NEXTAUTH_SECRET` を渡し、毎回同じ値を使用してください。
+
 ## 環境変数
 
-### 必須
+### データベースとセッション秘密鍵
 
 <div class="table-scroll" role="region" aria-label="必須の環境変数" tabindex="0">
 
   | 変数 | 説明 |
   | --- | --- |
   | `DATABASE_URL` | PostgreSQL 接続文字列。形式：`postgresql://user:password@host:port/dbname`。代わりに個別の `DB_*` 変数を設定することもできます（下記参照）。**省略した場合**、エントリーポイントは組み込みの PGlite インスタンスを自動的に起動します。 |
-  | `NEXTAUTH_SECRET` | JWT セッショントークンに署名するための秘密鍵。ランダムな文字列を使用してください（例：`openssl rand -base64 32`）。 |
+  | `NEXTAUTH_SECRET` | セッショントークンに署名するための秘密鍵。ランダムな文字列を使用してください（例：`openssl rand -base64 32`）。**Docker では空のままでも構いません。** その場合、コンテナが初回起動時に生成し、`/app/data/.secret` に保存します。複数のアプリコンテナを動かすときは、すべてのレプリカで同じ値を明示的に設定する必要があります。[セッションの秘密鍵](#セッションの秘密鍵nextauth_secret)を参照してください。 |
 
 </div>
 
@@ -223,14 +245,58 @@ docker run -d \
 
 コンテナのエントリーポイントは、起動するたびに同じ流れを実行します。
 
-1. `DATABASE_URL` が設定されておらず、`DB_*` 変数も一つも与えられていない場合、エントリーポイントは内部ポート（`5433`）で組み込みの PGlite インスタンスを起動します。外部データベースが**設定されている**ときは、PGlite は起動しません。
-2. `prisma migrate deploy` を実行し、保留中のデータベースマイグレーションを適用します。
-3. データベースがまだ準備できていない場合は、10 秒ごとにリトライします（最大 30 回、およそ 5 分）。
-4. マイグレーションが成功すると、Next.js サーバーが `8637` ポートで起動します。
+1. `NEXTAUTH_SECRET` を確認します。空の場合、または以前のサンプルファイルに載っていたプレースホルダー値の場合、コンテナは `/app/data/.secret` から秘密鍵を読み込むか新たに生成し、何をしたかをログに記録します（値そのものは決して出力しません）。自分で明示的に設定した秘密鍵はそのまま使われます。
+2. `DATABASE_URL` が設定されておらず、`DB_*` 変数も一つも与えられていない場合、エントリーポイントは内部ポート（`5433`）で組み込みの PGlite インスタンスを起動します。外部データベースが**設定されている**ときは、PGlite は起動しません。
+3. `prisma migrate deploy` を実行し、保留中のデータベースマイグレーションを適用します。
+4. データベースがまだ準備できていない場合は、10 秒ごとにリトライします（最大 30 回、およそ 5 分）。
+5. マイグレーションが成功すると、Next.js サーバーが `8637` ポートで起動します。
 
 :::note[マイグレーションは自動的に実行される]
 マイグレーションを自分で実行する必要はありません。保留中のマイグレーションを起動時に適用することはエントリーポイントの一部なので、アップグレードは同じデータベースに対して新しいイメージを起動するだけです。新しいイメージは初回起動時にスキーマをマイグレートしうるため、アップグレード前にはデータベースまたはデータボリュームをバックアップしてください。[運用](/ja/guides/deploy-operations/)を参照してください。
 :::
+
+## セッションの秘密鍵（`NEXTAUTH_SECRET`）
+
+`NEXTAUTH_SECRET` は Chorus 自身の `user_session`（組み込みログイン）と
+`admin_session`（Super Admin）の JWT に署名します。OIDC トークンは ID プロバイダーが署名し、
+Agent API key は別途検証されます。この秘密鍵の変更で無効になるのは Chorus が署名したセッションです。
+API key やプロバイダーの OIDC トークンは変更されません。
+
+:::caution[0.18.0 以前からのアップグレード]
+公開プレースホルダーの秘密鍵を使用していた場合、0.18.1 はその値を無視し、非公開の秘密鍵を
+再利用または生成します。影響を受ける Chorus セッションでは再ログインが必要です。
+エントリーポイントは明示的に渡された安全な秘密鍵を維持します。同じ値を再利用すれば、秘密鍵の変更による
+再ログインを避けられます。CDK の再デプロイでは `nextAuthSecret` を明示的に維持してください。
+[CDK の秘密鍵設定](/ja/guides/deploy-production/)を参照してください。
+
+古い Compose ファイルに `/app/data` のボリュームがない場合、コンテナの再作成ごとに生成済みの
+秘密鍵が失われます。上記のボリュームを追加するか、永続的な `NEXTAUTH_SECRET` を設定してください。
+:::
+
+### コンテナの動作
+
+- **明示的な非プレースホルダー値**：ファイルを読み書きせず、その値を使用します。
+- **未設定、空、既知の公開プレースホルダー**：`/app/data/.secret` を再利用します。ファイルがないか
+  空の場合、32 バイトの乱数を 64 文字の十六進数として生成し、権限 `0600` で保存します。
+  環境変数のプレースホルダーには警告も出します。
+- **利用できない保存済み秘密鍵**：通常ファイルでない、読めない、公開プレースホルダーが保存されている、
+  または生成・書き込みが失敗した場合は、マイグレーション前に停止します。
+  保存済みの公開プレースホルダーを黙って使用したり置き換えたりはしません。
+
+秘密鍵の値はログに出しません。自動生成した秘密鍵を保持するには、`/app/data` を永続ボリュームに置いてください。複数レプリカには
+**同じ**秘密鍵を明示的に渡します。[AWS CDK スタック](/ja/guides/deploy-production/)は
+Secrets Manager を通じて共有しています。
+
+### 秘密鍵の設定と変更
+
+`openssl rand -base64 32` で一度だけ生成し、シークレットストアか保護された `.env` に保存して
+再利用します。有効な秘密鍵を変更すると、組み込みログインのユーザーと Super Admin は再ログインが
+必要です。`.secret` の削除が影響するのは自動生成した秘密鍵だけで、明示的な設定値には影響しません。
+
+自動生成を行うのは Docker エントリーポイントと npm の `chorus` ランチャーです。
+`next start` や `node server.js` で直接起動する場合は、安全な値を自分で設定してください。
+アプリは既知のプレースホルダーをエラーログに記録しますが、置き換えはしません。
+秘密鍵が未設定だと Chorus 署名のセッションを発行できません。
 
 ## イメージの詳細
 

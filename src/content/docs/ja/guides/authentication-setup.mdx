@@ -26,7 +26,7 @@ SUPER_ADMIN_PASSWORD_HASH="$2b$10$..."   # パスワードの bcrypt ハッシ�
 node -e "console.log(require('bcryptjs').hashSync('your-password', 10))"
 ```
 
-ハッシュはデプロイのシークレットストアに保管し、平文のパスワードは決して保管しないでください。管理者セッションの署名には `NEXTAUTH_SECRET` の設定も必要です（これはアプリ全体で必須です）。
+bcrypt ハッシュをデプロイのシークレットストアに保管してください。管理者セッションには安全な `NEXTAUTH_SECRET` も必要です。単一インスタンスなら npm の `chorus` ランチャーや Docker エントリーポイントが生成・保存できます。複数レプリカには同じ値を明示的に設定してください。[Docker のセッション秘密鍵](/ja/guides/deploy-docker/)を参照してください。
 
 ## Super Admin としてサインインする
 

@@ -75,3 +75,8 @@ claude --resume <sessionId>
 - **`chorus_checkin` 返回 `401`**：创建或轮换智能体密钥，然后重新运行 `chorus agents add`（或更新 `~/.claude/settings.json` 中的 `env` 块），再重新启动 Claude Code。
 - **在线智能体列表中没有 Claude Code**：运行 `chorus daemon status`；需要进一步排查时运行 `chorus daemon logs`。
 - **工作目录错误**：使用正确的绝对路径重新执行 `chorus daemon install --agent claude-code --cwd ...`。
+
+## 子代理会话
+
+插件管理的子代理会话使用 Agent 类型作为名称。同类型的并行子代理可以共享 Chorus 会话，
+最后一个子代理结束后才会关闭，避免一个子代理退出时提前结束其他子代理的工作记录。

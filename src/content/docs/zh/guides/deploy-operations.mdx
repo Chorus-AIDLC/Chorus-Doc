@@ -69,6 +69,13 @@ Chorus 在启动时会自动应用待执行的数据库迁移（`prisma migrate 
 升级前务必备份数据库（内嵌或基于卷的存储则备份数据卷）。迁移会自动运行并可能修改表结构，备份是你唯一可靠的回滚点。请按照标准的 [PostgreSQL 备份文档](https://www.postgresql.org/docs/current/backup.html)操作，而不要自行拼凑针对特定引擎的流程。
 :::
 
+### 升级到 0.18.1 时的会话密钥
+
+备份数据库时也要妥善保管签名密钥。若依赖自动生成的密钥，即使使用外部 PostgreSQL，Docker 仍需
+持久的 `/app/data` 卷。npm 启动器默认使用 `~/.chorus-data/.secret`。若此前使用公开占位值，更换密钥后
+内置登录用户和超级管理员需要重新登录。启动器会保留显式配置的安全密钥。CDK 重新部署时需传入
+同一个 `nextAuthSecret`，省略它会在每次 synth 时生成新值。API key 和 OIDC token 不受此轮换影响。参见 [Docker 升级说明](/zh/guides/deploy-docker/#会话密钥nextauth_secret)。
+
 ## Cookie 与反向代理
 
 当 Chorus 运行在 TLS 终止或反向代理之后时，有两个设置需要关注：

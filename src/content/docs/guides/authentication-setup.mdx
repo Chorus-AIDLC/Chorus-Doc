@@ -31,8 +31,7 @@ Generate the hash with a one-off command, for example:
 node -e "console.log(require('bcryptjs').hashSync('your-password', 10))"
 ```
 
-Keep the hash in your deployment's secret store, never the plaintext password. Signing the
-admin session also needs `NEXTAUTH_SECRET` set (it is required for the app generally).
+Keep the bcrypt hash in your deployment's secret store. Admin sessions also need a secure `NEXTAUTH_SECRET`: the npm `chorus` launcher and Docker entrypoint can generate and persist it for one instance. Set the same value explicitly on all replicas. See [Docker session secrets](/guides/deploy-docker/#session-secret-nextauth_secret).
 
 ## Sign in as Super Admin
 

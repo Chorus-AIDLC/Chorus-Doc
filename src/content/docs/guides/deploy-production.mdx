@@ -27,7 +27,7 @@ required authentication and secret variables, then start it:
 
 ```sh
 DATABASE_URL='postgresql://chorus:password@db.internal:5432/chorus' \
-NEXTAUTH_SECRET='a-long-random-string' \
+NEXTAUTH_SECRET="${NEXTAUTH_SECRET:?Set a persistent random secret first}" \
 SUPER_ADMIN_EMAIL='admin@example.com' \
 SUPER_ADMIN_PASSWORD_HASH='$2b$10$...' \
 chorus
@@ -43,7 +43,7 @@ The variables Chorus reads in a production run:
 | Variable | Required | Description |
 | --- | --- | --- |
 | `DATABASE_URL` | Yes | PostgreSQL connection string, `postgresql://user:password@host:port/dbname`. |
-| `NEXTAUTH_SECRET` | Yes | Secret used to sign session tokens. Generate a random value, for example with `openssl rand -base64 32`. |
+| `NEXTAUTH_SECRET` | For multiple instances | Signing secret shared by all replicas. For a single npm instance, it may be omitted: `chorus` persists one in `~/.chorus-data/.secret` by default. Known placeholders in the environment are ignored with a warning; a persisted placeholder or empty key stops startup. |
 | `SUPER_ADMIN_EMAIL` | Yes | Email that bootstraps the `/admin` SuperAdmin panel. |
 | `SUPER_ADMIN_PASSWORD_HASH` | Yes | Bcrypt hash of the SuperAdmin password. |
 | `DEFAULT_USER` | Optional | Enables a built-in email/password login for first access. |
@@ -74,6 +74,8 @@ one instance never reach the others. A single-instance deployment can run withou
 that in-memory fallback, but any deployment with more than one instance must configure a
 shared Redis.
 
+All instances must also share the same secure `NEXTAUTH_SECRET`, so Chorus-signed sessions remain valid whichever instance receives a request.
+
 ## Deploy the AWS CDK stack
 
 Chorus bundles an AWS CDK stack under `packages/chorus-cdk` and a repository-root
@@ -82,11 +84,30 @@ deployment with managed PostgreSQL and Redis.
 
 ### Prerequisites
 
-`install.sh` first checks that the `aws`, `node`, and `pnpm` commands are available and
-that your AWS credentials are valid (it calls `aws sts get-caller-identity`). Configure
-your credentials with `aws configure` or `AWS_PROFILE` before running it, and have an
-[AWS Certificate Manager](https://aws.amazon.com/certificate-manager/) certificate ready
-in the deployment region.
+`install.sh` checks for `aws`, `node`, `pnpm`, and valid AWS credentials. Configure
+`aws configure` or `AWS_PROFILE` first. Certificate requirements depend on the mode below.
+
+### Choose the deployment mode
+
+- **`alb` (default)**: public ALB with HTTPS on port 443; requires an ACM certificate in
+  the deployment region. A custom domain is optional.
+- **`cloudfront`**: public HTTPS through CloudFront, forwarding to a private ALB on HTTP
+  port 80 through a VPC origin. No certificate is needed for the default `*.cloudfront.net`
+  domain. For a custom domain, supply both the domain and an ACM certificate in **`us-east-1`**.
+  Caching is disabled for authenticated pages and API responses.
+
+Choose the mode in `./install.sh`, or pass `-c deployMode=cloudfront` to CDK.
+`default_deploy.sh` preserves the choice. Non-interactive installs use
+`CHORUS_INSTALL_NONINTERACTIVE=1`, `DEPLOY_MODE=alb|cloudfront`, and the other required
+installer variables. Neither mode creates DNS records: point a custom domain at the
+`AlbDnsName` or `CloudFrontDomainName` stack output, and update the OIDC callback URL.
+
+:::caution[Switching modes on an existing deployment]
+Changing modes replaces the ALB and changes its DNS name. Deploy a new stack, migrate data
+and DNS, and verify it before retiring the old stack. Keeping `alb` preserves the existing
+topology. In `cloudfront` mode the ALB is private: diagnose through the CloudFront URL, ECS
+logs, or target-group health. Confirm your region supports CloudFront VPC origins.
+:::
 
 ### Run the installer
 
@@ -100,12 +121,18 @@ The installer prompts for the deployment configuration:
 
 | Prompt | Required | Notes |
 | --- | --- | --- |
+| Deployment mode | No | `alb` (default) or `cloudfront`. |
 | Stack name | No | Defaults to `Chorus`. |
-| ACM Certificate ARN | Yes | Must start with `arn:aws:acm:`. The load balancer uses it to terminate HTTPS. |
-| Custom domain | No | For example `chorus.example.com`. Adds a host rule for that domain when set. |
+| ACM Certificate ARN | Mode-dependent | Required in the deployment region for `alb`; required in `us-east-1` only with a custom domain for `cloudfront`. |
+| Custom domain | No | For `cloudfront`, pair with a `us-east-1` certificate; otherwise use the distribution domain. |
 | Super admin email | Yes | Bootstraps the `/admin` SuperAdmin account. |
 | Super admin password | Yes | Minimum 8 characters. Hashed with bcrypt at synth time; the plaintext is never stored in the template. |
-| NextAuth secret | No | Auto-generated if left blank. |
+| NextAuth secret | No | Generated at each synth if left blank. Supply one persistent value to keep sessions valid across redeployments. |
+
+The stack shares `NEXTAUTH_SECRET` through Secrets Manager, but does not read the existing
+value back during synth. Reuse the same value in the installer or CDK's `nextAuthSecret`
+context on every deployment. If you previously left it blank, preserve the existing
+Secrets Manager value before redeploying to avoid rotating it.
 
 After collecting the answers, `install.sh` installs and builds the CDK package, bootstraps
 the CDK environment, and deploys the stack. It also writes a re-runnable
@@ -117,7 +144,8 @@ The stack (`packages/chorus-cdk/lib/{chorus-stack,service,database,cache}.ts`) c
 
 | Component | What it is | Key configuration |
 | --- | --- | --- |
-| Application Load Balancer | Internet-facing entry point terminating HTTPS on port 443 with your ACM certificate. | Forwards to the service; a host rule routes your custom domain when one is set; 60-minute idle timeout. |
+| Application Load Balancer | Public HTTPS:443 in `alb`; private HTTP:80 origin in `cloudfront`. | Routes to ECS; 60-minute idle timeout. |
+| CloudFront | Public HTTPS endpoint, only in `cloudfront` mode. | Private VPC origin; caching disabled; optional custom domain. |
 | ECS Fargate service | Runs the Chorus container in private subnets. | Desired count 2, 1024 CPU units / 2048 MiB, deployment circuit breaker with automatic rollback. |
 | Aurora Serverless v2 (PostgreSQL) | Managed PostgreSQL cluster. | Encrypted storage; credentials auto-generated into Secrets Manager; 1-day backup retention. |
 | ElastiCache Serverless (Redis) | Managed Redis for cross-instance events. | RBAC user; password stored in Secrets Manager. |

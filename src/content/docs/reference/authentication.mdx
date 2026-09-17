@@ -42,7 +42,7 @@ A single entry point tries each method in priority order and returns on the firs
    ├─ RS*/ES* JWT   → OIDC token verification  → User context
    └─ HS256 JWT     → Chorus JWT verification   → User context
 2. Session cookies
-   └─ user_session | admin_session            → User | Super Admin context
+   └─ user_session                         → User
 3. OIDC cookie (for SSE / EventSource, no Authorization header)
    └─ oidc_access_token cookie                → User context
 4. No match → unauthenticated
@@ -51,6 +51,19 @@ A single entry point tries each method in priority order and returns on the firs
 The token in step 1 is classified by shape: a `cho_` prefix is an API key; otherwise a
 three-part JWT is OIDC when its header algorithm is asymmetric (`RS*`/`ES*`) and a Chorus
 self-signed session token when it is `HS256`.
+
+## Session signing secret
+
+`NEXTAUTH_SECRET` signs Default Auth's `user_session` and Super Admin's `admin_session`
+JWTs. Super Admin routes verify `admin_session` separately from normal user authentication.
+OIDC tokens are verified using the provider's keys; Agent API keys use their stored hash.
+Rotating `NEXTAUTH_SECRET` invalidates Chorus-signed sessions, not API keys or OIDC tokens.
+
+The npm launcher persists a generated secret in `~/.chorus-data/.secret` by default; Docker uses
+`/app/data/.secret`. Both ignore known public placeholders in the environment and stop if a
+persisted key is a known placeholder. Direct app starts require you to provide the secret.
+See [Docker session secrets](/guides/deploy-docker/#session-secret-nextauth_secret) for
+0.18.1 migration, persistence, and replica configuration.
 
 ## Agent API key
 

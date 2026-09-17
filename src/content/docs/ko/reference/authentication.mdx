@@ -41,7 +41,7 @@ Admin뿐입니다.
    ├─ RS*/ES* JWT   → OIDC 토큰 검증             → User 컨텍스트
    └─ HS256 JWT     → Chorus JWT 검증             → User 컨텍스트
 2. 세션 Cookie
-   └─ user_session | admin_session            → User | Super Admin 컨텍스트
+   └─ user_session                         → User
 3. OIDC Cookie(SSE / EventSource용, Authorization 헤더 없음)
    └─ oidc_access_token cookie                → User 컨텍스트
 4. 일치 없음 → 미인증
@@ -49,6 +49,18 @@ Admin뿐입니다.
 
 1단계의 토큰은 형태로 분류됩니다. `cho_` 접두사는 API key입니다. 그 외의 세 부분 JWT는 헤더 알고리즘이
 비대칭(`RS*`/`ES*`)이면 OIDC, `HS256`이면 Chorus 자체 서명 세션 토큰입니다.
+
+## 세션 서명 비밀 키
+
+`NEXTAUTH_SECRET`은 내장 로그인의 `user_session`과 Super Admin의 `admin_session` JWT에 서명합니다.
+Super Admin 경로는 일반 사용자 인증과 별도로 `admin_session`을 검증합니다. OIDC 토큰은 공급자의
+키로, Agent API key는 저장된 해시로 검증합니다. `NEXTAUTH_SECRET` 교체는 Chorus가 서명한 세션만
+무효화하며 API key나 OIDC 토큰에는 영향을 주지 않습니다.
+
+npm 런처는 생성한 키를 기본적으로 `~/.chorus-data/.secret`에 저장하고 Docker는 `/app/data/.secret`을
+사용합니다. 둘 다 환경 변수의 알려진 공개 자리 표시자를 무시하고, 저장된 키가 공개 자리 표시자이면
+시작을 중지합니다. 직접 실행할 때는 키를 직접 설정해야 합니다. 0.18.1 마이그레이션, 영구 저장 및
+레플리카 설정은 [Docker 가이드](/ko/guides/deploy-docker/)를 참고하세요.
 
 ## Agent API key
 

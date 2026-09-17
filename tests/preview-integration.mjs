@@ -123,10 +123,10 @@ try {
     for (const test of [
       { route: '/guides/getting-started/', query: 'workflow', result: /Workflow reference/i },
       { route: '/zh/guides/getting-started/', query: '工作流', result: /工作流参考/ },
-      // ja/ko reference pages are still English-fallback at this stage, so search a
-      // distinctive term from the translated getting-started page and expect that page.
+      // Search localized getting-started pages. Use the Korean title because
+      // generic login guidance can fill the first page of search results.
       { route: '/ja/guides/getting-started/', query: 'サインイン', result: /はじめに/ },
-      { route: '/ko/guides/getting-started/', query: '로그인', result: /시작하기/ },
+      { route: '/ko/guides/getting-started/', query: '시작하기', result: /시작하기/ },
     ]) {
       const page = await context.newPage();
       await page.goto(new URL(test.route, baseUrl).href, { waitUntil: 'networkidle' });

@@ -21,7 +21,7 @@ npm install --global @chorus-aidlc/chorus
 
 ```sh
 DATABASE_URL='postgresql://chorus:password@db.internal:5432/chorus' \
-NEXTAUTH_SECRET='a-long-random-string' \
+NEXTAUTH_SECRET="${NEXTAUTH_SECRET:?Set a persistent random secret first}" \
 SUPER_ADMIN_EMAIL='admin@example.com' \
 SUPER_ADMIN_PASSWORD_HASH='$2b$10$...' \
 chorus
@@ -36,7 +36,7 @@ Chorus が本番実行で読み取る変数：
 | 変数 | 必須 | 説明 |
 | --- | --- | --- |
 | `DATABASE_URL` | はい | PostgreSQL 接続文字列、`postgresql://user:password@host:port/dbname`。 |
-| `NEXTAUTH_SECRET` | はい | セッショントークンの署名に使う秘密鍵。ランダムな値を生成してください。例：`openssl rand -base64 32`。 |
+| `NEXTAUTH_SECRET` | 複数インスタンスで必須 | 全レプリカが共有する署名用の秘密鍵。単一 npm インスタンスでは省略でき、`chorus` が既定で `~/.chorus-data/.secret` に生成・保存します。環境変数の既知のプレースホルダーは警告して無視します。保存済みの鍵が空または公開プレースホルダーなら起動を停止します。 |
 | `SUPER_ADMIN_EMAIL` | はい | `/admin` の SuperAdmin パネルをブートストラップするメール。 |
 | `SUPER_ADMIN_PASSWORD_HASH` | はい | SuperAdmin パスワードの bcrypt ハッシュ。 |
 | `DEFAULT_USER` | 任意 | 初回アクセス用の組み込みメール／パスワードログインを有効にします。 |
@@ -61,13 +61,37 @@ REDIS_URL='redis://default:password@redis.internal:6379'
 
 **インスタンス間のイベント伝播には Redis が必須です。** `REDIS_URL` がないと、Chorus は単一プロセスにスコープされたメモリ内イベントバスにフォールバックします。あるインスタンスで行われた更新は、他のインスタンスには決して届きません。単一インスタンスのデプロイはそのメモリ内フォールバックで Redis なしに実行できますが、複数のインスタンスを持つデプロイは共有の Redis を必ず設定しなければなりません。
 
+全インスタンスに同じ安全な `NEXTAUTH_SECRET` も設定し、どのインスタンスでも Chorus 署名のセッションを検証できるようにしてください。
+
 ## AWS CDK スタックをデプロイする
 
 Chorus は `packages/chorus-cdk` の下に AWS CDK スタックを同梱し、それを対話的に駆動するリポジトリルートの `install.sh` を提供します。このスタックは、マネージドの PostgreSQL と Redis を備えた、HTTPS で前置された完全なデプロイを立ち上げます。
 
 ### 前提条件
 
-`install.sh` はまず `aws`、`node`、`pnpm` の各コマンドが利用可能かどうか、そして AWS 資格情報が有効かどうか（`aws sts get-caller-identity` を呼び出します）を確認します。実行する前に、`aws configure` または `AWS_PROFILE` で資格情報を設定し、デプロイ先リージョンで [AWS Certificate Manager](https://aws.amazon.com/certificate-manager/) の証明書を用意しておいてください。
+`install.sh` は `aws`、`node`、`pnpm` と AWS 資格情報を確認します。先に `aws configure`
+または `AWS_PROFILE` を設定してください。証明書の要件は次のモードによって異なります。
+
+### デプロイモードを選ぶ
+
+- **`alb`（既定）**：公開 ALB の HTTPS ポート 443 を使用します。デプロイ先リージョンの ACM 証明書が
+  必須で、カスタムドメインは任意です。
+- **`cloudfront`**：CloudFront が公開 HTTPS を提供し、VPC origin 経由でプライベート ALB の
+  HTTP ポート 80 に転送します。既定の `*.cloudfront.net` ドメインには証明書の準備は不要です。
+  カスタムドメインにはドメインと **`us-east-1`** の ACM 証明書を両方指定します。
+  キャッシュは無効で、認証済みページや API 応答はキャッシュしません。
+
+`./install.sh` で選ぶか、CDK に `-c deployMode=cloudfront` を渡します。`default_deploy.sh` も
+選択を保存します。非対話インストールでは `CHORUS_INSTALL_NONINTERACTIVE=1`、
+`DEPLOY_MODE=alb|cloudfront` と他の必須変数を設定します。DNS レコードは自動作成しません。
+カスタムドメインを `AlbDnsName` または `CloudFrontDomainName` の出力に向け、OIDC コールバック URL も更新します。
+
+:::caution[既存デプロイのモード変更]
+切り替えは ALB を置き換え、DNS 名も変更します。新しいスタックをデプロイし、データと DNS を移行して
+検証した後、旧スタックを削除してください。`alb` を維持すれば既存の構成を維持できます。
+`cloudfront` の ALB は非公開なので、CloudFront URL、ECS ログ、ターゲットグループの状態で診断します。
+デプロイ先リージョンで CloudFront VPC origin が利用できることも確認してください。
+:::
 
 ### インストーラーを実行する
 
@@ -83,12 +107,17 @@ Chorus は `packages/chorus-cdk` の下に AWS CDK スタックを同梱し、�
 
 | プロンプト | 必須 | 備考 |
 | --- | --- | --- |
+| Deployment mode | いいえ | `alb`（既定）または `cloudfront`。 |
 | Stack name | いいえ | デフォルトは `Chorus`。 |
-| ACM Certificate ARN | はい | `arn:aws:acm:` で始まる必要があります。ロードバランサーがこれを使って HTTPS を終端します。 |
-| Custom domain | いいえ | 例：`chorus.example.com`。設定するとそのドメイン向けのホストルールを追加します。 |
+| ACM Certificate ARN | モード次第 | `alb` はデプロイ先リージョンで必須。`cloudfront` はカスタムドメイン利用時のみ `us-east-1` の証明書が必須。 |
+| Custom domain | いいえ | `cloudfront` では `us-east-1` の証明書と同時に指定。省略時は配布ドメインを使用。 |
 | Super admin email | はい | `/admin` の SuperAdmin アカウントをブートストラップします。 |
 | Super admin password | はい | 最低 8 文字。synth 時に bcrypt でハッシュされ、平文はテンプレートに保存されません。 |
-| NextAuth secret | いいえ | 空欄のままだと自動生成されます。 |
+| NextAuth secret | いいえ | 空欄の場合は synth ごとに生成されます。再デプロイ後もセッションを維持するには、同じ永続的な値を指定してください。 |
+
+スタックは Secrets Manager で `NEXTAUTH_SECRET` を共有しますが、synth 時に既存値を読み戻しません。
+毎回、インストーラーか CDK の `nextAuthSecret` context に同じ値を指定してください。
+以前は空欄にしていた場合、再デプロイ前に Secrets Manager の既存値を引き継ぎ、意図しない変更を防いでください。
 
 </div>
 
@@ -102,7 +131,8 @@ Chorus は `packages/chorus-cdk` の下に AWS CDK スタックを同梱し、�
 
 | コンポーネント | 何であるか | 主な設定 |
 | --- | --- | --- |
-| Application Load Balancer | あなたの ACM 証明書でポート 443 の HTTPS を終端する、インターネット向けの入口。 | サービスへ転送します。カスタムドメインが設定されているとホストルールがそれをルーティングします。アイドルタイムアウト 60 分。 |
+| Application Load Balancer | `alb` は公開 HTTPS:443、`cloudfront` はプライベート HTTP:80 オリジン。 | ECS へ転送。アイドルタイムアウト 60 分。 |
+| CloudFront | `cloudfront` モードのみで作成する公開 HTTPS 入口。 | プライベート VPC origin、キャッシュ無効、任意のカスタムドメイン。 |
 | ECS Fargate サービス | プライベートサブネットで Chorus コンテナを実行します。 | 希望数 2、1024 CPU ユニット／2048 MiB、自動ロールバック付きのデプロイサーキットブレーカー。 |
 | Aurora Serverless v2（PostgreSQL） | マネージドの PostgreSQL クラスター。 | 暗号化ストレージ。資格情報は自動生成され Secrets Manager に格納。バックアップ保持 1 日。 |
 | ElastiCache Serverless（Redis） | インスタンス間イベント用のマネージド Redis。 | RBAC ユーザー。パスワードは Secrets Manager に格納。 |

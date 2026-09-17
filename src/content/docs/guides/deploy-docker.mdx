@@ -39,7 +39,10 @@ services:
     environment:
       # No DATABASE_URL — entrypoint auto-starts embedded PGlite
       - REDIS_URL=
-      - NEXTAUTH_SECRET=${NEXTAUTH_SECRET:-chorus-local-secret}
+      # Leave empty: the container generates a random session secret on first
+      # start and keeps it in the chorus-local-data volume. Set it explicitly
+      # (openssl rand -base64 32) if you prefer to manage it yourself.
+      - NEXTAUTH_SECRET=${NEXTAUTH_SECRET:-}
       - COOKIE_SECURE=false
       - DEFAULT_USER=${DEFAULT_USER:-admin@example.com}
       - DEFAULT_PASSWORD=${DEFAULT_PASSWORD:-changeme}
@@ -63,6 +66,8 @@ In standalone mode the container:
 
 - Starts PGlite on an internal port (`5433`), not exposed externally.
 - Stores data in the `chorus-local-data` Docker volume, so it persists across restarts.
+- Generates a random session-signing secret on first start and stores it in the same volume
+  when `NEXTAUTH_SECRET` is left empty (see [Session secret](#session-secret-nextauth_secret)).
 - Disables Redis (falls back to the in-memory EventBus — single-instance only).
 - Runs Prisma migrations automatically on startup.
 
@@ -80,9 +85,17 @@ services:
     environment:
       - DATABASE_URL=postgresql://chorus:chorus@db:5432/chorus
       - REDIS_URL=redis://default:chorus-redis@redis:6379
-      - NEXTAUTH_SECRET=change-me-to-a-random-secret
+      # Session-signing secret. Leave empty and the container generates one on
+      # first start and persists it in the chorus-app-data volume (single
+      # replica only). For production, or more than one app container, set it
+      # explicitly in .env or the environment:  openssl rand -base64 32
+      # Changing the secret invalidates Default Auth and Super Admin sessions.
+      - NEXTAUTH_SECRET=${NEXTAUTH_SECRET:-}
+      - COOKIE_SECURE=${COOKIE_SECURE:-false}
       - DEFAULT_USER=admin@example.com
       - DEFAULT_PASSWORD=your-password
+    volumes:
+      - chorus-app-data:/app/data
     depends_on:
       db:
         condition: service_healthy
@@ -115,8 +128,16 @@ services:
       retries: 5
 
 volumes:
+  chorus-app-data:
   chorus-data:
   redis-data:
+```
+
+To supply your own session secret, generate it once before starting and put it in a `.env`
+file next to the compose file:
+
+```bash
+echo "NEXTAUTH_SECRET=$(openssl rand -base64 32)" >> .env
 ```
 
 Then run:
@@ -144,21 +165,24 @@ docker run -d \
   -p 8637:8637 \
   -e DATABASE_URL=postgresql://user:pass@your-db-host:5432/chorus \
   -e REDIS_URL=redis://default:password@your-redis-host:6379 \
-  -e NEXTAUTH_SECRET=change-me-to-a-random-secret \
+  -v chorus-app-data:/app/data \
   -e COOKIE_SECURE=false \
   -e DEFAULT_USER=admin@example.com \
   -e DEFAULT_PASSWORD=your-password \
   chorusaidlc/chorus-app:latest
 ```
 
+This example keeps the generated secret in `chorus-app-data` across container recreates.
+To manage it yourself, inject one persistent `NEXTAUTH_SECRET` and reuse it on every start.
+
 ## Environment variables
 
-### Required
+### Database and session secret
 
 | Variable | Description |
 | --- | --- |
 | `DATABASE_URL` | PostgreSQL connection string. Format: `postgresql://user:password@host:port/dbname`. Alternatively, set individual `DB_*` variables (see below). **If omitted**, the entrypoint starts an embedded PGlite instance automatically. |
-| `NEXTAUTH_SECRET` | Secret key for signing JWT session tokens. Use a random string (for example, `openssl rand -base64 32`). |
+| `NEXTAUTH_SECRET` | Secret key for signing session tokens. Use a random string (for example, `openssl rand -base64 32`). **In Docker it may be left empty:** the container then generates one on first start and keeps it in `/app/data/.secret`. Must be set explicitly, to the same value, on every replica when running more than one app container. See [Session secret](#session-secret-nextauth_secret). |
 
 ### Database (alternative to `DATABASE_URL`)
 
@@ -212,13 +236,17 @@ pretty output is only available in local development.
 
 The container's entrypoint runs the same sequence every time it starts:
 
-1. If `DATABASE_URL` is not set and no `DB_*` variables are provided, the entrypoint starts an
+1. It checks `NEXTAUTH_SECRET`. If it is empty, or set to one of the placeholder values that
+   used to appear in the shipped examples, the container reads or generates the secret in
+   `/app/data/.secret` and logs what it did (never the value itself). An explicit secret of
+   your own is used as-is.
+2. If `DATABASE_URL` is not set and no `DB_*` variables are provided, the entrypoint starts an
    embedded PGlite instance on an internal port (`5433`). When an external database **is**
    configured, PGlite is not started.
-2. It runs `prisma migrate deploy` to apply any pending database migrations.
-3. If the database is not ready, it retries every 10 seconds (up to 30 attempts, roughly five
+3. It runs `prisma migrate deploy` to apply any pending database migrations.
+4. If the database is not ready, it retries every 10 seconds (up to 30 attempts, roughly five
    minutes).
-4. Once migrations succeed, the Next.js server starts on port `8637`.
+5. Once migrations succeed, the Next.js server starts on port `8637`.
 
 :::note[Migrations run automatically]
 You do not run migrations yourself. Applying pending migrations at startup is part of the
@@ -226,6 +254,51 @@ entrypoint, so upgrading is just starting a newer image against the same databas
 new image can migrate your schema on first boot, back up the database or data volume before
 upgrading — see [Operations](/guides/deploy-operations/).
 :::
+
+## Session secret (`NEXTAUTH_SECRET`)
+
+`NEXTAUTH_SECRET` signs Chorus's own `user_session` (Default Auth) and `admin_session`
+(Super Admin) JWTs. OIDC tokens are signed by the identity provider, and agent API keys are
+validated separately. Rotating this secret invalidates Chorus-signed sessions; it does not
+rotate API keys or invalidate the provider's OIDC tokens.
+
+:::caution[Upgrading from 0.18.0 or earlier]
+If your deployment used a public placeholder secret, 0.18.1 ignores that value and reuses
+or generates a private secret. Users of the affected Chorus-signed sessions must sign in
+again. The entrypoint preserves an explicitly supplied secure secret. Reusing that value
+avoids a sign-in caused by secret rotation. For CDK redeployments, explicitly preserve
+`nextAuthSecret`; see [CDK secret configuration](/guides/deploy-production/).
+
+An old Compose file without an `/app/data` volume loses the generated secret whenever the
+container is recreated. Add the volume shown above or supply a persistent `NEXTAUTH_SECRET`.
+:::
+
+### What the container does
+
+- **Explicit non-placeholder value**: uses it without reading or writing a secret file.
+- **Unset, empty, or a known public placeholder**: reuses `/app/data/.secret`; if missing
+  or empty, generates 32 random bytes encoded as 64 hexadecimal characters and saves them
+  with mode `0600`. A placeholder in the environment also produces a warning.
+- **Unusable persisted secret**: a non-regular or unreadable file, a persisted public
+  placeholder, or a generation/write failure stops startup before migrations. An invalid
+  persisted placeholder is never silently accepted or replaced.
+
+The secret value is never logged. To retain an auto-generated secret, keep `/app/data`
+on a persistent volume. For multiple
+replicas, explicitly inject the **same** secret into every instance; the
+[AWS CDK stack](/guides/deploy-production/) already shares it through Secrets Manager.
+
+### Setting and rotating the secret
+
+Generate a value once with `openssl rand -base64 32`, store it in your deployment's secret
+store or protected `.env`, and reuse it on subsequent starts. Changing the effective value
+requires Default Auth users and the Super Admin to sign in again. Deleting `.secret` only
+rotates an auto-generated secret; it has no effect when an explicit secret is configured.
+
+The Docker entrypoint and npm `chorus` launcher perform this bootstrap. Starting the app
+directly with `next start` or `node server.js` does not: provide a secure secret yourself.
+The app logs an error for a known placeholder, but that warning does not replace it; an
+unset secret prevents Chorus-signed session issuance.
 
 ## Image details
 

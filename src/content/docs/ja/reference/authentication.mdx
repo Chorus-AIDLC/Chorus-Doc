@@ -41,7 +41,7 @@ Chorus はすべてのリクエストを一つの統一された `AuthContext` �
    ├─ RS*/ES* JWT   → OIDC トークンの検証        → User コンテキスト
    └─ HS256 JWT     → Chorus JWT の検証           → User コンテキスト
 2. セッション Cookie
-   └─ user_session | admin_session            → User | Super Admin コンテキスト
+   └─ user_session                         → User
 3. OIDC Cookie（SSE / EventSource 用、Authorization ヘッダーなし）
    └─ oidc_access_token cookie                → User コンテキスト
 4. 一致なし → 未認証
@@ -50,6 +50,18 @@ Chorus はすべてのリクエストを一つの統一された `AuthContext` �
 ステップ 1 のトークンは形状で分類されます。`cho_` 接頭辞は API key です。それ以外の三分割 JWT は、
 ヘッダーのアルゴリズムが非対称（`RS*`/`ES*`）なら OIDC、`HS256` なら Chorus の自己署名セッション
 トークンです。
+
+## セッション署名用の秘密鍵
+
+`NEXTAUTH_SECRET` は組み込みログインの `user_session` と Super Admin の `admin_session` JWT
+に署名します。Super Admin ルートは通常のユーザー認証とは別に `admin_session` を検証します。
+OIDC トークンはプロバイダーの鍵で、Agent API key は保存されたハッシュで検証します。
+`NEXTAUTH_SECRET` の変更で無効になるのは Chorus 署名のセッションだけです。
+
+npm ランチャーは生成した鍵を既定で `~/.chorus-data/.secret` に保存し、Docker は `/app/data/.secret`
+を使います。どちらも環境変数の既知の公開プレースホルダーを無視し、保存済みの鍵が公開プレースホルダー
+なら起動を停止します。直接起動する場合は鍵を自分で設定してください。
+0.18.1 の移行・永続化・レプリカ設定は [Docker ガイド](/ja/guides/deploy-docker/)を参照してください。
 
 ## Agent API key
 

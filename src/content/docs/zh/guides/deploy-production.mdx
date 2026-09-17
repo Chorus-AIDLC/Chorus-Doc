@@ -21,7 +21,7 @@ npm install --global @chorus-aidlc/chorus
 
 ```sh
 DATABASE_URL='postgresql://chorus:password@db.internal:5432/chorus' \
-NEXTAUTH_SECRET='a-long-random-string' \
+NEXTAUTH_SECRET="${NEXTAUTH_SECRET:?Set a persistent random secret first}" \
 SUPER_ADMIN_EMAIL='admin@example.com' \
 SUPER_ADMIN_PASSWORD_HASH='$2b$10$...' \
 chorus
@@ -36,7 +36,7 @@ Chorus 在生产运行中读取的环境变量：
 | 环境变量 | 是否必需 | 说明 |
 | --- | --- | --- |
 | `DATABASE_URL` | 是 | PostgreSQL 连接串，格式为 `postgresql://user:password@host:port/dbname`。 |
-| `NEXTAUTH_SECRET` | 是 | 用于签名会话令牌的密钥。请使用随机值，例如 `openssl rand -base64 32`。 |
+| `NEXTAUTH_SECRET` | 多实例时必需 | 所有副本共享的签名密钥。单个 npm 实例可省略，`chorus` 默认生成并保存在 `~/.chorus-data/.secret`。环境变量中的已知占位值会被忽略并触发警告；已保存的密钥若为空或为公开占位值，则停止启动。 |
 | `SUPER_ADMIN_EMAIL` | 是 | 用于引导 `/admin` 超级管理员面板的邮箱。 |
 | `SUPER_ADMIN_PASSWORD_HASH` | 是 | 超级管理员密码的 bcrypt 哈希值。 |
 | `DEFAULT_USER` | 可选 | 启用内置的邮箱／密码登录，用于首次访问。 |
@@ -61,13 +61,34 @@ REDIS_URL='redis://default:password@redis.internal:6379'
 
 **跨实例的事件传播必须依赖 Redis。** 未设置 `REDIS_URL` 时，Chorus 会退回到进程内的内存事件总线，其作用范围仅限单个进程，在一个实例上产生的更新不会到达其他实例。单实例部署可以不配置 Redis，依靠这种内存回退运行；但只要部署多于一个实例，就必须配置共享 Redis。
 
+所有实例还必须共享同一个安全的 `NEXTAUTH_SECRET`，确保请求落到任意实例时，Chorus 自签名会话都能通过校验。
+
 ## 部署 AWS CDK 栈
 
 Chorus 在 `packages/chorus-cdk` 下自带一个 AWS CDK 栈，并提供仓库根目录的 `install.sh` 以交互方式驱动它。该栈会搭建一套完整的、经 HTTPS 前置的部署，并附带托管的 PostgreSQL 与 Redis。
 
 ### 前置条件
 
-`install.sh` 会先检查 `aws`、`node`、`pnpm` 命令是否可用，以及 AWS 凭据是否有效（它会调用 `aws sts get-caller-identity`）。运行之前，请先用 `aws configure` 或 `AWS_PROFILE` 配置凭据，并在部署所在区域准备好一张 [AWS Certificate Manager](https://aws.amazon.com/certificate-manager/) 证书。
+`install.sh` 会检查 `aws`、`node`、`pnpm` 和 AWS 凭据。请先通过 `aws configure` 或
+`AWS_PROFILE` 配置凭据。证书要求取决于下列模式。
+
+### 选择部署模式
+
+- **`alb`（默认）**：公网 ALB 使用 HTTPS 443 端口，必须提供部署区域内的 ACM 证书，自定义域名可选。
+- **`cloudfront`**：CloudFront 提供公网 HTTPS，经 VPC origin 转发到私有 ALB 的 HTTP 80 端口。
+  默认的 `*.cloudfront.net` 域名无需自备证书。使用自定义域名时，必须同时提供域名和 **`us-east-1`**
+  的 ACM 证书。已禁用缓存，不会缓存登录后的页面和 API 响应。
+
+在 `./install.sh` 中选择模式，或向 CDK 传入 `-c deployMode=cloudfront`。
+`default_deploy.sh` 会保留选择。非交互安装使用 `CHORUS_INSTALL_NONINTERACTIVE=1`、
+`DEPLOY_MODE=alb|cloudfront` 及其他必需变量。两种模式都不会创建 DNS 记录；请将自定义域名指向
+`AlbDnsName` 或 `CloudFrontDomainName` 栈输出，并更新 OIDC 回调地址。
+
+:::caution[切换现有部署的模式]
+模式切换会替换 ALB 并改变 DNS 名称。请部署新栈，迁移数据与 DNS，验证后再移除旧栈。
+继续使用 `alb` 会保留现有拓扑。`cloudfront` 模式的 ALB 不可从公网访问，排障请使用
+CloudFront 地址、ECS 日志或目标组健康状态，并确认部署区域支持 CloudFront VPC origin。
+:::
 
 ### 运行安装脚本
 
@@ -83,12 +104,17 @@ Chorus 在 `packages/chorus-cdk` 下自带一个 AWS CDK 栈，并提供仓库�
 
 | 提示 | 是否必需 | 说明 |
 | --- | --- | --- |
+| Deployment mode | 否 | `alb`（默认）或 `cloudfront`。 |
 | Stack name | 否 | 默认为 `Chorus`。 |
-| ACM Certificate ARN | 是 | 必须以 `arn:aws:acm:` 开头。负载均衡器用它来终止 HTTPS。 |
-| Custom domain | 否 | 例如 `chorus.example.com`。设置后会为该域名添加一条主机路由规则。 |
+| ACM Certificate ARN | 取决于模式 | `alb` 必须使用部署区域的证书；`cloudfront` 仅在使用自定义域名时需要 `us-east-1` 的证书。 |
+| Custom domain | 否 | `cloudfront` 模式需同时提供 `us-east-1` 的证书，否则使用分配的 CloudFront 域名。 |
 | Super admin email | 是 | 用于引导 `/admin` 超级管理员账号。 |
 | Super admin password | 是 | 至少 8 个字符。在 synth 阶段用 bcrypt 哈希，明文不会写入模板。 |
-| NextAuth secret | 否 | 留空则自动生成。 |
+| NextAuth secret | 否 | 留空时每次 synth 都会生成新值。提供同一个持久值，才能在重新部署后保留会话。 |
+
+栈通过 Secrets Manager 共享 `NEXTAUTH_SECRET`，但 synth 时不会读取已保存的值。
+每次部署请在安装器或 CDK 的 `nextAuthSecret` context 中复用同一值。若此前留空，
+请在重新部署前保留 Secrets Manager 中的现有值，避免意外轮换。
 
 </div>
 
@@ -102,7 +128,8 @@ Chorus 在 `packages/chorus-cdk` 下自带一个 AWS CDK 栈，并提供仓库�
 
 | 组件 | 是什么 | 关键配置 |
 | --- | --- | --- |
-| Application Load Balancer | 面向公网的入口，使用你的 ACM 证书在 443 端口终止 HTTPS。 | 转发到服务；设置自定义域名时，会有一条主机规则路由该域名；空闲超时 60 分钟。 |
+| Application Load Balancer | `alb` 为公网 HTTPS:443；`cloudfront` 为私有 HTTP:80 源站。 | 转发到 ECS，空闲超时 60 分钟。 |
+| CloudFront | 仅在 `cloudfront` 模式创建的公网 HTTPS 入口。 | 私有 VPC origin，禁用缓存，可选自定义域名。 |
 | ECS Fargate 服务 | 在私有子网中运行 Chorus 容器。 | 期望副本数 2，1024 CPU 单位／2048 MiB，部署断路器可自动回滚。 |
 | Aurora Serverless v2（PostgreSQL） | 托管的 PostgreSQL 集群。 | 存储加密；凭据自动生成并存入 Secrets Manager；备份保留 1 天。 |
 | ElastiCache Serverless（Redis） | 用于跨实例事件的托管 Redis。 | 使用 RBAC 用户；密码存入 Secrets Manager。 |

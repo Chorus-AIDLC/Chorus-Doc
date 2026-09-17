@@ -21,7 +21,7 @@ npm install --global @chorus-aidlc/chorus
 
 ```sh
 DATABASE_URL='postgresql://chorus:password@db.internal:5432/chorus' \
-NEXTAUTH_SECRET='a-long-random-string' \
+NEXTAUTH_SECRET="${NEXTAUTH_SECRET:?Set a persistent random secret first}" \
 SUPER_ADMIN_EMAIL='admin@example.com' \
 SUPER_ADMIN_PASSWORD_HASH='$2b$10$...' \
 chorus
@@ -36,7 +36,7 @@ Chorus가 프로덕션 실행에서 읽는 변수:
 | 변수 | 필수 | 설명 |
 | --- | --- | --- |
 | `DATABASE_URL` | 예 | PostgreSQL 연결 문자열, `postgresql://user:password@host:port/dbname`. |
-| `NEXTAUTH_SECRET` | 예 | 세션 토큰에 서명하는 데 사용하는 비밀 키. 무작위 값을 생성하세요. 예: `openssl rand -base64 32`. |
+| `NEXTAUTH_SECRET` | 여러 인스턴스에서 필수 | 모든 레플리카가 공유하는 서명 비밀 키. 단일 npm 인스턴스에서는 생략할 수 있으며 `chorus`가 기본적으로 `~/.chorus-data/.secret`에 생성·저장합니다. 환경 변수의 알려진 자리 표시자는 경고와 함께 무시합니다. 저장된 키가 비어 있거나 공개 자리 표시자이면 시작을 중지합니다. |
 | `SUPER_ADMIN_EMAIL` | 예 | `/admin` SuperAdmin 패널을 부트스트랩하는 이메일. |
 | `SUPER_ADMIN_PASSWORD_HASH` | 예 | SuperAdmin 비밀번호의 bcrypt 해시. |
 | `DEFAULT_USER` | 선택 | 첫 접근을 위한 내장 이메일/비밀번호 로그인을 활성화합니다. |
@@ -61,13 +61,36 @@ REDIS_URL='redis://default:password@redis.internal:6379'
 
 **인스턴스 간 이벤트 전파에는 Redis가 필수입니다.** `REDIS_URL`이 없으면 Chorus는 단일 프로세스로 범위가 한정된 메모리 내 이벤트 버스로 폴백합니다. 한 인스턴스에서 이루어진 업데이트는 다른 인스턴스에 결코 도달하지 않습니다. 단일 인스턴스 배포는 그 메모리 내 폴백으로 Redis 없이 실행할 수 있지만, 인스턴스가 두 개 이상인 배포는 공유 Redis를 반드시 구성해야 합니다.
 
+모든 인스턴스에 같은 안전한 `NEXTAUTH_SECRET`도 설정해 어느 인스턴스에서든 Chorus가 서명한 세션을 검증할 수 있도록 하세요.
+
 ## AWS CDK 스택 배포하기
 
 Chorus는 `packages/chorus-cdk` 아래에 AWS CDK 스택을 함께 담고 있으며, 그것을 대화식으로 구동하는 리포지토리 루트의 `install.sh`를 제공합니다. 이 스택은 관리형 PostgreSQL과 Redis를 갖춘, HTTPS로 앞단을 두른 완전한 배포를 세웁니다.
 
 ### 전제 조건
 
-`install.sh`는 먼저 `aws`, `node`, `pnpm` 명령을 사용할 수 있는지, 그리고 AWS 자격 증명이 유효한지(`aws sts get-caller-identity`를 호출합니다) 확인합니다. 실행하기 전에 `aws configure` 또는 `AWS_PROFILE`로 자격 증명을 구성하고, 배포 리전에 [AWS Certificate Manager](https://aws.amazon.com/certificate-manager/) 인증서를 준비해 두세요.
+`install.sh`는 `aws`, `node`, `pnpm`과 AWS 자격 증명을 확인합니다. 먼저 `aws configure` 또는
+`AWS_PROFILE`을 설정하세요. 인증서 요구 사항은 아래 모드에 따라 다릅니다.
+
+### 배포 모드 선택
+
+- **`alb`(기본값)**: 공개 ALB의 HTTPS 포트 443을 사용합니다. 배포 리전의 ACM 인증서는 필수이며
+  커스텀 도메인은 선택 사항입니다.
+- **`cloudfront`**: CloudFront가 공개 HTTPS를 제공하고 VPC origin을 통해 프라이빗 ALB의 HTTP 포트 80으로
+  전달합니다. 기본 `*.cloudfront.net` 도메인은 인증서를 준비할 필요가 없습니다. 커스텀 도메인에는
+  도메인과 **`us-east-1`** ACM 인증서를 함께 제공하세요. 캐시는 비활성화되어 인증된 페이지와 API 응답을 캐시하지 않습니다.
+
+`./install.sh`에서 선택하거나 CDK에 `-c deployMode=cloudfront`를 전달하세요. `default_deploy.sh`도
+선택을 저장합니다. 비대화형 설치에는 `CHORUS_INSTALL_NONINTERACTIVE=1`, `DEPLOY_MODE=alb|cloudfront`와
+다른 필수 변수를 사용합니다. DNS 레코드는 자동으로 만들지 않습니다. 커스텀 도메인이 `AlbDnsName` 또는
+`CloudFrontDomainName` 출력을 가리키도록 설정하고 OIDC 콜백 URL도 갱신하세요.
+
+:::caution[기존 배포의 모드 변경]
+모드를 전환하면 ALB가 교체되고 DNS 이름도 바뀝니다. 새 스택을 배포하고 데이터와 DNS를 이전한 뒤
+검증하고 기존 스택을 제거하세요. `alb`를 유지하면 기존 구성을 유지합니다. `cloudfront`의 ALB는
+비공개이므로 CloudFront URL, ECS 로그 또는 대상 그룹 상태로 진단하세요.
+배포 리전에서 CloudFront VPC origin을 지원하는지도 확인하세요.
+:::
 
 ### 설치 프로그램 실행하기
 
@@ -83,12 +106,17 @@ Chorus는 `packages/chorus-cdk` 아래에 AWS CDK 스택을 함께 담고 있으
 
 | 프롬프트 | 필수 | 참고 |
 | --- | --- | --- |
+| Deployment mode | 아니요 | `alb`(기본값) 또는 `cloudfront`. |
 | Stack name | 아니요 | 기본값 `Chorus`. |
-| ACM Certificate ARN | 예 | `arn:aws:acm:`로 시작해야 합니다. 로드 밸런서가 이를 사용해 HTTPS를 종료합니다. |
-| Custom domain | 아니요 | 예: `chorus.example.com`. 설정하면 그 도메인에 대한 호스트 규칙을 추가합니다. |
+| ACM Certificate ARN | 모드에 따라 다름 | `alb`는 배포 리전의 인증서가 필수. `cloudfront`는 커스텀 도메인을 사용할 때만 `us-east-1` 인증서가 필수. |
+| Custom domain | 아니요 | `cloudfront`에서는 `us-east-1` 인증서와 함께 제공. 생략하면 배포 도메인 사용. |
 | Super admin email | 예 | `/admin` SuperAdmin 계정을 부트스트랩합니다. |
 | Super admin password | 예 | 최소 8자. synth 시점에 bcrypt로 해시되며, 평문은 템플릿에 저장되지 않습니다. |
-| NextAuth secret | 아니요 | 비워 두면 자동으로 생성됩니다. |
+| NextAuth secret | 아니요 | 비워 두면 synth마다 생성됩니다. 재배포 후에도 세션을 유지하려면 같은 영구 값을 제공하세요. |
+
+스택은 Secrets Manager로 `NEXTAUTH_SECRET`을 공유하지만 synth 시 기존 값을 다시 읽지 않습니다.
+배포할 때마다 설치 프로그램이나 CDK의 `nextAuthSecret` context에 같은 값을 사용하세요.
+이전에 비워 두었다면 재배포 전에 Secrets Manager의 기존 값을 이어 사용해 의도하지 않은 교체를 방지하세요.
 
 </div>
 
@@ -102,7 +130,8 @@ Chorus는 `packages/chorus-cdk` 아래에 AWS CDK 스택을 함께 담고 있으
 
 | 구성 요소 | 무엇인가 | 주요 구성 |
 | --- | --- | --- |
-| Application Load Balancer | 당신의 ACM 인증서로 443 포트에서 HTTPS를 종료하는, 인터넷을 향한 진입점. | 서비스로 전달합니다. 커스텀 도메인이 설정되면 호스트 규칙이 그 도메인을 라우팅합니다. 유휴 타임아웃 60분. |
+| Application Load Balancer | `alb`는 공개 HTTPS:443, `cloudfront`는 프라이빗 HTTP:80 오리진. | ECS로 전달. 유휴 타임아웃 60분. |
+| CloudFront | `cloudfront` 모드에서만 생성되는 공개 HTTPS 진입점. | 프라이빗 VPC origin, 캐시 비활성화, 선택적 커스텀 도메인. |
 | ECS Fargate 서비스 | 프라이빗 서브넷에서 Chorus 컨테이너를 실행합니다. | 원하는 개수 2, 1024 CPU 단위 / 2048 MiB, 자동 롤백을 갖춘 배포 서킷 브레이커. |
 | Aurora Serverless v2(PostgreSQL) | 관리형 PostgreSQL 클러스터. | 암호화 스토리지. 자격 증명은 자동 생성되어 Secrets Manager에 저장. 백업 보존 1일. |
 | ElastiCache Serverless(Redis) | 인스턴스 간 이벤트를 위한 관리형 Redis. | RBAC 사용자. 비밀번호는 Secrets Manager에 저장. |

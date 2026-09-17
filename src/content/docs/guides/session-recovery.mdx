@@ -36,6 +36,19 @@ Files, commands, comments, and external actions completed before the interrupt r
 place. Review the partial result before starting another execution.
 :::
 
+## When a conversation stays running
+
+If the process has finished but the conversation still says **Running**, select
+**Interrupt** in that conversation. The control is available even when no live execution
+is listed. If Chorus has no live run to stop, it can mark the turn interrupted directly;
+otherwise it forwards the request to the daemon and waits for the stop report.
+
+Completion reports retry temporary failures, and a child process that has exited no
+longer stays active just because a background process keeps its output pipe open.
+This recovery behavior adds no duration limit to running work. Backend limits still
+apply: DeepSeek Harness (`dsh`) defaults to 30 minutes per turn, configurable through
+`CHORUS_DSH_TIMEOUT_MS`. Check the final output and any remaining processes before resuming.
+
 ## Inspect the partial result
 
 Before resuming:
