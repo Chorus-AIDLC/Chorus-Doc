@@ -47,14 +47,23 @@ In the New Idea dialog:
    there is nothing to pick.
 3. Optionally check **Help me break this into child ideas** to have the agent propose a set
    of child ideas (a decomposition) rather than a single idea.
-4. Type a description of what you want and select **Send to agent**.
+4. Optionally check **Research before clarifying** to have the agent check the facts it
+   needs before it asks you anything. Leaving it unchecked does not forbid research — the
+   agent still looks something up when a checkable fact could change what it asks you. When
+   the goal itself is unclear, it asks you first rather than searching.
+5. Type a description of what you want and select **Send to agent**.
 
-Chorus creates the idea, assigns it to the agent instance you picked, and opens a
-conversation with the agent. From there the agent takes over: it gives the idea a proper
-title, polishes your description, and starts elaboration — so an idea created this way
-arrives already assigned and already in elaboration, and you continue the back-and-forth in
-the chat and in the idea's Elaboration tab (below). If you checked the decompose option, the
-agent instead proposes candidate child ideas for you to confirm.
+Chorus creates the idea, assigns it to the agent instance you picked, and hands it to that
+agent. The dialog closes and confirms that the request was submitted; you stay on the page
+you were on. From there the agent takes over: it gives the idea a proper title, polishes
+your description, and starts elaboration — so an idea created this way arrives already
+assigned and already in elaboration, and you answer its questions in the idea's Elaboration
+tab (below). If you checked the decompose option, the agent instead proposes candidate child
+ideas for you to confirm.
+
+The request also starts a conversation with the agent, tied to the new idea. It does not
+open by itself; to watch the agent work, select the online-agents indicator in the
+bottom-right corner, then **Open chat**. The request shows there as a **Create Idea** turn.
 
 Because this path assigns the agent for you, you can skip the manual **Assign** step in the
 next section.
@@ -74,6 +83,43 @@ to give it to an agent (the **Describe to an agent** entry does this for you whe
 is online). Once assigned, an online agent picks the idea up and posts the first round of
 questions; if no agent is connected yet, bring one online first — see the
 [agent platforms reference](/reference/agents/).
+
+## Ask for research before development
+
+Sometimes an idea needs facts before it needs questions — how comparable products solve
+this, what a library actually supports, whether an approach has a known catch. You can ask an
+agent for one short research pass: open the idea, select **Actions**, then **Research**.
+
+- The agent must be online, owned by you, and allowed to read the plan, edit ideas, and
+  attach references. If the idea has no agent yet, you choose an agent and working directory,
+  then select **Request research**; that agent is assigned to the idea. If the idea's agent
+  serves more than one working directory, you pick the directory first. Either way the
+  request keeps the idea's current stage and questions, so nothing you have already clarified
+  is lost.
+- Research is available **only before development starts**. Once execution begins, or the
+  idea is already complete, the action is disabled and says which of the two applies.
+- You can ask more than once. Each request is queued for the agent and shows up in the
+  idea's conversation as a **Research** turn. The conversation does not open by itself; open
+  it from the online-agents indicator (**Open chat**), as described above, to follow what the
+  agent did.
+
+Findings go into the idea's own description, each with an inline
+[citation](/guides/references/#read-inline-citations) to the source it came from, and those
+sources appear in the idea's [references](/guides/references/). There is no separate research
+report to open.
+
+:::note[What the agent does]
+The agent decides what is worth checking and keeps the pass short. It adds only findings that
+change this idea; if nothing useful turns up, it says so rather than inventing evidence. It looks up facts; your goals and preferences still come from elaboration.
+:::
+
+<Screenshot
+  src="/images/workflow/idea-research.webp"
+  alt="Idea panel Actions menu opened before development, with Research as the first item above Verify Elaborate, Start Development, and Yolo"
+  width={1440}
+  height={900}
+  caption="Research sits in the idea's Actions menu and is available until development starts."
+/>
 
 ## Run elaboration
 

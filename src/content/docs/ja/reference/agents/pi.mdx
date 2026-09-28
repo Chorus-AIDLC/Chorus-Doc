@@ -89,13 +89,17 @@ Pi を再起動し、`/mcp` を確認して、Pi に `chorus_checkin` の呼び�
 
 ## 機能
 
-- **13 のスキル**が AI-DLC の全段階を駆動します。`/skill:chorus`、`/skill:idea`、`/skill:proposal`、
+- **14 のスキル**が AI-DLC の全段階を駆動します。`/skill:chorus`、`/skill:idea`、`/skill:proposal`、
   `/skill:develop`、`/skill:review`、`/skill:quick-dev`、`/skill:yolo`、`/skill:brainstorm`、
-  `/skill:orchestrate`、`/skill:docs`、`/skill:chorus-cli`、加えて `openspec-aware` と `spec-lite` サブ手順。
+  `/skill:orchestrate`、`/skill:docs`、`/skill:chorus-cli`、加えて `openspec-aware`、`spec-lite`、
+  `research` サブ手順。`research` は idea スキルと proposal スキルが呼び出す短い事実調査で、
+  着想の [**リサーチ** 操作](/ja/guides/capture-an-idea/#開発の前にリサーチを依頼する)が実行するのもこれです。
 - **3 つの読み取り専用レビュー用サブエージェント** — `chorus-proposal-reviewer`、
   `chorus-task-reviewer`、`chorus-code-reviewer` — はパッケージ相対で検出され（コピー不要）、
-  ブロッキングする `subagent` ツールを介して起動されます。これらは `VERDICT` コメントを投稿して
-  停止します。
+  `subagent` ツールを介して起動されます。これらは `VERDICT` コメントを投稿して停止します。
+  コミュニティの `pi-subagents` パッケージのもとでは、呼び出しで直接指定された Chorus のレビュアーと
+  ワーカーは、その呼び出しが `async: false` を求めていてもバックグラウンドで実行されます。そこではフォアグラウンドの子が
+  Chorus のツールに到達できないためです。
 - **公式の pi `subagent` ツール**は `extensions/subagent/`（pi のリファレンスパターン）に同梱され、
   第三者のサブエージェントパッケージは不要です。さらにコミュニティの **`pi-subagents` パッケージ
   （nicobailon）と共存**します。両者とも `subagent` という名前のツールを登録するため、

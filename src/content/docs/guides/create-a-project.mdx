@@ -48,7 +48,18 @@ button.
    below); you can also leave it and set it later.
 5. Select **Create Project**.
 
-Chorus creates the project and adds it to the group.
+Chorus creates the project and adds it to the group. Selecting **Create Project** again, or
+pressing Enter, while the request is running does not create a second project.
+
+:::caution[If the result is not confirmed]
+If Chorus cannot confirm the result, for example because the request takes longer than
+20 seconds or the connection drops, the dialog says so and keeps your draft. The project may
+still have been created. Close the dialog and check or refresh the project list before trying
+again: creating again requires **I've checked the list and still want to create again**,
+because it could produce a duplicate. If a request you dismissed turns out to have succeeded,
+the dialog tells you the next time you open it, and creating another project requires
+**I want to create another project**.
+:::
 
 ## Fix a working directory
 

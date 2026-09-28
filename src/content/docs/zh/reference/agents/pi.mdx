@@ -77,12 +77,14 @@ pi install npm:@chorus-aidlc/chorus-pi
 
 ## 能力
 
-- **13 个技能**，驱动每个 AI-DLC 阶段：`/skill:chorus`、`/skill:idea`、`/skill:proposal`、
+- **14 个技能**，驱动每个 AI-DLC 阶段：`/skill:chorus`、`/skill:idea`、`/skill:proposal`、
   `/skill:develop`、`/skill:review`、`/skill:quick-dev`、`/skill:yolo`、`/skill:brainstorm`、
-  `/skill:orchestrate`、`/skill:docs`、`/skill:chorus-cli`，外加 `openspec-aware` 与 `spec-lite` 子流程。
+  `/skill:orchestrate`、`/skill:docs`、`/skill:chorus-cli`，外加 `openspec-aware`、`spec-lite` 与 `research` 子流程。
+  `research` 是想法与提案技能调用的简短事实调研流程，也是想法的[**调研**操作](/zh/guides/capture-an-idea/#在开发之前请求调研)所运行的流程。
 - **3 个只读评审子智能体**：`chorus-proposal-reviewer`、`chorus-task-reviewer`、
-  `chorus-code-reviewer`，以包相对方式发现（无需复制），通过阻塞式的 `subagent` 工具派生；
-  它们发布一条 `VERDICT` 评论后停止。
+  `chorus-code-reviewer`，以包相对方式发现（无需复制），通过 `subagent` 工具派生；
+  它们发布一条 `VERDICT` 评论后停止。在社区的 `pi-subagents` 包下，在调用中被直接点名的 Chorus 评审
+  子智能体和 worker 会在后台运行，即使调用要求 `async: false` 也是如此，因为在那里前台子进程无法访问 Chorus 工具。
 - **官方 pi `subagent` 工具**，内置于 `extensions/subagent/`（pi 的参考实现），无需任何第三方
   子智能体包。它同时**与社区的 `pi-subagents` 包（nicobailon）共存**：两者都注册名为 `subagent`
   的工具，因此需通过 `settings.packages` 过滤器排除内置的那一个；`chorus-pi` 的会话生命周期既支持

@@ -92,6 +92,17 @@ safe rollback point. Follow the standard
 your setup rather than improvising a per-engine procedure.
 :::
 
+### Upgrade order for 0.19.1
+
+0.19.1 adds a migration that only adds a nullable column, so existing data is untouched.
+Upgrade the Chorus server **before** upgrading the `chorus` CLI that runs your agent daemons.
+Older daemons keep working against the new server, receiving Idea creation and Research
+requests in the form they already understand. For an emergency rollback of the new request
+format, set `CHORUS_DEDICATED_OPERATION_WRITES=false` and restart the server: new requests
+use the older format, and ones already queued are still delivered. Roll back the CLI separately
+if you need to. Do not roll the server back to a version older than 0.19.1 while requests
+created by it are still pending or running, and do not remove the new column.
+
 ### Session secrets when upgrading to 0.18.1
 
 Keep the signing secret stable alongside your database backups. To retain an auto-generated

@@ -84,13 +84,18 @@ loaded, and inspect `/subagents` for `chorus-proposal-reviewer`.
 
 ## Capabilities
 
-- **13 skills** driving every AI-DLC stage — `/skill:chorus`, `/skill:idea`, `/skill:proposal`,
+- **14 skills** driving every AI-DLC stage — `/skill:chorus`, `/skill:idea`, `/skill:proposal`,
   `/skill:develop`, `/skill:review`, `/skill:quick-dev`, `/skill:yolo`, `/skill:brainstorm`,
-  `/skill:orchestrate`, `/skill:docs`, `/skill:chorus-cli`, plus the `openspec-aware` and
-  `spec-lite` sub-procedures.
+  `/skill:orchestrate`, `/skill:docs`, `/skill:chorus-cli`, plus the `openspec-aware`,
+  `spec-lite`, and `research` sub-procedures. `research` is the short fact-finding pass the
+  idea and proposal skills call, and the one an idea's
+  [**Research** action](/guides/capture-an-idea/#ask-for-research-before-development) runs.
 - **3 read-only reviewer sub-agents** — `chorus-proposal-reviewer`, `chorus-task-reviewer`,
-  `chorus-code-reviewer` — discovered package-relative (no copy) and spawned via the blocking
-  `subagent` tool; they post a `VERDICT` comment and stop.
+  `chorus-code-reviewer` — discovered package-relative (no copy) and spawned via the
+  `subagent` tool; they post a `VERDICT` comment and stop. Under the community `pi-subagents`
+  package, Chorus reviewers and workers named directly in a call run in the background even
+  if the call asks for `async: false`, because a foreground child there cannot reach the
+  Chorus tools.
 - **The official pi `subagent` tool**, bundled at `extensions/subagent/` (pi's reference pattern) —
   no third-party sub-agents package required. It also **coexists with the community `pi-subagents`
   package** (nicobailon): both register a `subagent` tool, so exclude the bundled one via a

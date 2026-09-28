@@ -14,15 +14,21 @@ route: /zh/guides/plugin-automation/
 - `PASS` / `PASS WITH NOTES`：工作继续进行；备注仅供参考。
 - `FAIL`：必须先修复列出的阻塞项并重新提交，工作才能继续。
 
-审查子智能体负责检查，而不是修改工作成果。Proposal reviewer 可以运行 `ls`、`rg`、`find`、`git log/show/diff` 等只读 shell 命令，报告路径缺失前必须先确认。它不能修改文件、执行 Git 写操作、安装依赖或运行测试/构建。Task reviewer 与 code reviewer 可在运行时允许的范围内运行只读及测试/构建命令；Kiro 的 task reviewer 与 code reviewer 没有 shell 权限。
+审查子智能体负责检查，而不是修改工作成果。Proposal reviewer 可以运行 `ls`、`rg`、`find`、`git log/show/diff` 等只读 shell 命令，报告路径缺失前必须先确认。它不能修改文件、执行 Git 写操作、安装依赖或运行测试/构建。Task reviewer 与 code reviewer 还可以运行项目自身的测试、构建和 lint 命令，这适用于包括 Kiro 在内的所有平台；在 Kiro 上，一份禁用命令列表会阻止修改文件、Git 写操作和安装依赖。
 
 | 审查子智能体 | 触发时机 | 审查内容 | 裁定发布在 |
 | --- | --- | --- | --- |
 | Proposal reviewer | `chorus_pm_submit_proposal` 之后 | 文档完整性、任务粒度、验收标准的对应关系，以及依赖图 | 提案上 |
-| Task reviewer | `chorus_submit_for_verify` 之后 | 该任务的实现是否满足其验收标准与提案文档 | 任务上 |
+| Task reviewer | `chorus_submit_for_verify` 之后 | 该任务的实现是否满足其验收标准与提案文档，外加即使没有任何验收标准涉及也始终适用的默认质量检查：正确性、重新实现已有功能、任务自身代码中的安全漏洞、不可能失败的测试，以及必需操作失败却被静默吞掉 | 任务上 |
 | Code reviewer | 以想法为根的提案的最后一个任务被验证时（`chorus_admin_verify_task`） | 该想法跨全部任务的**聚合**改动（跨任务集成、架构漂移、安全、回归、特性级覆盖） | 想法上 |
 
 Code reviewer 是交付前的最终关口：只有当以想法为根的提案的*最后一个*任务被验证时它才运行，并且一次性审查整个特性，而不是单个任务。触发这些提示的三个匹配器定义在 `public/chorus-plugin/hooks/hooks.json` 中。
+
+### 跨轮次跟踪发现项
+
+每个发现项都有一个稳定的 ID：阻塞项为 `B<round>-<slug>`，备注为 `N<round>-<slug>`，其中轮次是首次报告它的那一轮，例如 `B1-ac3-not-implemented`。这个 ID 永不改变，因此第 3 轮裁定里出现一行 `B1-…`，就说明这个问题已经扛过了两次修复尝试。从第 2 轮起，审查子智能体会在 **Prior findings** 下列出此前的每个发现项，并标注三种状态之一：`fixed`、`still-open` 或 `not-verifiable`，同时说明它为作出判断重新运行了什么。只有 `fixed` 才会关闭一个发现项。仍未解决*或*无法重新验证的阻塞项会让裁定保持为 `FAIL`；未解决的备注最多只会让裁定变为 `PASS WITH NOTES`，不会更差。
+
+裁定没有篇幅上限：阻塞项的证据会完整写出。取而代之的是，第一轮最多报告五条备注，之后的轮次不再新增备注，这样每条评论都聚焦于需要处理的事项。
 
 ### 等待本轮裁定
 

@@ -29,20 +29,35 @@ current round's verdict comment. A completed review posts `PASS`, `PASS WITH NOT
 Reviewers inspect the work rather than change it. The proposal reviewer may use read-only
 shell commands such as `ls`, `rg`, `find`, and `git log/show/diff`, and must confirm a path is
 missing before reporting it as a blocker. It must not modify files, perform Git write
-operations, install dependencies, or run tests/builds. Task and code reviewers may run
-read-only and test/build commands where their runtime permits; Kiro's task and code reviewers
-have no shell access.
+operations, install dependencies, or run tests/builds. Task and code reviewers may also run
+the project's own test, build, and lint commands, on every surface including Kiro, where a
+list of blocked commands stops file changes, Git writes, and installs.
 
 | Reviewer | Fires after | Reviews | Verdict posted on |
 | --- | --- | --- | --- |
 | Proposal reviewer | `chorus_pm_submit_proposal` | Document completeness, task granularity, acceptance-criteria alignment, and the dependency graph | The proposal |
-| Task reviewer | `chorus_submit_for_verify` | The task's implementation against its acceptance criteria and the proposal documents | The task |
+| Task reviewer | `chorus_submit_for_verify` | The task's implementation against its acceptance criteria and the proposal documents, plus default quality checks that apply even where no criterion speaks: correctness, reimplementing something that already exists, security holes in the task's own code, tests that could not fail, and failures of required operations that are silently swallowed | The task |
 | Code reviewer | the last task of an idea-rooted proposal being verified (`chorus_admin_verify_task`) | The idea's **aggregate** change across all its tasks — cross-task integration, architecture drift, security, regressions, feature-level coverage | The idea |
 
 The code reviewer is the final ship-time gate: it runs only when the *last* task of an
 idea-rooted proposal is verified, and reviews the whole feature at once rather than a single
 task. The three matchers that trigger these prompts live in
 `public/chorus-plugin/hooks/hooks.json`.
+
+### Follow findings across rounds
+
+Every finding gets a stable ID: blockers are `B<round>-<slug>` and notes are
+`N<round>-<slug>`, where the round is the one that first reported it — for example
+`B1-ac3-not-implemented`. The ID never changes, so a `B1-…` line in a round-3 verdict tells
+you that problem has survived two fix attempts. From round 2 on, the reviewer lists every
+earlier finding under **Prior findings** with one of three states: `fixed`, `still-open`, or
+`not-verifiable`, plus what it re-ran to decide. Only `fixed` closes a finding. A blocker that
+is still open *or* could not be re-verified keeps the verdict at `FAIL`; an open note never
+makes it worse than `PASS WITH NOTES`.
+
+Verdicts have no length cap: blocker evidence is written in full. Instead, the first round
+reports at most five notes and later rounds add no new notes, so each comment stays focused
+on what needs action.
 
 ### Wait for the current round's verdict
 
