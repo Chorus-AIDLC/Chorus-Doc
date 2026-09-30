@@ -9,6 +9,14 @@ sidebar:
 
 フォアグラウンドのデーモン接続を確認した後に、このガイドを使ってください。コマンドは対応する常駐バックエンド、つまり Claude Code、Codex、Kiro、Pi に適用されます。
 
+## デーモンバックエンドを 0.20.0 に更新する
+
+[更新コマンド](/ja/reference/cli/#cli-とプラグインを更新する)で Chorus CLI を更新し、実行中の作業が許すタイミングでデーモンを再起動します。ホスト CLI は別途更新してください。最初の起動前にバックエンドごとの要件を確認します。
+
+- [Codex App Server](/ja/reference/agents/codex/#0200-のデーモン動作)：codex-cli 0.157.1 で検証済み。デーモンの `args` はモデル指定と許可された設定だけに対応します。`--chorus-only` では、必要な MCP ツールの許可を Codex 設定で確認してください。
+- [Claude Code stream-json](/ja/reference/agents/claude-code/#0200-のデーモン動作)：Claude Code 2.1.283 と 2.1.284 で検証済み。中断はまずプロトコルを使い、バックグラウンドでの質問は Chorus コメントか要件の明確化を使います。
+- [Pi RPC](/ja/reference/agents/pi/#0200-のデーモン動作)：pi 0.85.0 以降が必要です（0.85.1 で検証済み）。`--plugins` は Chorus のパッケージを更新しますが、pi 本体は更新しません。
+
 ## デーモンがアクセスできる範囲を選ぶ
 
 各 `--cwd` は、一つの作業ディレクトリを Chorus 上の別々のターゲットとして登録します。
@@ -44,7 +52,7 @@ chorus daemon \
 | `cwds` | string[] | このデーモンが提供する作業ディレクトリ。各パスは一つの独立したオンライン接続です。 |
 | `browseRoots` | string[] | リモートの作業ディレクトリ探索に公開するルート。browse root は接続を作りません。 |
 | `agent` | string | 起こすローカルバックエンド：`"claude-code"`、`"codex"`、`"kiro"`、`"pi"`。 |
-| `sigintTimeoutMs` | number | `SIGINT` の後、起こされたエージェントが強制終了されるまでの猶予時間（ミリ秒）。既定値は `10000`。 |
+| `sigintTimeoutMs` | number | 中断から強制終了までの猶予（ミリ秒）。Claude Code、Codex、Pi はまずプロトコルで中断します。既定値 `10000`。 |
 | `agents` | object[] | *任意。* 1 つのデーモンで複数の独立したエージェントを動かします。各エントリは共有ランタイムの既定値を上書きできますが、`args` と `env` は継承しません。後述の「1 つのデーモンで複数のエージェントを動かす」を参照。 |
 
 `chorus login` と `chorus daemon install` の後の最小限のファイル。

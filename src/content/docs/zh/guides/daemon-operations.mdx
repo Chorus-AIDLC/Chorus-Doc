@@ -7,6 +7,14 @@ sidebar:
   order: 10
 ---
 
+## 将 daemon 后端升级到 0.20.0
+
+通过[升级命令](/zh/reference/cli/#升级-cli-与插件)更新 Chorus CLI，待当前工作允许时重启 daemon。宿主 CLI 需要单独更新。首次唤醒前请核对对应后端的要求：
+
+- [Codex App Server](/zh/reference/agents/codex/#0200-的-daemon-行为)：已验证 codex-cli 0.157.1；daemon `args` 只接受模型参数和允许的配置覆盖。使用 `--chorus-only` 时，请在 Codex 配置中验证所需 MCP 工具的授权。
+- [Claude Code stream-json](/zh/reference/agents/claude-code/#0200-的-daemon-行为)：已验证 Claude Code 2.1.283 和 2.1.284；中断优先使用协议，后台提问应通过 Chorus 评论或澄清流程。
+- [Pi RPC](/zh/reference/agents/pi/#0200-的-daemon-行为)：需要 pi 0.85.0 或更新版本（已验证 0.85.1）；`--plugins` 会更新 Chorus 相关包，但不会升级 pi 本身。
+
 ## 选择运行方式
 
 `chorus daemon` 会把本机的 Claude Code、Codex、Kiro 或 Pi 连接到 Chorus。首次接入时，建议先在前台运行，确认登录、运行后端和工作目录都正确：
@@ -58,7 +66,7 @@ daemon 的设置都读自 `~/.chorus/daemon.json`。常见的单智能体场景�
 | `cwds` | string[] | 本 daemon 服务的工作目录。每个路径都是一个独立的在线连接。 |
 | `browseRoots` | string[] | 向远程工作目录发现开放的根目录。浏览根目录不会创建连接。 |
 | `agent` | string | 要唤起的本地运行后端：`"claude-code"`、`"codex"`、`"kiro"` 或 `"pi"`。 |
-| `sigintTimeoutMs` | number | 收到 `SIGINT` 后强制终止已唤起智能体前的宽限时间（毫秒）。默认 `10000`。 |
+| `sigintTimeoutMs` | number | 中断后强制终止前的宽限时间（毫秒）；Claude Code、Codex 和 Pi 会先发送协议中断。默认 `10000`。 |
 | `agents` | object[] | *可选。* 用一个 daemon 服务多个独立智能体；每个条目可覆盖共享运行默认值，但不会继承 `args` 和 `env`。见下文「在一个 daemon 中运行多个智能体」。 |
 
 执行 `chorus login` 加 `chorus daemon install` 后的最简文件：

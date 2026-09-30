@@ -86,6 +86,8 @@ Codex 的 MCP 服务器**不**随插件打包。Codex 不会在插件 MCP 配置
 
 ## 升级插件
 
+对于已配置的 Claude Code、Codex、Kiro 和 Pi，可用 `chorus upgrade --plugins` 升级 CLI 与 Chorus 插件，无需重新注册智能体或轮换凭据。参见 [CLI 升级范围与完成状态](/zh/reference/cli/#升级-cli-与插件)。下面的配置流程仍适用于选择智能体或更改凭据。
+
 原地升级；你的智能体密钥与 Chorus URL 不受影响。
 
 - **任意智能体**：加上 `--update-installed` 运行安装向导，并选择需要更新的智能体。不加该参数时，完整的现有安装可能会被跳过：

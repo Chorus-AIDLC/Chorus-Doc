@@ -12,7 +12,7 @@ route: /zh/reference/cli/
 
 ```sh
 npm install --global @chorus-aidlc/chorus
-chorus --version   # 0.17.2 or later provides `chorus agents` and `chorus mcp`
+chorus --version
 ```
 
 运行 `chorus --help` 或 `chorus <command> --help` 查看完整的参数列表。
@@ -22,6 +22,7 @@ chorus --version   # 0.17.2 or later provides `chorus agents` and `chorus mcp`
 | 命令 | 作用 |
 | --- | --- |
 | `chorus` | 启动 Chorus 服务器（不带子命令时的默认行为）。参见[使用 Docker 部署](/zh/guides/deploy-docker/)。 |
+| `chorus upgrade` / `chorus update` | 升级 npm 全局安装的 CLI；加 `--plugins` 刷新已配置的 Chorus 插件。 |
 | `chorus agents` | 配置本机的智能体：`list`（默认）、`add`、`remove`，以及 `run`（启动一个）。 |
 | `chorus mcp` | 原生 MCP 客户端：`call` 调用工具、打印你的 UUID（`whoami`），或 `list` 列出可调用的工具。 |
 | `chorus login` | 以智能体身份认证，并把连接保存到 `~/.chorus/daemon.json`。 |
@@ -31,6 +32,34 @@ chorus --version   # 0.17.2 or later provides `chorus agents` and `chorus mcp`
 `chorus init` 现已改为 `chorus agents add`（参数不变）。各智能体的 `install-*.sh` 脚本已废弃，
 它们现在只会引导你去运行 `chorus agents add`。
 :::
+
+## 升级 CLI 与插件
+
+从 Chorus 0.20.0 起，可以运行：
+
+```sh
+chorus upgrade             # 仅升级 CLI
+chorus upgrade --plugins   # 先升级 CLI，再刷新已配置的 Chorus 插件
+chorus update --plugins    # upgrade 的别名
+```
+
+该命令支持经过验证的 `@chorus-aidlc/chorus` **npm 全局安装**。它查询 npm 最新稳定版，在同一个 npm prefix 下更新当前安装，并核验安装后的版本。当前版本已是最新或更高时，不会重装或降级，但仍会执行 `--plugins`。源码检出、链接安装和其他包管理器的安装方式不受支持。旧 CLI 尚无此命令时，先用 `npm install --global @chorus-aidlc/chorus@latest` 安装新版。
+
+### `--plugins` 的刷新范围
+
+它读取 `~/.chorus/daemon.json`，处理明确标注为 Claude Code、Codex、Kiro 或 Pi 的记录，包括未启用 daemon 唤醒的记录。每条记录的 `env`、`PATH` 和自定义配置目录决定更新目标；共享目录只更新一次，不同目录分别处理。该命令目前只读取默认文件，不使用 `CHORUS_DAEMON_CONFIG_PATH`。
+
+- **Claude Code 与 Codex**：通过宿主的插件机制刷新 Chorus 插件。
+- **Kiro**：从记录所配置的 Chorus 实例刷新模板。请先升级该服务端，才能获取它提供的新版模板。同一目标目录对应多个冲突的实例地址时，会报告未完成。
+- **Pi**：只更新 `@chorus-aidlc/chorus-pi` 和 `pi-mcp-adapter`。保留已有的版本固定、范围或非 latest 标签，并始终报告未完成；移除这些限制后才能更新到最新版本。若 Pi 不支持单独更新这些包，会说明限制，不会更新所有扩展。
+
+宿主 CLI 已安装时，可以补装缺失的 Chorus 插件。命令保留注册信息与凭据，不安装或升级宿主 CLI。修改配置文件前，会将原文件备份为 `<file>.chorus-upgrade.bak`，下次升级时覆盖。`offline` 或未知类型记录（包括默认的 OpenCode、OpenClaw 和 dsh 记录），以及在各自 `PATH` 中找不到宿主的记录，会跳过并标为 **INCOMPLETE**。这些宿主请使用[对应平台的配置或升级流程](/zh/reference/agents/)。
+
+### 完成状态与生效方式
+
+命令无需交互确认。退出码 **0** 表示请求的工作全部完成，**1** 表示失败或某个目标未完成。没有 daemon 文件或智能体列表为空时，插件刷新成功结束且不做修改；文件不可读或格式错误则视为失败。CLI 升级失败时不执行插件更新；单个插件失败后仍继续处理其他目标，已完成的更新会保留，不会自动回滚。
+
+npm 安装会持续输出进度，没有安装超时限制。失败时按输出的 npm 错误排查；遇到 `EACCES` 或 `EPERM`，可改用当前用户拥有的 Node 安装，或请管理员更新系统 npm prefix。Chorus 不会自动提权。更新后启动新的智能体会话，并在合适时运行 `chorus daemon restart`；命令不会自动重启 daemon 或中断活跃会话。
 
 ## 配置智能体：`chorus agents`
 
@@ -120,6 +149,8 @@ chorus agents run --name codex-worker -- exec --model gpt-5.4 -c model_reasoning
 **子命令**：持久化参数插入最深的已识别命令之后：Codex 的 `exec`、`exec resume` 或 `resume`，Kiro 的 `chat`，OpenClaw 的 `agent`。显式覆盖也应放在同一作用域，如 `exec --model chosen`，而非 `--model chosen exec`。根命令或父命令的模型选项不会移除子命令中配置的模型；Codex 的 `-c`/`--config` 键跨作用域生效。未识别到命令时，配置参数放在最前面。不推断其他命令路径；对这些路径，请去掉不兼容的持久化参数，改用原生透传。
 
 **未知选项**：持久化 `args` 允许普通未知选项，但无法猜测下一项是值还是提示词。后端支持时用 `["--future=value"]`，不要用 `["--future", "value"]`。已知选项必须提供其要求的值。未知或可重复选项在选定作用域内保持先配置、后显式的顺序，不保证后者覆盖前者。遇到有歧义的显式选项（未知且无内联值）后，Chorus 停止推断覆盖关系；请将已知覆盖项放在它之前，或使用受支持的内联值。移除外层 Chorus 分隔符后，分析也会在智能体参数中的第一个单独 `--` 处停止。命令识别遇到位置提示词、未知命令或有歧义的选项时停止，并跳过已知选项的值。所有显式参数仍原样透传；请自行确认后端参数及版本兼容性。Windows `.cmd`/`.bat` 限制见 daemon 指南。
+
+Codex daemon 进一步将持久化参数限制为模型选项和允许的 `-c` / `--config` 覆盖。其他参数即使在前台可用，也会在 daemon 唤醒前报错。参见 [Codex daemon 配置](/zh/reference/agents/codex/#模型参数与会话连续性)。
 
 ## 从 shell 调用 MCP 工具：`chorus mcp`
 

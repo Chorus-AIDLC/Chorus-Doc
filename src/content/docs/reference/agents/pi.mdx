@@ -127,9 +127,10 @@ wakes it. To wire it by hand, run the daemon with the pi backend:
 chorus daemon --agent pi
 ```
 
-- The daemon resolves the `pi` executable from PATH (override with `CHORUS_PI_PATH`) and runs it
-  headless (`pi --mode json -p`), exporting `CHORUS_URL` / `CHORUS_API_KEY` / `CHORUS_AGENT_PROFILE`
-  into the woken session.
+- The daemon resolves the `pi` executable from PATH (override with `CHORUS_PI_PATH`) and starts
+  one headless `pi --mode rpc` process per wake, exporting `CHORUS_URL` / `CHORUS_API_KEY` /
+  `CHORUS_AGENT_PROFILE` into the woken session. Daemon wakes need **pi 0.85.0 or newer**; see
+  [Daemon behavior in 0.20.0](#daemon-behavior-in-0200).
 - Pi has **no permission system**, so no sandbox / skip-permissions flag is involved — the `chorus`
   and `yolo` daemon modes run pi identically.
 - A woken pi reaches Chorus MCP tools only through this package's extension / `pi-mcp-adapter`, so
@@ -142,6 +143,34 @@ through the agent's `env` in `~/.chorus/daemon.json`, the daemon's inherited env
 or the provider's supported credential store. A `systemd --user` service does not inherit
 exports from your login shell. The [daemon guide](/guides/daemon-operations/) covers model and
 thinking args, per-agent env, service credentials, and the required restart.
+
+### Daemon behavior in 0.20.0
+
+From Chorus 0.20.0, each Pi wake runs over pi's RPC mode. There is no fallback to the earlier
+headless mode, so upgrade pi on every host that runs the daemon:
+
+```bash
+pi --version                                                # needs 0.85.0 or newer
+npm install -g @earendil-works/pi-coding-agent@latest       # upgrade pi itself
+```
+
+`chorus upgrade --plugins` refreshes `chorus-pi` and `pi-mcp-adapter`, but it does not upgrade pi.
+This behavior was verified live on Linux with pi **0.85.1**; macOS and Windows are covered by
+platform tests; neither has live verification for this migration.
+
+- **Older pi:** the daemon skips the wake and logs the upgrade command above. If it cannot read
+  the pi version, it logs a warning and tries the wake anyway.
+- **Session continuity:** each idea keeps its pi session, including sessions from before the
+  upgrade. If pi cannot restore an earlier session's history, the wake continues in a new
+  session, and the conversation shows a notice that the previous history could not be restored.
+- **Interrupt:** **Interrupt** in Chorus sends RPC `abort` to stop pi's current run,
+  including a running tool, and the turn is recorded as interrupted even if Pi exits zero. If pi is still running when `sigintTimeoutMs`
+  ends, the daemon force-stops it as before.
+- **Extension dialogs:** nobody is at the terminal during a wake, so an extension dialog
+  (select, confirm, input, or editor) is cancelled immediately and the daemon logs
+  `cancelled pi extension <method> dialog`. Ask through a Chorus comment or elaboration instead.
+- **Finding the process:** pi renames its process to `pi`, so `pgrep -f 'pi --mode rpc'` finds
+  nothing on Linux. Use `pgrep -x pi -P <daemon-pid>`.
 
 ## Common issues
 

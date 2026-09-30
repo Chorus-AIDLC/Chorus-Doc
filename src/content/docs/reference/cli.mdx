@@ -13,7 +13,7 @@ endpoint from the shell. Install it globally:
 
 ```sh
 npm install --global @chorus-aidlc/chorus
-chorus --version   # 0.17.2 or later provides `chorus agents` and `chorus mcp`
+chorus --version
 ```
 
 Run `chorus --help`, or `chorus <command> --help`, for the complete flag list.
@@ -23,6 +23,7 @@ Run `chorus --help`, or `chorus <command> --help`, for the complete flag list.
 | Command | What it does |
 | --- | --- |
 | `chorus` | Start the Chorus server (the default with no subcommand). See [Deploy with Docker](/guides/deploy-docker/). |
+| `chorus upgrade` / `chorus update` | Upgrade the npm-global CLI; optionally refresh configured Chorus plugins with `--plugins`. |
 | `chorus agents` | Configure this machine's agents — `list` (default), `add`, `remove`, and `run` (launch one). |
 | `chorus mcp` | Native MCP client — `call` a tool, print your UUID (`whoami`), or `list` callable tools. |
 | `chorus login` | Authenticate as an agent and save the connection to `~/.chorus/daemon.json`. |
@@ -32,6 +33,63 @@ Run `chorus --help`, or `chorus <command> --help`, for the complete flag list.
 `chorus init` is now `chorus agents add` (same flags). The per-agent `install-*.sh`
 scripts are retired — they now just point you at `chorus agents add`.
 :::
+
+## Upgrade the CLI and plugins
+
+From Chorus 0.20.0, use:
+
+```sh
+chorus upgrade             # CLI only
+chorus upgrade --plugins   # CLI, then configured Chorus plugins
+chorus update --plugins    # alias of upgrade
+```
+
+The command supports a verified **npm global installation** of `@chorus-aidlc/chorus`.
+It checks npm's latest stable release, updates the active installation in the same npm
+prefix, and verifies the installed version. If already current or newer, it does not
+reinstall or downgrade; `--plugins` still runs. Source checkouts, linked installs, and
+installs managed by other package managers are unsupported. For an older CLI without this
+command, install the new release first with `npm install --global @chorus-aidlc/chorus@latest`.
+
+### What `--plugins` refreshes
+
+It reads `~/.chorus/daemon.json` and refreshes explicitly typed Claude Code, Codex, Kiro,
+and Pi entries, including those with daemon waking disabled. Each entry's `env`, `PATH`,
+and custom config home determine the target. Shared destinations are updated once;
+distinct homes are handled separately. This command currently reads the default file,
+not `CHORUS_DAEMON_CONFIG_PATH`.
+
+- **Claude Code and Codex:** refresh the Chorus plugin using the host's plugin mechanism.
+- **Kiro:** refresh Chorus templates from the entry's configured Chorus instance. Upgrade
+  that server first to receive its new templates. Conflicting instance URLs for one shared
+  destination are reported as incomplete.
+- **Pi:** update only `@chorus-aidlc/chorus-pi` and `pi-mcp-adapter`. Version pins, ranges, and
+  non-latest tags are preserved and always reported as incomplete; remove the constraint to
+  allow the latest update. If Pi cannot
+  update these packages individually, the command reports that limitation rather than
+  updating all extensions.
+
+Missing Chorus plugins can be installed when the host CLI already exists. The command
+preserves registrations and credentials and does not install or upgrade the host CLI.
+Before changing a config file, it saves a copy as `<file>.chorus-upgrade.bak`, replaced on
+the next upgrade.
+`offline` or unknown entries (including the default OpenCode, OpenClaw, and dsh records),
+and hosts missing from the entry's `PATH`, are skipped and reported as **INCOMPLETE**.
+Use [the platform's setup or upgrade procedure](/reference/agents/) for those hosts.
+
+### Completion and activation
+
+The command runs without prompts. Exit code **0** means all requested work completed;
+**1** means failure or an incomplete target. No daemon file or an empty agent list is a
+successful plugin no-op; an unreadable or malformed file is a failure. A CLI failure
+prevents plugin work. Individual plugin failures do not stop later targets, and completed
+updates are kept, with no automatic rollback.
+
+npm installation streams progress and has no installation timeout. If it fails, inspect
+the reported npm error; for `EACCES` or `EPERM`, use a user-owned Node installation or have
+the system npm prefix updated by its administrator. Chorus does not elevate privileges.
+After an update, start new agent sessions and run `chorus daemon restart` when convenient.
+Active sessions and the daemon are not restarted automatically.
 
 ## Configure agents — `chorus agents`
 
@@ -164,6 +222,8 @@ supported inline value. Analysis also stops at the first bare `--` inside agent 
 prompt, unknown command, or ambiguous option, and skips known option values. All explicit
 tokens are still forwarded unchanged; backend flag and version compatibility remain yours
 to check. For Windows `.cmd`/`.bat` limits, see the daemon guide.
+
+The Codex daemon further limits persistent args to model options and permitted `-c` / `--config` overrides. Other flags fail before a daemon wake, even if usable in a foreground session. See [Codex daemon configuration](/reference/agents/codex/#model-options-and-session-continuity).
 
 ## Call MCP tools from the shell — `chorus mcp`
 

@@ -134,9 +134,10 @@ Pi は第一級の **wakeable なデーモンバックエンド**です。Chorus
 chorus daemon --agent pi
 ```
 
-- デーモンは PATH から `pi` 実行ファイルを解決し（`CHORUS_PI_PATH` で上書き可能）、ヘッドレスで
-  実行します（`pi --mode json -p`）。起動されたセッションには `CHORUS_URL` / `CHORUS_API_KEY` /
-  `CHORUS_AGENT_PROFILE` をエクスポートします。
+- デーモンは PATH から `pi` 実行ファイルを解決し（`CHORUS_PI_PATH` で上書き可能）、起動ごとに
+  ヘッドレスの `pi --mode rpc` プロセスを一つ開始します。起動されたセッションには `CHORUS_URL` /
+  `CHORUS_API_KEY` / `CHORUS_AGENT_PROFILE` をエクスポートします。デーモンからの起動には
+  **pi 0.85.0 以降**が必要です。[0.20.0 のデーモン動作](#0200-のデーモン動作)を参照してください。
 - Pi には**権限システムがありません**。そのためサンドボックスや skip-permissions フラグは関与
   しません。`chorus` モードと `yolo` モードのデーモンは pi を同一に実行します。
 - 起動された pi が Chorus MCP ツールに到達できるのは、このパッケージの拡張 / `pi-mcp-adapter` を
@@ -148,6 +149,34 @@ chorus daemon --agent pi
 またはデーモンの継承環境やプロバイダーが対応する資格情報ストアで提供してください。`systemd --user` サービスは
 ログインシェルの export を継承しません。[デーモンガイド](/ja/guides/daemon-operations/)にモデル・思考の引数、
 エージェントごとの env、サービスの資格情報と再起動要件を説明しています。
+
+### 0.20.0 のデーモン動作
+
+Chorus 0.20.0 から、Pi の起動はすべて pi の RPC モードで実行されます。以前のヘッドレスモードへの
+フォールバックはないため、デーモンを実行するすべてのホストで pi を更新してください。
+
+```bash
+pi --version                                                # 0.85.0 以降が必要
+npm install -g @earendil-works/pi-coding-agent@latest       # pi 本体を更新
+```
+
+`chorus upgrade --plugins` は `chorus-pi` と `pi-mcp-adapter` を更新しますが、pi 本体は更新しません。
+この動作は Linux 上の pi **0.85.1** で実機検証済みで、macOS と Windows はプラットフォームテストで
+確認していますが、本移行の実機検証はまだ行っていません。
+
+- **古い pi：** デーモンはその起動をスキップし、上記の更新コマンドをログに出します。pi のバージョンを
+  読み取れない場合は警告を記録し、そのまま起動を試みます。
+- **セッションの継続：** 各アイデアは自分の pi セッションを保持し、更新前に作られたセッションも
+  引き継がれます。pi が以前のセッション履歴を復元できない場合、起動は新しいセッションで続行され、
+  会話に以前の履歴を復元できなかったという通知が表示されます。
+- **中断：** Chorus で **中断** すると RPC `abort` を送り、実行中のツールも含めて pi を停止します。
+  Pi がゼロで終了しても、そのターンは中断として記録されます。`sigintTimeoutMs` の経過後も pi が動作している場合は、
+  従来どおりデーモンが強制停止します。
+- **拡張のダイアログ：** 起動中は端末の前に誰もいないため、拡張のダイアログ（select、confirm、
+  input、editor）は即座にキャンセルされ、デーモンは `cancelled pi extension <method> dialog` を
+  ログに出します。質問には Chorus のコメントか要件の明確化を使ってください。
+- **プロセスの探し方：** pi はプロセス名を `pi` に変更するため、Linux では
+  `pgrep -f 'pi --mode rpc'` では見つかりません。`pgrep -x pi -P <daemon-pid>` を使ってください。
 
 ## よくある問題
 

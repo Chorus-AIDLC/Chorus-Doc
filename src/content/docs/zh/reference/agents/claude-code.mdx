@@ -46,6 +46,16 @@ export CHORUS_API_KEY="cho_REDACTED"
 选择 `claude-code` 运行后端。先在前台确认连接无误，再按照
 [管理后台服务](/zh/guides/daemon-operations/)让它保持在线。
 
+## 0.20.0 的 daemon 行为
+
+每次唤醒仍启动一个 `claude -p` 进程，回合结束后退出。Chorus 现在使用双向 **stream-json** 输入输出，保持连接以处理控制响应。已有会话与 `claude --resume` 仍可使用；没有纯文本回退或传输切换选项。已在 Linux 上使用 Claude Code **2.1.283 和 2.1.284** 做真实运行验证；这是已验证版本，不代表所有 Claude 版本的最低兼容承诺。
+
+- **中断**：daemon 先发送协议中断。若进程未在 `sigintTimeoutMs` 内停止，则强制终止进程树，现有默认值为 10 秒。Windows 清理有平台测试覆盖，未做真实 Windows 运行验证。
+- **受限工具**：`--chorus-only` 模式会明确拒绝非 Chorus 工具，并提示智能体使用 Chorus 工具或通过 Chorus 评论提问。日志只标出被拒绝的工具名称，不记录其输入。YOLO 行为不变。
+- **提问**：所有 daemon 唤醒（包括 YOLO）都会禁用 `AskUserQuestion`，因为终端前无人回答。智能体应使用 Chorus 评论或澄清流程；交互式 Claude Code 会话仍使用正常提问流程。
+
+升级后，请用主机上实际安装的 Claude Code 版本验证签到、追加一轮消息，以及中断和恢复。协议问题可通过 [daemon 日志](/zh/guides/daemon-operations/)排查，继续会话的步骤见[会话恢复](/zh/guides/session-recovery/)。
+
 ## 验证连接
 
 1. 在 Claude Code 中运行 `/plugin list`，确认 `chorus@chorus-plugins` 已启用。

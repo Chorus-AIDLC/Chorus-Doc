@@ -52,6 +52,29 @@ Otherwise, follow [Connect an agent runtime](/guides/operator-onboarding/) and s
 `claude-code` as the backend. Verify the connection in the foreground before using
 [Daemon operations](/guides/daemon-operations/) to keep it online.
 
+## Daemon behavior in 0.20.0
+
+Each wake still starts one `claude -p` process and exits after its turn. Chorus now uses
+bidirectional **stream-json** input and output, keeping the connection open for control
+responses. Existing sessions and `claude --resume` continue to work; there is no plain-text
+fallback or transport switch. This behavior was verified live on Linux with Claude Code
+**2.1.283 and 2.1.284**; those are verified versions, not a guaranteed minimum for every
+Claude release.
+
+- **Interrupt:** the daemon sends a protocol interrupt first. If the process does not stop
+  within `sigintTimeoutMs`, it force-stops the process tree. The existing default is
+  10 seconds. Windows cleanup is covered by platform tests, not a live Windows run.
+- **Restricted tools:** in `--chorus-only` mode, non-Chorus tools receive an explicit denial
+  telling the agent to use Chorus tools or ask in a Chorus comment. Logs identify the denied
+  tool by name without its input. YOLO behavior is unchanged.
+- **Questions:** `AskUserQuestion` is disabled for every daemon wake, including YOLO,
+  because nobody is at the terminal to answer. The agent should ask through Chorus comments
+  or elaboration. Interactive Claude Code sessions retain their normal question flow.
+
+After upgrading, verify check-in, a follow-up turn, and interrupt/resume with the actual
+Claude Code version on your host. Use [daemon logs](/guides/daemon-operations/) to diagnose
+a protocol failure; [session recovery](/guides/session-recovery/) explains how to continue.
+
 ## Verify the connection
 
 In Claude Code, run `/plugin list` and confirm that `chorus@chorus-plugins` is enabled.

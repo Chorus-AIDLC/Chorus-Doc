@@ -33,6 +33,35 @@ chorus agents add --agents codex
 `codex` 运行后端。先在前台确认连接无误，再按照
 [管理后台服务](/zh/guides/daemon-operations/)让它保持在线。
 
+## 0.20.0 的 daemon 行为
+
+每次 daemon 唤醒现在使用一个独立的 `codex app-server --listen stdio://` 进程执行一轮。最低已验证基线为 **codex-cli 0.157.1**；更早版本未经验证，缺少协议支持会导致唤醒失败。没有回退到 `codex exec` 的机制或后端切换选项。使用自定义 `CODEX_HOME` 时，也要在其中安装 Chorus 集成。更新 Chorus 插件不会升级 Codex CLI 本身。
+
+### 模型参数与会话连续性
+
+daemon 的 `args` 支持模型选择（`--model` / `-m`）和允许的 `-c` / `--config` 设置，例如 `model_reasoning_effort`。其他选项，包括 `--oss`、图片输入和未知参数，会在启动前报错。传输、工作目录、权限和托管 MCP 控制项受保护。请使用支持的配置项，或通过 [CLI](/zh/reference/cli/) 显式运行前台命令；`chorus agents run --type codex -- exec ...` 和 `... -- resume ...` 保持原有行为。
+
+daemon 会以当前工作目录和权限策略恢复保存的线程，包括旧 `exec` 后端创建的线程。只有明确返回“no rollout found”时，才会尝试一次新建替代线程，并在会话中提示上下文连续性变化；其他恢复错误会终止唤醒并保留映射。会话映射读取失败时，会警告并新建线程；写入失败时，会提示后续恢复可能受影响。新消息排队等待后续回合，不会插入正在运行的回合。Token 用量根据累计计数计算本轮增量；恢复的线程缺少可信基线时，会省略本轮用量，避免把历史记录重复计入。
+
+### 受限模式与工具授权
+
+`--chorus-only` 让 Codex 保持只读，禁用交互审批，并关闭该回合的网络访问。原生审批或用户输入请求会被拒绝；无法安全拒绝的请求会使唤醒失败。需要提问时，请通过 Chorus 评论或澄清流程。在已验证的 Codex 版本中，需要审批的 Chorus MCP 工具也可能被拒绝，包括 `chorus_checkin`。回合完成不代表其中的 MCP 调用成功。
+
+如果你决定允许签到，可在 `~/.codex/config.toml`（或该智能体的 `CODEX_HOME/config.toml`）中明确添加：
+
+```toml
+[mcp_servers.chorus.tools.chorus_checkin]
+approval_mode = "approve"
+```
+
+该配置已在 0.157.1 的新建和恢复线程中验证，同时保留只读和禁用交互审批策略。它只允许签到；评论和任务更新需要各自明确授权并验证。规则应写在 Codex 配置中，不要放进 daemon 的 `args`。daemon 不会代替你批准请求。
+
+### 中断与排障
+
+获授权的中断会发送 `turn/interrupt`；启动阶段取消会关闭传输，随后在限定时间内清理进程树。Windows 需要 Windows PowerShell（`Get-CimInstance`）和 `taskkill`；Windows 行为由平台测试覆盖，Linux 已做真实运行验证。
+
+启动或协议失败时，检查 `codex --version`、登录状态、模型与配置，以及本地会话存储权限。初始化限时 30 秒，启动阶段 RPC 响应限时 60 秒，清理限时 10 秒。运行中的回合没有空闲或总运行时长限制，卡住时请用**中断**。`CLOSED` 是信息性诊断；即使进程退出码为零，失败、中断或缺少终态的回合也不会被判为成功。恢复步骤见[会话恢复](/zh/guides/session-recovery/)。
+
 ## 验证连接
 
 1. 启动 Codex，输入 `check in to chorus`。

@@ -90,12 +90,19 @@ Sometimes an idea needs facts before it needs questions — how comparable produ
 this, what a library actually supports, whether an approach has a known catch. You can ask an
 agent for one short research pass: open the idea, select **Actions**, then **Research**.
 
-- The agent must be online, owned by you, and allowed to read the plan, edit ideas, and
-  attach references. If the idea has no agent yet, you choose an agent and working directory,
-  then select **Request research**; that agent is assigned to the idea. If the idea's agent
-  serves more than one working directory, you pick the directory first. Either way the
-  request keeps the idea's current stage and questions, so nothing you have already clarified
-  is lost.
+- **Assign an agent first.** Research requires an assigned agent (or agent instance)
+  owned by you with permission to read the plan, edit ideas, and attach references. With no
+  assignee or a human assignee, the action stays visible but disabled and tells you to assign
+  an agent. It no longer opens an agent chooser.
+- **Bring that agent online.** At least one of the assigned agent's connections must be
+  online. Another agent's connection or a stale connection is not enough. Availability
+  updates as assignment and presence change, without reloading the page. Hover or focus the
+  disabled action to read the reason; the action sheet shows it inline.
+- If the assigned agent's new Research conversation needs a working-directory choice,
+  choose it when prompted. An online indicator does not guarantee that the required
+  directory or session origin is available: the server checks the target again and reports
+  a failure if it has changed or disconnected. An accepted request preserves the idea's
+  current stage and questions.
 - Research is available **only before development starts**. Once execution begins, or the
   idea is already complete, the action is disabled and says which of the two applies.
 - You can ask more than once. Each request is queued for the agent and shows up in the

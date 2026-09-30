@@ -12,7 +12,7 @@ route: /ko/reference/cli/
 
 ```sh
 npm install --global @chorus-aidlc/chorus
-chorus --version   # 0.17.2 or later provides `chorus agents` and `chorus mcp`
+chorus --version
 ```
 
 전체 플래그 목록은 `chorus --help` 또는 `chorus <command> --help`를 실행하세요.
@@ -22,6 +22,7 @@ chorus --version   # 0.17.2 or later provides `chorus agents` and `chorus mcp`
 | 명령 | 하는 일 |
 | --- | --- |
 | `chorus` | Chorus 서버를 시작합니다(서브커맨드가 없을 때의 기본값). [Docker로 배포](/ko/guides/deploy-docker/)를 참고하세요. |
+| `chorus upgrade` / `chorus update` | npm 전역 CLI를 업데이트합니다. `--plugins`로 설정된 Chorus 플러그인도 갱신합니다. |
 | `chorus agents` | 이 컴퓨터의 에이전트를 구성합니다 — `list`(기본), `add`, `remove`, 그리고 `run`(하나 실행). |
 | `chorus mcp` | 네이티브 MCP 클라이언트 — 도구를 `call`하거나, 자신의 UUID를 출력하거나(`whoami`), 호출 가능한 도구를 `list`합니다. |
 | `chorus login` | 에이전트로 인증하고 연결을 `~/.chorus/daemon.json`에 저장합니다. |
@@ -31,6 +32,34 @@ chorus --version   # 0.17.2 or later provides `chorus agents` and `chorus mcp`
 `chorus init`은 이제 `chorus agents add`입니다(플래그 동일). 에이전트별 `install-*.sh` 스크립트는
 폐기되었으며, 이제 그저 `chorus agents add`로 안내할 뿐입니다.
 :::
+
+## CLI와 플러그인 업그레이드
+
+Chorus 0.20.0부터 다음 명령을 사용할 수 있습니다.
+
+```sh
+chorus upgrade             # CLI만 업데이트
+chorus upgrade --plugins   # CLI, 이어서 설정된 Chorus 플러그인
+chorus update --plugins    # upgrade의 별칭
+```
+
+검증 가능한 `@chorus-aidlc/chorus` **npm 전역 설치** 를 지원합니다. npm의 최신 안정 버전을 확인하고 현재 설치와 같은 npm prefix에 업데이트한 뒤 설치된 버전을 검증합니다. 이미 같거나 더 높은 버전이면 재설치하거나 다운그레이드하지 않지만 `--plugins`는 실행합니다. 소스 체크아웃, 링크 설치, 다른 패키지 관리자의 설치는 지원하지 않습니다. 이 명령이 없는 이전 CLI에서는 먼저 `npm install --global @chorus-aidlc/chorus@latest`로 새 버전을 설치하세요.
+
+### `--plugins`의 업데이트 범위
+
+`~/.chorus/daemon.json`을 읽어 Claude Code, Codex, Kiro, Pi로 명시된 항목을 처리합니다. 데몬 깨우기가 꺼진 항목도 포함됩니다. 각 항목의 `env`, `PATH`, 사용자 지정 설정 홈으로 대상을 정합니다. 공유 경로는 한 번만, 서로 다른 홈은 별도로 처리합니다. 현재는 기본 파일만 읽으며 `CHORUS_DAEMON_CONFIG_PATH`는 사용하지 않습니다.
+
+- **Claude Code와 Codex**: 호스트의 플러그인 기능으로 Chorus 플러그인을 갱신합니다.
+- **Kiro**: 항목에 설정된 Chorus 인스턴스에서 템플릿을 가져옵니다. 새 템플릿을 받으려면 해당 서버를 먼저 업그레이드하세요. 같은 대상 경로에 충돌하는 인스턴스 URL이 있으면 미완료로 보고합니다.
+- **Pi**: `@chorus-aidlc/chorus-pi`와 `pi-mcp-adapter`만 업데이트합니다. 버전 고정, 범위, latest가 아닌 태그는 유지되며 항상 미완료로 보고됩니다. 최신 버전으로 업데이트하려면 해당 제한을 제거하세요. Pi가 개별 패키지 업데이트를 지원하지 않으면 제한을 알리고 모든 확장을 업데이트하지 않습니다.
+
+호스트 CLI가 있으면 누락된 Chorus 플러그인을 설치할 수 있습니다. 등록 정보와 자격 증명은 유지하며 호스트 CLI 자체를 설치하거나 업데이트하지 않습니다. 설정 파일을 변경하기 전에 `<file>.chorus-upgrade.bak`으로 사본을 저장하며, 다음 업그레이드 때 교체됩니다. `offline` 또는 알 수 없는 유형(기본 OpenCode, OpenClaw, dsh 항목 포함), 각 항목의 `PATH`에 호스트가 없는 경우는 건너뛰고 **INCOMPLETE** 로 표시합니다. 이 호스트에는 [플랫폼별 설정 또는 업데이트 절차](/ko/reference/agents/)를 사용하세요.
+
+### 완료 상태와 적용
+
+명령은 대화형 확인 없이 실행됩니다. 종료 코드 **0** 은 요청한 작업 전체 완료, **1** 은 실패 또는 미완료 대상이 있음을 뜻합니다. 데몬 파일이 없거나 에이전트 목록이 비어 있으면 변경 없이 성공합니다. 파일을 읽을 수 없거나 형식이 잘못되면 실패합니다. CLI 업데이트 실패 시 플러그인 작업은 실행하지 않습니다. 개별 플러그인 실패 후에도 나머지 대상을 처리하고 완료된 업데이트는 유지하며, 자동 롤백은 하지 않습니다.
+
+npm 설치는 진행 상황을 출력하며 설치 시간 제한이 없습니다. 실패하면 표시된 npm 오류를 확인하세요. `EACCES` 또는 `EPERM`이면 사용자 소유의 Node 설치를 쓰거나 관리자에게 시스템 npm prefix 업데이트를 요청하세요. Chorus는 자동으로 권한을 올리지 않습니다. 업데이트 후 새 에이전트 세션을 시작하고 적절한 시점에 `chorus daemon restart`를 실행하세요. 데몬과 실행 중인 세션은 자동으로 재시작되지 않습니다.
 
 ## 에이전트 구성하기 — `chorus agents`
 
@@ -125,6 +154,8 @@ chorus agents run --name codex-worker -- exec --model gpt-5.4 -c model_reasoning
 **하위 명령**: 영구 인수는 인식한 가장 깊은 명령 뒤에 삽입됩니다. 대상은 Codex의 `exec`, `exec resume`, `resume`, Kiro의 `chat`, OpenClaw의 `agent`입니다. 명시적 재정의도 같은 범위에 두세요. `--model chosen exec`가 아니라 `exec --model chosen`을 사용합니다. 루트/부모 명령의 모델 옵션은 자식 명령에 구성된 모델을 제거하지 않습니다. Codex `-c`/`--config` 키는 범위를 넘어 적용됩니다. 인식한 명령이 없으면 구성 인수를 맨 앞에 둡니다. 다른 명령 경로는 추론하지 않으므로 호환되지 않는 영구 인수를 빼고 네이티브 패스스루를 사용하세요.
 
 **알 수 없는 옵션**: 영구 `args`는 일반적인 미지의 플래그를 허용하지만 다음 토큰이 값인지 프롬프트인지 추측하지 못합니다. 백엔드가 지원하면 `["--future=value"]`를 사용하고 `["--future", "value"]`는 쓰지 마세요. 알려진 옵션에는 요구되는 값을 제공해야 합니다. 미지의 옵션이나 반복 가능한 옵션은 선택 범위에서 구성 후 명시 순서를 유지하며, 일반적인 후순위 우선 규칙은 보장하지 않습니다. 모호한 명시적 옵션(알 수 없고 인라인 값도 없음) 뒤에서는 재정의 추론을 멈춥니다. 알려진 재정의를 앞에 두거나 지원되는 인라인 값을 사용하세요. 바깥쪽 Chorus 구분자를 제거한 뒤 에이전트 인수 안의 첫 단독 `--`에서도 분석이 멈춥니다. 명령 탐색은 위치 프롬프트, 알 수 없는 명령, 모호한 옵션에서 멈추며 알려진 옵션 값을 건너뜁니다. 명시적 토큰은 모두 그대로 전달되므로 백엔드 플래그와 버전 호환성은 직접 확인하세요. Windows `.cmd`/`.bat` 제한은 데몬 가이드를 참고하세요.
+
+Codex 데몬은 영구 인수를 모델 옵션과 허용된 `-c` / `--config` 설정으로 더 제한합니다. 다른 옵션은 포그라운드에서 사용할 수 있어도 데몬 실행 전에 오류가 발생합니다. [Codex 데몬 설정](/ko/reference/agents/codex/#모델-옵션과-세션-연속성)을 참고하세요.
 
 ## 셸에서 MCP 도구 호출하기 — `chorus mcp`
 

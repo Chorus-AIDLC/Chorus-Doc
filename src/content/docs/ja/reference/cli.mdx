@@ -13,7 +13,7 @@ route: /ja/reference/cli/
 
 ```sh
 npm install --global @chorus-aidlc/chorus
-chorus --version   # 0.17.2 or later provides `chorus agents` and `chorus mcp`
+chorus --version
 ```
 
 完全なフラグ一覧は、`chorus --help` または `chorus <command> --help` を実行してください。
@@ -23,6 +23,7 @@ chorus --version   # 0.17.2 or later provides `chorus agents` and `chorus mcp`
 | コマンド | 何をするか |
 | --- | --- |
 | `chorus` | Chorus サーバーを起動します（サブコマンドなしの既定）。[Docker でデプロイ](/ja/guides/deploy-docker/)を参照。 |
+| `chorus upgrade` / `chorus update` | npm グローバル CLI を更新。`--plugins` で設定済み Chorus プラグインも更新。 |
 | `chorus agents` | このマシンのエージェントを設定します — `list`（既定）、`add`、`remove`、そして `run`（1 つ起動）。 |
 | `chorus mcp` | ネイティブ MCP クライアント — ツールを `call` し、自分の UUID を表示（`whoami`）し、呼び出せるツールを `list` します。 |
 | `chorus login` | エージェントとして認証し、接続を `~/.chorus/daemon.json` に保存します。 |
@@ -32,6 +33,34 @@ chorus --version   # 0.17.2 or later provides `chorus agents` and `chorus mcp`
 `chorus init` は `chorus agents add` になりました（フラグは同じ）。エージェントごとの
 `install-*.sh` スクリプトは廃止され、いまは `chorus agents add` を案内するだけになっています。
 :::
+
+## CLI とプラグインを更新する
+
+Chorus 0.20.0 から次のコマンドを使えます。
+
+```sh
+chorus upgrade             # CLI のみ
+chorus upgrade --plugins   # CLI、続いて設定済みの Chorus プラグイン
+chorus update --plugins    # upgrade の別名
+```
+
+検証可能な `@chorus-aidlc/chorus` の **npm グローバルインストール** が対象です。npm の最新安定版を確認し、現在のインストールと同じ npm prefix で更新して、導入後のバージョンを検証します。すでに同じか新しいバージョンなら再インストールもダウングレードもしませんが、`--plugins` は実行します。ソースのチェックアウト、リンク、他のパッケージマネージャーによるインストールには対応しません。このコマンドがない旧 CLI では、先に `npm install --global @chorus-aidlc/chorus@latest` で新版を導入してください。
+
+### `--plugins` の更新対象
+
+`~/.chorus/daemon.json` を読み、Claude Code、Codex、Kiro、Pi と明示された設定を処理します。デーモン起動が無効な設定も対象です。各設定の `env`、`PATH`、独自の設定ホームから更新先を決めます。共有の更新先は一度だけ、異なるホームは個別に処理します。現時点では既定のファイルだけを読み、`CHORUS_DAEMON_CONFIG_PATH` は参照しません。
+
+- **Claude Code と Codex**：ホストのプラグイン機構で Chorus プラグインを更新します。
+- **Kiro**：設定された Chorus インスタンスからテンプレートを取得します。新版テンプレートを取得するには、先にそのサーバーを更新してください。同じ更新先に異なるインスタンス URL が指定されている場合は未完了になります。
+- **Pi**：`@chorus-aidlc/chorus-pi` と `pi-mcp-adapter` だけを更新します。バージョン固定、範囲指定、latest 以外のタグは維持され、常に未完了と報告されます。最新版に更新するには、その制約を外してください。個別のパッケージ更新に対応していない Pi では、その制限を報告し、全拡張の更新は行いません。
+
+ホスト CLI があれば不足する Chorus プラグインを追加できます。登録情報と認証情報は保持し、ホスト CLI 自体のインストールや更新は行いません。設定ファイルを変更する前に `<file>.chorus-upgrade.bak` としてコピーを保存し、次回の更新で置き換えます。`offline` や未知の種別（既定の OpenCode、OpenClaw、dsh の設定を含む）、各設定の `PATH` にホストがない場合はスキップし、**INCOMPLETE** と表示します。これらは[各プラットフォームの設定・更新手順](/ja/reference/agents/)を使ってください。
+
+### 完了状態と反映
+
+コマンドは対話なしで動きます。終了コード **0** は全処理の完了、**1** は失敗または未完了です。デーモンファイルがない場合やエージェント一覧が空の場合は、変更せず成功します。読み取り不能や不正なファイルは失敗です。CLI の更新に失敗するとプラグイン処理は行いません。個別のプラグインが失敗しても後続は処理し、完了した更新は保持します。自動ロールバックはありません。
+
+npm のインストールは進捗を表示し、インストールのタイムアウトは設けません。失敗時は表示された npm エラーを確認してください。`EACCES` や `EPERM` なら、ユーザー所有の Node を使うか、管理者にシステムの npm prefix の更新を依頼します。Chorus は自動昇格しません。更新後は新しいエージェントセッションを開始し、都合のよい時に `chorus daemon restart` を実行してください。デーモンや実行中のセッションは自動再起動されません。
 
 ## エージェントを設定する — `chorus agents`
 
@@ -128,6 +157,8 @@ chorus agents run --name codex-worker -- exec --model gpt-5.4 -c model_reasoning
 **サブコマンド**：永続引数は最も深い認識済みコマンドの後に入ります。対象は Codex の `exec`、`exec resume`、`resume`、Kiro の `chat`、OpenClaw の `agent` です。明示的な上書きも同じスコープに置いてください。`--model chosen exec` ではなく `exec --model chosen` とします。ルート/親コマンドのモデル指定は子コマンドの設定済みモデルを削除しません。Codex の `-c`/`--config` キーはスコープをまたいで適用されます。認識されたコマンドがなければ、設定引数を先頭に置きます。他のコマンドパスは推測しないため、互換性のない永続引数を外し、ネイティブの引数渡しを使ってください。
 
 **未知のオプション**：永続 `args` は通常の未知フラグを受け付けますが、次の要素が値かプロンプトかは推測できません。バックエンドが対応していれば `["--future=value"]` を使い、`["--future", "value"]` は避けてください。既知のオプションには必要な値を指定します。未知/繰り返し可能なオプションは、選択スコープ内で設定、明示の順に並びますが、後勝ちは保証しません。曖昧な明示オプション（未知でインライン値なし）の後では上書きの推測を停止します。既知の上書きをその前に置くか、対応するインライン値を使ってください。外側の Chorus 区切りを除去した後、エージェント引数内の最初の単独 `--` でも解析を停止します。コマンド探索は位置引数のプロンプト、未知コマンド、曖昧なオプションで止まり、既知のオプション値を飛ばします。明示的な引数はすべてそのまま渡されます。バックエンドのフラグとバージョンの互換性は確認してください。Windows `.cmd`/`.bat` の制限はデーモンガイドを参照してください。
+
+Codex デーモンでは永続引数をモデル指定と許可された `-c` / `--config` 設定にさらに限定します。他の引数はフォアグラウンドで使えてもデーモン起動前にエラーになります。[Codex デーモンの設定](/ja/reference/agents/codex/#モデル設定とセッションの継続)を参照してください。
 
 ## シェルから MCP ツールを呼び出す — `chorus mcp`
 

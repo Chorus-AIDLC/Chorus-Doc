@@ -113,9 +113,9 @@ Pi 是一等的**可唤醒后台服务后端**，Chorus 后台服务会在收到
 chorus daemon --agent pi
 ```
 
-- 后台服务从 PATH 解析 `pi` 可执行文件（可用 `CHORUS_PI_PATH` 覆盖），并以无头模式运行它
-  （`pi --mode json -p`），把 `CHORUS_URL` / `CHORUS_API_KEY` / `CHORUS_AGENT_PROFILE` 导出到被唤醒
-  的会话中。
+- 后台服务从 PATH 解析 `pi` 可执行文件（可用 `CHORUS_PI_PATH` 覆盖），每次唤醒启动一个无头的
+  `pi --mode rpc` 进程，并把 `CHORUS_URL` / `CHORUS_API_KEY` / `CHORUS_AGENT_PROFILE` 导出到被唤醒
+  的会话中。后台唤醒需要 **pi 0.85.0 或更新版本**，详见 [0.20.0 的 daemon 行为](#0200-的-daemon-行为)。
 - Pi **没有权限系统**，因此不涉及沙箱 / 跳过权限的标志，`chorus` 与 `yolo` 两种后台服务模式运行
   pi 的方式完全一致。
 - 被唤醒的 pi 只能通过本包的扩展 / `pi-mcp-adapter` 访问 Chorus MCP 工具，因此请在后台服务唤醒的环境
@@ -125,6 +125,31 @@ chorus daemon --agent pi
 替你获取模型提供方凭据。可通过该智能体的 `env` 提供，也可使用后台服务继承的环境或
 提供方支持的凭据存储。`systemd --user` 服务不会继承登录 shell 中导出的变量。[管理后台服务](/zh/guides/daemon-operations/)
 说明了模型与思考参数、每智能体 env、服务凭据和重启要求。
+
+### 0.20.0 的 daemon 行为
+
+从 Chorus 0.20.0 起，每次 Pi 唤醒都通过 pi 的 RPC 模式运行，不再回退到之前的无头模式。请在每台运行
+daemon 的主机上升级 pi：
+
+```bash
+pi --version                                                # 需要 0.85.0 或更新版本
+npm install -g @earendil-works/pi-coding-agent@latest       # 升级 pi 本身
+```
+
+`chorus upgrade --plugins` 会更新 `chorus-pi` 和 `pi-mcp-adapter`，但不会升级 pi 本身。该行为已在
+Linux 上用 pi **0.85.1** 实测验证；macOS 和 Windows 由平台测试覆盖，本次迁移尚未在这两个平台做实机验证。
+
+- **pi 版本过旧**：daemon 会跳过这次唤醒，并在日志中给出上面的升级命令。如果读取不到 pi 版本，
+  daemon 会记录警告并照常尝试唤醒。
+- **会话连续性**：每个想法保留自己的 pi 会话，升级前创建的会话也一样。如果 pi 无法恢复之前会话的
+  历史，唤醒会在新会话中继续，对话中会显示一条提示，说明之前的历史无法恢复。
+- **中断**：在 Chorus 中点击**中断**会通过 RPC `abort` 停止 pi 当前的运行（包括正在执行的工具）；即使 Pi 以零退出，该轮仍记录为
+  已中断。如果 `sigintTimeoutMs` 到期时 pi 仍在运行，daemon 会像以前一样强制停止它。
+- **扩展对话框**：唤醒期间没有人在终端前，因此扩展弹出的对话框（select、confirm、input 或
+  editor）会被立即取消，daemon 日志记录 `cancelled pi extension <method> dialog`。请改用 Chorus
+  评论或澄清流程提问。
+- **查找进程**：pi 会把进程名改为 `pi`，所以在 Linux 上 `pgrep -f 'pi --mode rpc'` 找不到它。请使用
+  `pgrep -x pi -P <daemon-pid>`。
 
 ## 常见问题
 

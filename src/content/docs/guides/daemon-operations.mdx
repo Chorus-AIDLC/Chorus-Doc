@@ -10,6 +10,21 @@ sidebar:
 Use this guide after you have verified a foreground daemon connection. The commands apply
 to the supported resident backends: Claude Code, Codex, Kiro, and Pi.
 
+## Upgrade daemon backends to 0.20.0
+
+Update the Chorus CLI using [the upgrade command](/reference/cli/#upgrade-the-cli-and-plugins),
+then restart the daemon when ongoing work allows. Host CLIs are updated separately.
+Check these backend-specific requirements before your first wake:
+
+- [Codex App Server](/reference/agents/codex/#daemon-behavior-in-0200): verified with
+  codex-cli 0.157.1; daemon `args` accept only model options and permitted config overrides.
+  In `--chorus-only` mode, verify the required MCP tool allowances in Codex configuration.
+- [Claude Code stream-json](/reference/agents/claude-code/#daemon-behavior-in-0200): verified
+  with Claude Code 2.1.283 and 2.1.284; interruption first uses the protocol, and background
+  questions must use Chorus comments or elaboration.
+- [Pi RPC](/reference/agents/pi/#daemon-behavior-in-0200): requires pi 0.85.0 or newer
+  (verified with 0.85.1); `--plugins` refreshes the Chorus packages but not pi itself.
+
 ## Choose what the daemon can access
 
 Each `--cwd` registers one working directory as a separate target in Chorus:
@@ -59,7 +74,7 @@ your shell does not change an already-running service.
 | `cwds` | string[] | Working directories this daemon serves. Each path is one independent online connection. |
 | `browseRoots` | string[] | Roots exposed to remote working-directory discovery. A browse root does not create a connection. |
 | `agent` | string | Local backend to wake: `"claude-code"`, `"codex"`, `"kiro"`, or `"pi"`. |
-| `sigintTimeoutMs` | number | Grace window (ms) after `SIGINT` before a woken agent is force-killed. Default `10000`. |
+| `sigintTimeoutMs` | number | Interrupt-escalation grace (ms); Claude Code, Codex, and Pi send a protocol interrupt first. Default `10000`. |
 | `agents` | object[] | *Optional.* Serve several independent agents from one daemon; each entry can override shared runtime defaults, but `args` and `env` are never inherited. See [Run several agents in one daemon](#run-several-agents-in-one-daemon). |
 
 A minimal file after `chorus login` plus `chorus daemon install`:

@@ -41,6 +41,68 @@ follow [Connect an agent runtime](/guides/operator-onboarding/) and select `code
 backend. Verify the connection in the foreground before using
 [Daemon operations](/guides/daemon-operations/) to keep it online.
 
+## Daemon behavior in 0.20.0
+
+Daemon wakes now use one isolated `codex app-server --listen stdio://` process per turn.
+The minimum verified baseline is **codex-cli 0.157.1**; older versions are unverified, and
+missing protocol support fails the wake. There is no `codex exec` fallback or backend
+switch. Install the Chorus integration in each custom `CODEX_HOME` too. Updating Chorus
+plugins does not upgrade the Codex CLI itself.
+
+### Model options and session continuity
+
+Daemon `args` support model selection (`--model` / `-m`) and permitted `-c` / `--config`
+settings such as `model_reasoning_effort`. Other options, including `--oss`, image inputs,
+and unknown switches, fail before launch. Transport, cwd, permission, and managed MCP
+controls are protected. Use supported config settings or explicit foreground commands
+through [the CLI](/reference/cli/); `chorus agents run --type codex -- exec ...` and
+`... -- resume ...` retain their existing behavior.
+
+The daemon resumes stored threads, including threads from the earlier `exec` backend,
+with the current working directory and permission policy. Only a definitive “no rollout
+found” response starts a replacement thread, once, with a continuity notice in the
+conversation. Other resume errors stop the wake and preserve the stored mapping. A
+session-map read failure starts fresh with a warning; a write failure warns that future
+continuity may be reduced. New messages queue for later turns; they do not steer a running
+turn. Token usage is computed from cumulative counters for this turn; if a resumed thread
+has no trustworthy baseline, that turn's usage is omitted rather than counting its history.
+
+### Restricted mode and tool approvals
+
+`--chorus-only` keeps Codex read-only, with interactive approvals disabled and network
+access disabled for the turn. Native requests for approval or user input are denied;
+requests that cannot be safely rejected fail the wake. Questions should go through Chorus
+comments or elaboration. On the verified Codex version, Chorus MCP tools that require
+approval can also be rejected, including `chorus_checkin`. A completed turn does not prove
+that its MCP calls succeeded.
+
+If you choose to allow check-in, put this explicit tool allowance in `~/.codex/config.toml`
+(or the agent's `CODEX_HOME/config.toml`):
+
+```toml
+[mcp_servers.chorus.tools.chorus_checkin]
+approval_mode = "approve"
+```
+
+This allowance was verified for new and resumed threads on 0.157.1 while read-only mode
+and disabled interactive approvals remained in effect. It permits only check-in; comments
+and task updates require their own explicit allowance and verification. Put these rules in
+Codex configuration, not daemon `args`. The daemon does not approve requests on your behalf.
+
+### Interrupts and troubleshooting
+
+An authorized interrupt sends `turn/interrupt`; cancellation during startup closes the
+transport. The daemon then performs bounded process-tree cleanup. On Windows this needs
+Windows PowerShell (`Get-CimInstance`) and `taskkill`; Windows behavior is covered by
+platform tests, while Linux has live verification.
+
+For startup or protocol failures, check `codex --version`, login, model/config settings,
+and local session storage permissions. Initialization has a 30-second limit, setup RPC
+responses 60 seconds, and cleanup 10 seconds. A running turn has no inactivity or total
+runtime timeout: use **Interrupt** if it is stuck. `CLOSED` is an informational diagnostic;
+a failed, interrupted, or missing terminal outcome is not success just because the process
+exits zero. See [Session recovery](/guides/session-recovery/) for the recovery flow.
+
 ## Verify the connection
 
 Open Codex and ask it to `check in to chorus`. Confirm that the response shows the

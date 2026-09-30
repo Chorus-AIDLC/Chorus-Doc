@@ -47,6 +47,16 @@ export CHORUS_API_KEY="cho_REDACTED"
 [데몬 운영](/ko/guides/daemon-operations/)으로 온라인 상태를 유지하기 전에, 포그라운드에서
 연결을 확인하세요.
 
+## 0.20.0의 데몬 동작
+
+깨울 때마다 하나의 `claude -p` 프로세스를 시작하고 턴이 끝나면 종료하는 방식은 유지됩니다. Chorus는 이제 양방향 **stream-json** 입출력을 사용하며 제어 응답을 위해 연결을 열어 둡니다. 기존 세션과 `claude --resume`은 계속 사용할 수 있습니다. 일반 텍스트 대체 경로나 전송 전환 옵션은 없습니다. Linux에서 Claude Code **2.1.283 및 2.1.284** 로 실제 실행을 검증했습니다. 이는 검증된 버전이며 모든 Claude 릴리스에 대한 최소 호환 버전 보장은 아닙니다.
+
+- **중단**: 먼저 프로토콜 중단을 보냅니다. `sigintTimeoutMs` 안에 멈추지 않으면 프로세스 트리를 강제로 종료합니다. 기본값은 기존과 같은 10초입니다. Windows 정리는 플랫폼 테스트로 검증했으며 실제 Windows 실행 검증은 아닙니다.
+- **제한 도구**: `--chorus-only`에서 Chorus 외 도구를 명시적으로 거부하며 Chorus 도구를 사용하거나 댓글로 질문하도록 안내합니다. 로그에는 거부된 도구 이름만 기록하고 입력은 기록하지 않습니다. YOLO 동작은 유지됩니다.
+- **질문**: 데몬 실행은 YOLO를 포함해 모두 `AskUserQuestion`을 비활성화합니다. 터미널에서 답할 사람이 없으므로 Chorus 댓글이나 요구사항 구체화를 사용합니다. 대화형 Claude Code 세션의 질문 흐름은 그대로입니다.
+
+업데이트 후 호스트에 설치된 실제 Claude Code 버전으로 체크인, 후속 턴, 중단 및 재개를 확인하세요. 프로토콜 문제는 [데몬 로그](/ko/guides/daemon-operations/), 계속 진행하는 방법은 [세션 복구](/ko/guides/session-recovery/)를 참고하세요.
+
 ## 연결 확인
 
 Claude Code에서 `/plugin list`를 실행해 `chorus@chorus-plugins`가 활성화되어 있는지 확인합니다.
