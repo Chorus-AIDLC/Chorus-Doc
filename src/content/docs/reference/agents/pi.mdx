@@ -5,18 +5,16 @@ docsLocale: en
 route: /reference/agents/pi/
 ---
 
-# Pi
-
 The [Pi coding agent](https://pi.dev) is a first-party Chorus integration, distributed as the
 published npm package **`@chorus-aidlc/chorus-pi`**. It ships Chorus workflow skills, read-only
-reviewer sub-agents, the official pi `subagent` tool, and session-aware extension hooks through
-Pi's native extension + skill + agent mechanisms — installed with a single `pi install`.
+reviewer sub-agents, Pi's official `subagent` tool, and session-aware extension hooks through
+Pi's native extension, skill, and agent mechanisms — installed with a single `pi install`.
 
-Pi can also run as a **wakeable `--agent pi` daemon backend**: the Chorus daemon wakes a headless
-pi session on remote dispatch, so Pi participates in the reversed-conversation loop like Claude
-Code, Codex, and Kiro.
+Pi can also run as a **wakeable `--agent pi` daemon backend**: the Chorus daemon wakes a
+headless Pi session when work is sent to it remotely, so Pi takes part in the
+reversed-conversation loop just like Claude Code, Codex, and Kiro.
 
-Before installation, create an agent key by following
+Before you install, create an agent key by following
 [Prepare agent access](/guides/administrator-setup/).
 
 ## Prerequisites
@@ -27,7 +25,7 @@ Before installation, create an agent key by following
   ```bash
   pi install npm:pi-mcp-adapter
   ```
-  There is **no** separate sub-agents package to install — `chorus-pi` bundles pi's official
+  There is **no** separate sub-agents package to install — `chorus-pi` bundles Pi's official
   `subagent` tool itself.
 - A Chorus **API key** (starts with `cho_`).
 
@@ -59,7 +57,7 @@ root (or `~/.pi/agent/mcp.json` globally) so the main agent gets the `chorus_*` 
 }
 ```
 
-Literal URL + literal Bearer work out of the box — Pi does not require `${VAR}` expansion in
+A literal URL and Bearer token work as-is — Pi does not require `${VAR}` expansion in
 `.mcp.json`. Keep `.mcp.json` out of version control because it contains the agent key.
 
 ## Step 3: Install the chorus-pi package
@@ -79,8 +77,8 @@ Developing `chorus-pi` locally? Install from a repo checkout instead: `pi instal
 
 Restart Pi, inspect `/mcp`, and ask Pi to call `chorus_checkin`. Confirm the response shows the
 expected agent identity and permissions, and that the first turn reports a
-`# Chorus Plugin — Active` context with your checkin info. Type `/skill:chorus` to confirm skills
-loaded, and inspect `/subagents` for `chorus-proposal-reviewer`.
+`# Chorus Plugin — Active` context with your check-in details. Type `/skill:chorus` to confirm
+the skills loaded, and inspect `/subagents` for `chorus-proposal-reviewer`.
 
 ## Capabilities
 
@@ -96,46 +94,49 @@ loaded, and inspect `/subagents` for `chorus-proposal-reviewer`.
   package, Chorus reviewers and workers named directly in a call run in the background even
   if the call asks for `async: false`, because a foreground child there cannot reach the
   Chorus tools.
-- **The official pi `subagent` tool**, bundled at `extensions/subagent/` (pi's reference pattern) —
-  no third-party sub-agents package required. It also **coexists with the community `pi-subagents`
-  package** (nicobailon): both register a `subagent` tool, so exclude the bundled one via a
-  `settings.packages` filter, and `chorus-pi`'s session lifecycle handles that package's
-  **async / detached** subagent runs alongside the bundled blocking runs. See the
-  [`chorus-pi` README](https://www.npmjs.com/package/@chorus-aidlc/chorus-pi) for the filter and setup.
-- **Session-aware extension** subscribing to Pi's native events (`session_start` → `chorus_checkin`
-  + spec-mode resolution, `tool_call` on `subagent` → per-worker Chorus session, `tool_result` →
-  close the worker session + reviewer nudges, `session_shutdown` → cleanup).
+- **Pi's official `subagent` tool**, bundled at `extensions/subagent/` (Pi's reference
+  pattern), so no third-party sub-agents package is required. It also **coexists with the
+  community `pi-subagents` package** (nicobailon): both register a `subagent` tool, so exclude
+  the bundled one with a `settings.packages` filter. `chorus-pi`'s session lifecycle then
+  tracks that package's **async / detached** sub-agent runs alongside the bundled blocking
+  runs. See the [`chorus-pi` README](https://www.npmjs.com/package/@chorus-aidlc/chorus-pi)
+  for the filter and setup.
+- **Session-aware extension** subscribing to Pi's native events (`session_start` →
+  `chorus_checkin` + spec-mode resolution, `tool_call` on `subagent` → per-worker Chorus
+  session, `tool_result` → close the worker session + reviewer nudges, `session_shutdown` →
+  cleanup).
 
-The extension is config-by-env (Pi has no plugin-settings UI). `CHORUS_SPEC_MODE` selects
-`openspec`, `lite`, or `off`; without it, usable OpenSpec wins, otherwise the session uses
-spec-lite. The older `CHORUS_OPENSPEC_MODE=off` disables only OpenSpec, so the fallback is
+The extension is configured through environment variables (Pi has no plugin-settings UI).
+`CHORUS_SPEC_MODE` selects `openspec`, `lite`, or `off`; without it, the session uses
+OpenSpec when it is usable and spec-lite otherwise. The older `CHORUS_OPENSPEC_MODE=off` disables only OpenSpec, so the fallback is
 `lite`, not free-form. Use `CHORUS_SPEC_MODE=off` for no local spec files. See
 [OpenSpec mode](/guides/openspec-mode/) and [Spec-lite mode](/guides/spec-lite-mode/).
 Reviewer toggles remain `CHORUS_ENABLE_{PROPOSAL,TASK,CODE}_REVIEWER` (default `true`).
 
-## Run pi as a wakeable daemon backend
+## Run Pi as a wakeable daemon backend
 
-Pi is a first-class **wakeable daemon backend** — the Chorus daemon wakes a headless pi session on
-remote dispatch (an idea/task assigned to your agent, an `@mention`, a proposal decision).
+Pi is a first-class **wakeable daemon backend** — the Chorus daemon wakes a headless Pi session
+when work is sent to it remotely (an idea/task assigned to your agent, an `@mention`, a
+proposal decision).
 
-The simplest path is `chorus agents add`: select **Pi** in the agent
-checklist and it installs `pi-mcp-adapter` and `chorus-pi` through `pi install`, seeds pi as a
-**wakeable** agent in `~/.chorus/daemon.json`, and — if you opt in — installs the boot daemon that
-wakes it. To wire it by hand, run the daemon with the pi backend:
+The simplest path is `chorus agents add`: select **Pi** in the agent checklist and it installs
+`pi-mcp-adapter` and `chorus-pi` through `pi install`, seeds Pi as a **wakeable** agent in
+`~/.chorus/daemon.json`, and — if you opt in — installs the daemon boot service that wakes
+it. To wire it by hand, run the daemon with the Pi backend:
 
 ```bash
 chorus daemon --agent pi
 ```
 
-- The daemon resolves the `pi` executable from PATH (override with `CHORUS_PI_PATH`) and starts
+- The daemon resolves the `pi` executable from `PATH` (override with `CHORUS_PI_PATH`) and starts
   one headless `pi --mode rpc` process per wake, exporting `CHORUS_URL` / `CHORUS_API_KEY` /
-  `CHORUS_AGENT_PROFILE` into the woken session. Daemon wakes need **pi 0.85.0 or newer**; see
+  `CHORUS_AGENT_PROFILE` into the woken session. Daemon wakes need **Pi 0.85.0 or newer**; see
   [Daemon behavior in 0.20.0](#daemon-behavior-in-0200).
 - Pi has **no permission system**, so no sandbox / skip-permissions flag is involved — the `chorus`
-  and `yolo` daemon modes run pi identically.
-- A woken pi reaches Chorus MCP tools only through this package's extension / `pi-mcp-adapter`, so
-  keep `chorus-pi` installed in the environment the daemon wakes (the npm install makes that
-  reliable).
+  and `yolo` daemon modes run Pi identically.
+- A woken Pi reaches Chorus MCP tools only through this package's extension / `pi-mcp-adapter`, so
+  keep `chorus-pi` installed in the environment the daemon wakes (installing from npm keeps it
+  available to the daemon).
 
 The daemon supplies the Chorus connection (`CHORUS_URL`, `CHORUS_API_KEY`, and
 `CHORUS_AGENT_PROFILE`), but does not obtain model-provider credentials for you. Supply those
@@ -146,30 +147,29 @@ thinking args, per-agent env, service credentials, and the required restart.
 
 ### Daemon behavior in 0.20.0
 
-From Chorus 0.20.0, each Pi wake runs over pi's RPC mode. There is no fallback to the earlier
-headless mode, so upgrade pi on every host that runs the daemon:
+From Chorus 0.20.0, each Pi wake runs over Pi's RPC mode. There is no fallback to the earlier
+headless mode, so upgrade Pi on every host that runs the daemon:
 
 ```bash
 pi --version                                                # needs 0.85.0 or newer
 npm install -g @earendil-works/pi-coding-agent@latest       # upgrade pi itself
 ```
 
-`chorus upgrade --plugins` refreshes `chorus-pi` and `pi-mcp-adapter`, but it does not upgrade pi.
-This behavior was verified live on Linux with pi **0.85.1**; macOS and Windows are covered by
-platform tests; neither has live verification for this migration.
+`chorus upgrade --plugins` refreshes `chorus-pi` and `pi-mcp-adapter`, but it does not upgrade Pi.
+This behavior was verified live on Linux with Pi **0.85.1**.
 
-- **Older pi:** the daemon skips the wake and logs the upgrade command above. If it cannot read
-  the pi version, it logs a warning and tries the wake anyway.
-- **Session continuity:** each idea keeps its pi session, including sessions from before the
-  upgrade. If pi cannot restore an earlier session's history, the wake continues in a new
+- **Older Pi:** the daemon skips the wake and logs the upgrade command above. If it cannot read
+  the Pi version, it logs a warning and tries the wake anyway.
+- **Session continuity:** each idea keeps its Pi session, including sessions from before the
+  upgrade. If Pi cannot restore an earlier session's history, the wake continues in a new
   session, and the conversation shows a notice that the previous history could not be restored.
-- **Interrupt:** **Interrupt** in Chorus sends RPC `abort` to stop pi's current run,
-  including a running tool, and the turn is recorded as interrupted even if Pi exits zero. If pi is still running when `sigintTimeoutMs`
-  ends, the daemon force-stops it as before.
+- **Interrupt:** **Interrupt** in Chorus sends RPC `abort` to stop Pi's current run,
+  including a running tool, and the turn is recorded as interrupted even if Pi exits zero.
+  If Pi is still running when `sigintTimeoutMs` ends, the daemon force-stops it as before.
 - **Extension dialogs:** nobody is at the terminal during a wake, so an extension dialog
   (select, confirm, input, or editor) is cancelled immediately and the daemon logs
   `cancelled pi extension <method> dialog`. Ask through a Chorus comment or elaboration instead.
-- **Finding the process:** pi renames its process to `pi`, so `pgrep -f 'pi --mode rpc'` finds
+- **Finding the process:** Pi renames its process to `pi`, so `pgrep -f 'pi --mode rpc'` finds
   nothing on Linux. Use `pgrep -x pi -P <daemon-pid>`.
 
 ## Common issues
@@ -185,4 +185,4 @@ platform tests; neither has live verification for this migration.
   server name in gateway mode. Call `mcp({ tool: "chorus_chorus_checkin" })`, or set
   `"toolPrefix": "none"` on the chorus server to use the native `chorus_*` names.
 
-For general connection problems, see [Troubleshooting](/guides/troubleshooting/).
+For general connection problems, see [Troubleshoot agent connections](/guides/troubleshooting/).

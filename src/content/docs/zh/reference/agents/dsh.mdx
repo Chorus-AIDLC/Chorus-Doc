@@ -1,28 +1,26 @@
 ---
 title: DeepSeek Harness
-description: 通过第一方 npm bundle 安装并验证 DeepSeek Harness (dsh) 的 Chorus 接入。
+description: 通过官方 npm bundle 把 DeepSeek Harness (dsh) 连接到 Chorus。
 docsLocale: zh
 route: /zh/reference/agents/dsh/
 ---
 
-# DeepSeek Harness
+DeepSeek Harness (dsh) 通过官方 npm bundle `@chorus-aidlc/chorus-dsh` 接入 Chorus。该 bundle 会把 Chorus 的 MCP 工具、工作流技能和 persona 注入到一个 dsh profile。你可以交互式使用 dsh；自 dsh `0.1.2-rc.1` 起，Chorus 也能作为后台服务后端无人值守地唤醒 dsh。
 
-DeepSeek Harness (dsh) 通过第一方 npm bundle `@chorus-aidlc/chorus-dsh` 接入 Chorus。该 bundle 会把 Chorus 的 MCP 工具、工作流技能和 persona 注入到一个 dsh profile。你可以交互式使用 dsh；自 dsh `0.1.2-rc.1` 起，Chorus 也能作为后台服务后端无人值守地唤醒 dsh。
+开始之前，请安装 `0.1.2-rc.1` 或更高版本的 dsh 以及 `pnpm`，并按照[为智能体创建访问权限](/zh/guides/administrator-setup/)创建一个智能体密钥。
 
-安装前请使用 `0.1.2-rc.1` 或更高版本的 dsh（并安装 `pnpm`），并按照[准备智能体访问](/zh/guides/administrator-setup/)创建一个智能体密钥。
+## 安装 bundle 并写入凭据
 
-## 安装 bundle 并写入凭证
-
-`chorus agents add` 会一步把 bundle 安装进某个 dsh profile，并把你的凭证写入 `$DSH_HOME/.env`。用 `--dsh-profile` 指定 profile 名称：
+`chorus agents add` 会一步把 bundle 安装进某个 dsh profile，并把你的凭据写入 `$DSH_HOME/.env`。用 `--dsh-profile` 指定 profile 名称：
 
 ```bash
 npm install --global @chorus-aidlc/chorus
 chorus agents add --agents dsh --dsh-profile <name>
 ```
 
-在提示时输入 Chorus 地址和智能体密钥。由于 dsh 会从工具子进程中剥离形似凭证的环境变量，`chorus agents add` 会把 `CHORUS_URL`、`CHORUS_API_KEY` 和 `CHORUS_AGENT_PROFILE` 持久化到 `$DSH_HOME/.env`，dsh 会把它加载进会话。dsh 解析凭证的顺序为：环境变量 → `$DSH_HOME/.credentials.yaml` → `<cwd>/.env` → `$DSH_HOME/.env`。
+在提示时输入 Chorus 地址和智能体密钥。由于 dsh 会从工具子进程中剥离形似凭据的环境变量，`chorus agents add` 会把 `CHORUS_URL`、`CHORUS_API_KEY` 和 `CHORUS_AGENT_PROFILE` 持久化到 `$DSH_HOME/.env`，dsh 会把它加载进会话。dsh 解析凭据的顺序为：环境变量 → `$DSH_HOME/.credentials.yaml` → `<cwd>/.env` → `$DSH_HOME/.env`。
 
-若要改为手动添加 bundle，请运行下面的命令（必须带 `-w`，因为 dsh profile 是一个 pnpm workspace 根），然后自行在 `$DSH_HOME/.env` 中设置凭证：
+若要改为手动添加 bundle，请运行下面的命令（必须带 `-w`，因为 dsh profile 是一个 pnpm workspace 根），然后自行在 `$DSH_HOME/.env` 中设置凭据：
 
 ```bash
 dsh plugin --profile <name> add @chorus-aidlc/chorus-dsh -w
@@ -40,26 +38,26 @@ dsh --profile <name>
 
 ## 作为后台服务后端运行（可选）
 
-自 dsh `0.1.2-rc.1` 起，Chorus 可以像唤醒 Claude Code、Codex、Kiro 那样无人值守地唤醒 dsh。先用 `chorus agents add --agents dsh` 写入一次凭证，然后启动 daemon 并选择 dsh 后端：
+自 dsh `0.1.2-rc.1` 起，Chorus 可以像唤醒 Claude Code、Codex、Kiro 那样无人值守地唤醒 dsh。先用 `chorus agents add --agents dsh` 写入一次凭据，然后启动后台服务并选择 dsh 后端：
 
 ```bash
 chorus daemon --agent dsh
 ```
 
-daemon 会在首次唤醒 dsh 时自建并校验它自己的托管 `sdk` profile，因此这条路径只需要凭证，你无需为它手动安装 profile。`dsh` 本体必须在 `PATH` 上（或设置 `CHORUS_DSH_PATH`）；Chorus 从不打包 dsh 运行时。一次 Chorus 派发——给 dsh 指派 idea/任务，或 `@提及`——即可唤醒它。
+后台服务会在首次唤醒 dsh 时自行构建并校验它托管的 profile，因此这条路径只需要凭据，你无需为它手动安装 profile。`dsh` 本体必须在 `PATH` 上（或设置 `CHORUS_DSH_PATH`）；Chorus 从不打包 dsh 运行时。给 dsh 指派想法或任务，或 @提及它，都会唤醒它。
 
-每次唤醒都是一个**全新**的 dsh 会话（dsh 没有原生的跨唤醒续聊）；Chorus 把对话上下文保存在被指派的 idea/任务上，被唤醒的 dsh 智能体通过 Chorus MCP 工具读回它。
+每次唤醒都是一个**全新**的 dsh 会话（dsh 没有原生的跨唤醒续聊）；Chorus 把对话上下文保存在被指派的想法或任务上，被唤醒的 dsh 智能体通过 Chorus MCP 工具读回它。
 
 ## 能力与限制
 
 - bundle 提供 Chorus 的 MCP 工具、工作流技能和 Chorus persona。
 - dsh 既可通过自己的 profile 以交互方式运行，**也可**作为无人值守的后台服务后端（`chorus daemon --agent dsh`）。
-- 每次唤醒 dsh 都会新建会话——没有原生的跨唤醒续聊；连续性来自唤醒所锚定的 Chorus 资源。
+- 每次唤醒 dsh 都会新建会话（没有原生的跨唤醒续聊）；连续性来自唤醒所锚定的 Chorus 资源。
 
 ## 常见问题
 
 - **找不到 `dsh` 或 `pnpm`**：安装这两个前置工具并重新打开 shell。
 - **`ERR_PNPM_ADDING_TO_ROOT`**：带 `-w` 重新运行命令，因为 dsh profile 是一个 pnpm workspace 根。
 - **找不到包**：确认 registry 访问和包名 `@chorus-aidlc/chorus-dsh`，然后重新运行安装命令。
-- **check-in 未授权**：确认 `CHORUS_URL` 和 `cho_` 智能体密钥已写入 `$DSH_HOME/.env`（重新运行 `chorus agents add --agents dsh --dsh-profile <name>` 可刷新它们），然后重新启动 profile。
-- **profile 更新后无法 check in**：重启该 dsh profile，使最终 composition 重新加载。
+- **签到未授权**：确认 `CHORUS_URL` 和 `cho_` 智能体密钥已写入 `$DSH_HOME/.env`（重新运行 `chorus agents add --agents dsh --dsh-profile <name>` 可刷新它们），然后重新启动 profile。
+- **profile 更新后无法签到**：重启该 dsh profile，使它重新加载更新后的配置。

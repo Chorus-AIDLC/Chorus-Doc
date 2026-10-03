@@ -10,7 +10,7 @@ sidebar:
 Start with the symptom visible in Chorus. Run the daemon in the foreground while
 diagnosing whenever possible, because startup errors are easier to see there.
 
-## The agent never becomes online
+## The agent never comes online
 
 1. Run `chorus agents` to confirm the agent is configured on this machine (it lists each
    agent's name, UUID, and backend; API keys are never printed).
@@ -55,17 +55,17 @@ connection in **Settings → Agents**.
 Check that:
 
 - the selected connection is still **Online**;
-- the project or task is not pinned to a different offline connection;
+- the project or task is not fixed to a different offline connection;
 - the working directory is registered by the daemon;
 - the agent has permission to read the item and perform the requested action.
 
-Restore the pinned connection or explicitly choose a new target. Do not broaden filesystem
+Restore the fixed connection or explicitly choose a new target. Do not broaden filesystem
 access merely to make a missing target appear.
 
 ## Interrupt or resume fails
 
-Open the conversation and verify that it is currently in a state that allows the requested
-control. The daemon that owns the session must be online. Resume always returns to the
+Open the conversation and check that its current state allows the interrupt or resume you
+requested. The daemon that owns the session must be online. Resume always returns to the
 original connection and working directory.
 
 If the process crashed, inspect partial filesystem changes before resuming. For the full

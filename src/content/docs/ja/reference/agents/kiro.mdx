@@ -5,13 +5,11 @@ docsLocale: ja
 route: /ja/reference/agents/kiro/
 ---
 
-# Kiro
-
-Kiro CLI には、ツール、ワークフロースキル、エージェント、フックを備えた第一者の Chorus 統合が
+Kiro CLI には、ツール、ワークフロースキル、レビューエージェント、フックを備えた公式の Chorus 統合が
 あります。Kiro はサポートされる Chorus デーモンのバックエンドでもあります。
 
-インストール前に、Kiro CLI v2 をインストールし、[エージェントのアクセスを準備する](/ja/guides/administrator-setup/)に
-従ってエージェントキーを作成します。
+始める前に、Kiro CLI v2 をインストールし、[エージェントのアクセスを準備する](/ja/guides/administrator-setup/)に
+従って API キーを作成します。
 
 ## 統合をインストールする
 
@@ -22,7 +20,7 @@ npm install --global @chorus-aidlc/chorus
 chorus agents add --agents kiro
 ```
 
-プロンプトが出たら、Chorus URL とエージェントキーを入力します。`chorus agents add` は、接続された
+プロンプトが出たら、Chorus URL と API キーを入力します。`chorus agents add` は、接続された
 Chorus インスタンスから Kiro 統合ファイル（スキル、レビューエージェント、フック）を `~/.kiro` に
 ダウンロードし、Chorus MCP サーバーを `~/.kiro/settings/mcp.json` にマージします。別の Kiro
 ディレクトリにインストールするには、実行前に `KIRO_DIR` を設定します。インストール後に Kiro を
@@ -31,8 +29,8 @@ Chorus インスタンスから Kiro 統合ファイル（スキル、レビュ�
 ## リモート起動を有効にする
 
 対話的な Kiro セッションからのみ Chorus を使う場合は、このセクションを飛ばしてください。
-それ以外の場合は、[ランタイムを接続する](/ja/guides/operator-onboarding/)に従い、バックエンドとして
-`kiro` を選びます。[デーモンの運用](/ja/guides/daemon-operations/)でオンラインを維持する前に、
+それ以外の場合は、[エージェントランタイムを接続する](/ja/guides/operator-onboarding/)に従い、バックエンドとして
+`kiro` を選びます。[Chorus デーモンを運用する](/ja/guides/daemon-operations/)に従ってオンラインを維持する前に、
 フォアグラウンドで接続を確認してください。
 
 ## 接続を確認する
@@ -52,21 +50,20 @@ Chorus インスタンスから Kiro 統合ファイル（スキル、レビュ�
 - リモート作業はローカルユーザーのアクセス権を継承します。信頼できる作業ディレクトリのみを
   登録してください。
 
-共通の運用手順については、[リモート制御](/ja/guides/remote-control/)と
-[セッションの復旧](/ja/guides/session-recovery/)を使ってください。
+共通の運用手順については、[リモートのエージェントで作業を始める](/ja/guides/remote-control/)と
+[セッションを中断して再開する](/ja/guides/session-recovery/)を参照してください。
 
 ## ターミナルから再開する
 
 自分のターミナルから進行中の会話を引き継ぐには、チャット UI からそのセッション ID をコピーし
-（トランスクリプトのヘッダーにある**Copy session ID**）、その会話の作業ディレクトリで実行します。
+（トランスクリプトのヘッダーにある **セッション ID をコピー**）、その会話の作業ディレクトリで実行します。
 
 ```bash
 kiro-cli chat --resume-id <sessionId>
 ```
 
-コピーした ID は、Chorus がセッションを再開するときに Kiro CLI へ渡すのと同じ ID です。完全な
-流れは
-[セッションの中断と再開](/ja/guides/session-recovery/#ターミナルから引き継ぐ)を参照してください。
+コピーした ID は、Chorus がセッションを再開するときに Kiro CLI へ渡すのと同じ ID です。完全な流れは
+[セッションを中断して再開する](/ja/guides/session-recovery/#ターミナルから引き継ぐ)を参照してください。
 
 ## よくある問題
 
@@ -76,4 +73,4 @@ kiro-cli chat --resume-id <sessionId>
 - **チェックインが認可されない：** `chorus agents add` を再実行して `mcp.json` と認証情報を更新
   します。デーモンモードでは、デーモンが起動ごとにキーを供給します。
 - **デーモンがオフライン：** `chorus daemon status` を実行し、次に
-  [トラブルシューティング](/ja/guides/troubleshooting/)を参照します。
+  [エージェント接続のトラブルシューティング](/ja/guides/troubleshooting/)を参照します。

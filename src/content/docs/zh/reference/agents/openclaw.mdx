@@ -1,13 +1,13 @@
 ---
 title: OpenClaw
-description: 安装并验证 OpenClaw 的 Chorus 第一方插件。
+description: 通过官方插件把 OpenClaw 连接到 Chorus。
 docsLocale: zh
 route: /zh/reference/agents/openclaw/
 ---
 
-# OpenClaw
+OpenClaw 有 Chorus 官方插件。它通过 OpenClaw 网关及其原生后台服务保持在线，不使用 Chorus 后台服务。
 
-OpenClaw 通过第一方插件接入 Chorus。插件使用 OpenClaw 自己的原生常驻服务接收远程指令，不需要安装 Chorus 后台服务。
+开始之前，请确认 OpenClaw 版本为 `2026.4.27` 或更高，并按照[为智能体创建访问权限](/zh/guides/administrator-setup/)创建智能体密钥。
 
 ## 安装插件
 
@@ -18,37 +18,36 @@ npm install --global @chorus-aidlc/chorus
 chorus agents add --agents openclaw
 ```
 
-也可以直接用 OpenClaw 安装（OpenClaw 版本需为 `2026.4.27` 或更高）：
+也可以直接用 OpenClaw 安装：
 
 ```bash
 openclaw plugins install npm:@chorus-aidlc/chorus-openclaw-plugin
 openclaw plugins enable chorus-openclaw-plugin
 ```
 
-无论用哪种方式，都要在 `~/.openclaw/openclaw.json` 中配置：
-
-- `plugins.entries.chorus-openclaw-plugin.config.chorusUrl`：Chorus 根地址，例如 `https://chorus.example.com`
-- `plugins.entries.chorus-openclaw-plugin.config.apiKey`：为该智能体创建的 API 密钥
-
-配置完成后重新启动 OpenClaw 网关。
+无论用哪种方式，都要打开 `~/.openclaw/openclaw.json`，把
+`plugins.entries.chorus-openclaw-plugin.config.chorusUrl` 设为你的 Chorus 地址，把 `apiKey`
+设为专用的智能体密钥。首次安装后以及每次修改配置后，都要重新启动 OpenClaw 网关。
 
 ## 验证连接
 
-1. 在 OpenClaw 中运行 `/chorus status`，确认返回正确的智能体身份。
-2. 确认工具列表中包含 `chorus__chorus_checkin`。
-3. 在 Chorus 的在线智能体列表中确认 OpenClaw 连接已上线。
-4. 如果使用沙箱（Sandbox）模式，确认 `chorus__*` 已加入 `tools.sandbox.tools.alsoAllow`。
+在 OpenClaw 中运行 `/chorus status`，确认它报告了预期的 Chorus 智能体，且 Chorus 工具可用。
+在 Chorus 中打开**设置 → 智能体**，确认 OpenClaw 连接处于在线状态。
+
+如果 OpenClaw 以沙箱模式运行智能体，请在沙箱策略中允许 `chorus__*` 工具。
 
 ## 能力与限制
 
-- Chorus 官方维护插件、MCP 工具和内置技能。
-- OpenClaw 原生服务支持远程启动会话、追加指令、中断和恢复。
-- OpenClaw 不使用 `chorus daemon`，也不能作为 `chorus daemon --agent` 的运行后端。
-- 插件不提供 Chorus 工作流生命周期钩子；工作流技能会管理相关子智能体会话。
+- 插件提供 Chorus MCP 工具和工作流技能。
+- OpenClaw 网关提供常驻在线、远程启动、追加指令、中断和恢复。
+- `chorus daemon --agent` 不接受 OpenClaw；请改为保持网关运行。
+- OpenClaw 不提供与 Claude Code 相同的工作流生命周期钩子。
+
+通用的操作流程见[从 Chorus 发起远程工作](/zh/guides/remote-control/)和[中断与恢复会话](/zh/guides/session-recovery/)。
 
 ## 常见问题
 
-- **插件已启用但连接离线**：确认 OpenClaw 版本符合要求，然后重新启动网关。
-- **沙箱中看不到 Chorus 工具**：将 `chorus__*` 加入 `tools.sandbox.tools.alsoAllow`。
-- **连接返回 `401`**：在 Chorus 中创建新 API 密钥，更新 `openclaw.json` 后重启网关。
-- **无法远程启动会话**：确认 OpenClaw 的主会话和模型已经配置，并检查网关日志。
+- **插件已启用但处于离线状态**：确认 OpenClaw 版本，然后重新启动网关。
+- **沙箱中看不到 Chorus 工具**：把 `chorus__*` 加入沙箱的允许列表。
+- **签到返回未授权**：轮换智能体密钥，更新 `openclaw.json`，然后重新启动网关。
+- **远程启动失败**：确认网关已配置主会话和模型，然后参阅[排查智能体连接故障](/zh/guides/troubleshooting/)。

@@ -10,7 +10,7 @@ sidebar:
 import Screenshot from '../../../components/Screenshot.astro';
 
 Use this guide after a Chorus administrator gives you an agent API key. It connects
-Claude Code, Codex, or Kiro as a resident runtime that Chorus can wake remotely.
+Claude Code, Codex, or Kiro as an always-on runtime that Chorus can start work on remotely.
 
 ## Before you start
 
@@ -31,7 +31,7 @@ npm install --global @chorus-aidlc/chorus
 
 `chorus agents add` is the one command that connects this machine's agents to Chorus. It
 detects the agents you already have installed, installs each one's Chorus plugin, and
-captures your Chorus URL and API key once into `~/.chorus/daemon.json`. For Claude Code,
+saves your Chorus URL and API key once to `~/.chorus/daemon.json`. For Claude Code,
 Codex, and the DeepSeek Harness it also writes the credential into that agent's own config,
 so interactive sessions authenticate with no manual environment setup.
 
@@ -58,7 +58,7 @@ If you only need to save the credential without installing a plugin — for exam
 machine where the agent is already set up — run `chorus login` instead; it validates the URL
 and key and writes the connection to `~/.chorus/daemon.json` (mode `0600`).
 
-See [The chorus CLI](/reference/cli/) for the full `chorus agents` and `chorus mcp` surface.
+See [The chorus CLI](/reference/cli/) for all `chorus agents` and `chorus mcp` options.
 
 ## Start the runtime
 
@@ -69,11 +69,11 @@ chorus daemon --agent claude-code --cwd /path/to/your/project --chorus-only
 ```
 
 Replace `claude-code` with `codex` or `kiro` when needed. `--chorus-only` restricts the
-woken agent to Chorus tools. Omit it only when you intentionally want the agent to use
-its full local toolset and have reviewed the security implications.
+agent to Chorus tools. Omit it only when you intentionally want the agent to use its full
+local toolset and have reviewed the security implications.
 
-Keep the command running while you verify the connection. To install a boot service so the
-daemon comes up on login, add `--daemon-autostart` to `chorus agents add`, or see
+Keep the command running while you verify the connection. To install a service so the
+daemon starts when you log in, add `--daemon-autostart` to `chorus agents add`, or see
 [Operate the Chorus daemon](/guides/daemon-operations/).
 
 ## Verify the connection

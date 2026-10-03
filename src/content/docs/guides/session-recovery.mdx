@@ -43,10 +43,10 @@ If the process has finished but the conversation still says **Running**, select
 is listed. If Chorus has no live run to stop, it can mark the turn interrupted directly;
 otherwise it forwards the request to the daemon and waits for the stop report.
 
-Completion reports retry temporary failures, and a child process that has exited no
-longer stays active just because a background process keeps its output pipe open.
-This recovery behavior adds no duration limit to running work. Backend limits still
-apply: DeepSeek Harness (`dsh`) defaults to 30 minutes per turn, configurable through
+Chorus retries reporting that a turn finished after temporary failures, and treats the
+agent as finished once its process exits, even if a background process it started is still
+running. None of this limits how long a turn may run, but backend limits still apply:
+DeepSeek Harness (`dsh`) defaults to 30 minutes per turn, configurable through
 `CHORUS_DSH_TIMEOUT_MS`. Check the final output and any remaining processes before resuming.
 
 ## Inspect the partial result
@@ -80,24 +80,24 @@ For repeated failures, use [Troubleshoot agent connections](/guides/troubleshoot
 
 You can continue a conversation from your own terminal instead of the in-UI **Resume**
 button. Open the conversation and select **Copy session ID** in the transcript header. This
-copies the backend-owned resume id — the exact id the daemon hands to the agent CLI when it
-resumes — so a manual resume rejoins the same conversation rather than starting a fresh one.
+copies the session ID that the agent CLI itself uses to resume, so a manual resume rejoins
+the same conversation rather than starting a fresh one.
 
 {/* Screenshot surface: transcript header with the Copy session ID control. */}
 
-From the working directory the conversation ran in, pass the copied id to your backend's
-resume command:
+From the working directory the conversation ran in, pass the copied session ID to your
+backend's resume command:
 
 - **Claude Code** — `claude --resume <sessionId>`
 - **Codex** — `codex exec resume <thread_id>`
 - **Kiro** — `kiro-cli chat --resume-id <sessionId>`
 
-Each backend owns its own id format, so the copied value is whatever that backend accepts.
-See your platform's reference page for the exact command: [Claude Code](/reference/agents/claude-code/),
-[Codex](/reference/agents/codex/), and [Kiro](/reference/agents/kiro/).
+Each backend has its own ID format, so the copied value is whatever that backend accepts.
+See your platform's reference page for the exact command:
+[Claude Code](/reference/agents/claude-code/), [Codex](/reference/agents/codex/), and
+[Kiro](/reference/agents/kiro/).
 
-Chorus keeps one canonical session per idea. When an idea is worked on directly, its session
-id is the idea's own UUID (`sessionId === directIdeaUuid`), and a wake that moves to a
-different working directory re-points that single session instead of forking a new one — so
+Chorus keeps one session per idea. If you start work on the idea from a different working
+directory, Chorus moves that single session there instead of starting a new one — so
 there is always exactly one conversation to take over, wherever it last ran. See the
 [Online agents overview](/guides/online-agents-overview/) for the full model.

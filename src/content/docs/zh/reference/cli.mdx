@@ -5,8 +5,6 @@ docsLocale: zh
 route: /zh/reference/cli/
 ---
 
-# `chorus` 命令行工具
-
 `chorus` 命令（发布为 `@chorus-aidlc/chorus`）承担三项工作：运行 Chorus 服务器、配置本机上的
 编码智能体，以及从 shell 调用 Chorus MCP 端点。全局安装它：
 
@@ -26,7 +24,7 @@ chorus --version
 | `chorus agents` | 配置本机的智能体：`list`（默认）、`add`、`remove`，以及 `run`（启动一个）。 |
 | `chorus mcp` | 原生 MCP 客户端：`call` 调用工具、打印你的 UUID（`whoami`），或 `list` 列出可调用的工具。 |
 | `chorus login` | 以智能体身份认证，并把连接保存到 `~/.chorus/daemon.json`。 |
-| `chorus daemon` | 让运行环境保持在线，以便 Chorus 唤起它。参见[管理后台服务](/zh/guides/daemon-operations/)。 |
+| `chorus daemon` | 让运行环境保持在线，以便 Chorus 唤醒它。参见[管理后台服务](/zh/guides/daemon-operations/)。 |
 
 :::note[0.17.0 中的重命名]
 `chorus init` 现已改为 `chorus agents add`（参数不变）。各智能体的 `install-*.sh` 脚本已废弃，
@@ -43,30 +41,30 @@ chorus upgrade --plugins   # 先升级 CLI，再刷新已配置的 Chorus 插件
 chorus update --plugins    # upgrade 的别名
 ```
 
-该命令支持经过验证的 `@chorus-aidlc/chorus` **npm 全局安装**。它查询 npm 最新稳定版，在同一个 npm prefix 下更新当前安装，并核验安装后的版本。当前版本已是最新或更高时，不会重装或降级，但仍会执行 `--plugins`。源码检出、链接安装和其他包管理器的安装方式不受支持。旧 CLI 尚无此命令时，先用 `npm install --global @chorus-aidlc/chorus@latest` 安装新版。
+该命令仅支持 `@chorus-aidlc/chorus` 的 **npm 全局安装**。它查询 npm 最新稳定版，在同一个 npm prefix 下更新当前安装，并核验安装后的版本。若已安装的版本已是最新或更高，则既不重装也不降级，但仍会执行 `--plugins`。源码检出、链接安装和其他包管理器的安装方式不受支持。旧 CLI 尚无此命令时，先用 `npm install --global @chorus-aidlc/chorus@latest` 安装新版。
 
 ### `--plugins` 的刷新范围
 
-它读取 `~/.chorus/daemon.json`，处理明确标注为 Claude Code、Codex、Kiro 或 Pi 的记录，包括未启用 daemon 唤醒的记录。每条记录的 `env`、`PATH` 和自定义配置目录决定更新目标；共享目录只更新一次，不同目录分别处理。该命令目前只读取默认文件，不使用 `CHORUS_DAEMON_CONFIG_PATH`。
+它读取 `~/.chorus/daemon.json`，处理明确标注为 Claude Code、Codex、Kiro 或 Pi 的记录，包括未启用后台服务唤醒的记录。每条记录的 `env`、`PATH` 和自定义配置目录决定更新目标；共享目录只更新一次，不同目录分别处理。该命令目前只读取默认文件，不使用 `CHORUS_DAEMON_CONFIG_PATH`。
 
 - **Claude Code 与 Codex**：通过宿主的插件机制刷新 Chorus 插件。
-- **Kiro**：从记录所配置的 Chorus 实例刷新模板。请先升级该服务端，才能获取它提供的新版模板。同一目标目录对应多个冲突的实例地址时，会报告未完成。
+- **Kiro**：从记录所配置的 Chorus 实例刷新模板。需先升级该服务端，才能获取新版模板。同一目标目录对应多个冲突的实例地址时，会报告未完成。
 - **Pi**：只更新 `@chorus-aidlc/chorus-pi` 和 `pi-mcp-adapter`。保留已有的版本固定、范围或非 latest 标签，并始终报告未完成；移除这些限制后才能更新到最新版本。若 Pi 不支持单独更新这些包，会说明限制，不会更新所有扩展。
 
-宿主 CLI 已安装时，可以补装缺失的 Chorus 插件。命令保留注册信息与凭据，不安装或升级宿主 CLI。修改配置文件前，会将原文件备份为 `<file>.chorus-upgrade.bak`，下次升级时覆盖。`offline` 或未知类型记录（包括默认的 OpenCode、OpenClaw 和 dsh 记录），以及在各自 `PATH` 中找不到宿主的记录，会跳过并标为 **INCOMPLETE**。这些宿主请使用[对应平台的配置或升级流程](/zh/reference/agents/)。
+若宿主 CLI 已安装但缺少 Chorus 插件，命令会补装插件。它保留注册信息与凭据，不会安装或升级宿主 CLI。修改配置文件前，它会把原文件备份为 `<file>.chorus-upgrade.bak`（下次升级时覆盖）。`offline` 或未知类型记录（包括默认的 OpenCode、OpenClaw 和 dsh 记录），以及在各自 `PATH` 中找不到宿主的记录，会跳过并标为 **INCOMPLETE**。这些宿主请使用[对应平台的配置或升级流程](/zh/reference/agents/)。
 
 ### 完成状态与生效方式
 
-命令无需交互确认。退出码 **0** 表示请求的工作全部完成，**1** 表示失败或某个目标未完成。没有 daemon 文件或智能体列表为空时，插件刷新成功结束且不做修改；文件不可读或格式错误则视为失败。CLI 升级失败时不执行插件更新；单个插件失败后仍继续处理其他目标，已完成的更新会保留，不会自动回滚。
+命令无需交互确认。退出码 **0** 表示请求的工作全部完成，**1** 表示失败或某个目标未完成。没有后台服务配置文件或智能体列表为空时，视为成功，无需刷新任何内容；文件不可读或格式错误则视为失败。CLI 升级失败时不执行插件更新；单个插件失败不会中止后续目标，已完成的更新会保留（不会自动回滚）。
 
-npm 安装会持续输出进度，没有安装超时限制。失败时按输出的 npm 错误排查；遇到 `EACCES` 或 `EPERM`，可改用当前用户拥有的 Node 安装，或请管理员更新系统 npm prefix。Chorus 不会自动提权。更新后启动新的智能体会话，并在合适时运行 `chorus daemon restart`；命令不会自动重启 daemon 或中断活跃会话。
+npm 安装会持续输出进度，没有安装超时限制。失败时按输出的 npm 错误排查；遇到 `EACCES` 或 `EPERM`，可改用当前用户拥有的 Node 安装，或请管理员更新系统 npm prefix。Chorus 不会自动提权。更新后，请启动新的智能体会话，并在方便时运行 `chorus daemon restart`；活跃会话和后台服务都不会被自动重启。
 
 ## 配置智能体：`chorus agents`
 
-`chorus agents add` 是把本机编码智能体连接到 Chorus 的唯一一条命令。它会检测你已安装的智能体，
+只需 `chorus agents add` 这一条命令，即可把本机编码智能体连接到 Chorus。它会检测你已安装的智能体，
 通过各智能体自己的插件机制为其安装 Chorus 插件，并把 Chorus 网址和智能体密钥一次性写入
 `~/.chorus/daemon.json`。对 Claude Code、Codex 和 DeepSeek Harness，它还会把凭据写入该智能体
-自己的配置，因此交互式会话无需手动设置环境变量即可完成认证（见下文「凭据写往何处」一节）。
+自己的配置，因此交互式会话无需手动设置环境变量即可完成认证（见[凭据写往何处](#凭据写往何处)）。
 
 ```sh
 chorus agents add                     # interactive: detect, pick, configure
@@ -75,18 +73,18 @@ chorus agents add --agents claude,codex \
   --url https://chorus.example.com --api-key cho_xxx
 ```
 
-它是幂等的：可以安全地重新运行，以添加智能体、刷新插件或轮换密钥。已检测到但尚未安装的智能体
-仍可选择。支持的智能体有 Claude Code、Codex、Kiro、Pi、opencode、OpenClaw 和 DeepSeek Harness。
-`pi` 在 PATH 中时会自动安装 `pi-mcp-adapter` 和 `chorus-pi`；否则给出手动安装指引。
+它是幂等的：可以安全地重新运行，以添加智能体、刷新插件或轮换密钥。已检测到但尚未安装 Chorus 插件的
+智能体仍可选择。支持的智能体有 Claude Code、Codex、Kiro、Pi、OpenCode、OpenClaw 和 DeepSeek Harness（dsh）。
+`pi` 在 `PATH` 中时，配置过程会同时安装 `pi-mcp-adapter` 和 `chorus-pi`；否则给出手动安装指引。
 
 常用参数（`chorus agents add --help` 会列出全部）：
 
 - `--agents <a,b>` / `--all`：要配置哪些智能体。
 - `--url` / `--api-key`：以非交互方式提供凭据（环境变量：`CHORUS_URL` / `CHORUS_API_KEY`）。
-- `--update-installed`：更新已安装的集成。Pi 会运行 `pi update --extensions`；仅重复 `pi install` 不会升级已安装的包。
+- `--update-installed`：刷新已有的安装。对 Pi，这会运行 `pi update --extensions`；仅重复 `pi install` 不会升级已安装的包。
 - `--dsh-profile <name>`：把 bundle 安装进哪个 DeepSeek Harness profile。
-- `--daemon-wake <a,b>` / `--daemon-wake-all`：把指定的（或全部可唤起的）智能体选入 daemon 唤起范围。可唤起的智能体（Claude Code、Codex、Kiro、Pi）默认以「停靠」状态添加：`chorus mcp` 可以访问它，但在你于此显式选入（或在 TTY 下逐个应答提示）之前，daemon 不会唤起它。
-- `--daemon-autostart`：同时安装并启用 daemon 开机服务（Linux systemd / macOS launchd）。
+- `--daemon-wake <a,b>` / `--daemon-wake-all`：把指定的（或全部可唤醒的）智能体选入后台服务唤醒范围。可唤醒的智能体（Claude Code、Codex、Kiro、Pi）默认以「停靠」状态添加：`chorus mcp` 可以访问它们，但在你通过此参数（或 TTY 下逐个智能体的提示）选入之前，后台服务不会唤醒它们。
+- `--daemon-autostart`：同时安装并启用后台服务的开机自启（Linux systemd / macOS launchd）。
 - `-y, --yes`：跳过确认（非 TTY 环境下自动生效，此时必须传入 `--agents` 或 `--all`）。
 
 列出并移除已配置的智能体：
@@ -101,8 +99,8 @@ chorus agents remove <name|uuid>  # remove one (match by name or UUID)
 
 ## 启动智能体：`chorus agents run`
 
-`chorus agents run` 在你的终端里启动一个已配置的智能体，并已把它的 Chorus 连接接好，这是 daemon
-唤起的前台对应命令。由于子进程无法改动父 shell 的环境，该命令会把连接直接注入被启动的智能体进程，
+`chorus agents run` 在你的终端里启动一个已配置的智能体，并自动接好它的 Chorus 连接，相当于后台服务
+唤醒的前台版本。由于子进程无法改动父 shell 的环境，该命令会把连接直接注入被启动的智能体进程，
 因此你无需手动 export 任何变量。
 
 ```sh
@@ -116,18 +114,20 @@ chorus agents run --name work --type codex -- resume # 覆盖后端，再把 `re
 - **注入了什么**（只注入被启动的进程，绝不进入你的 shell，也绝不打印）：`CHORUS_URL`、
   `CHORUS_API_KEY` 和 `CHORUS_AGENT_PROFILE`。
 - **启动哪个二进制**：默认取该智能体存储的后端，`--type` 可覆盖。类型分别映射到 `claude`、`codex`、
-  `kiro-cli`、`pi`、`opencode`、`openclaw` 和 `dsh`。以 opencode / OpenClaw /
-  DeepSeek Harness 添加的智能体会被存储为 `offline`（daemon 不会自动唤起它们），启动它们时需显式传 `--type`。
-- **透传**：`--` 之后的一切都会原样交给智能体，因此其完整参数面均可用。智能体继承你的终端，
+  `kiro-cli`、`pi`、`opencode`、`openclaw` 和 `dsh`。以 OpenCode / OpenClaw /
+  DeepSeek Harness 添加的智能体会被存储为 `offline`（后台服务不会自动唤醒它们），启动它们时需显式传 `--type`。
+- **透传**：`--` 之后的一切都会原样交给智能体，因此智能体自身的全部参数都可使用。智能体继承你的终端，
   `chorus agents run` 以它的退出码退出。
 
 ### 持久化 args/env 与一次性覆盖
 
-选中的 `agents[]` 条目可设置 `args`（字符串数组，默认 `[]`）和 `env`（字符串到字符串的对象，默认 `{}`），daemon 唤起与前台启动都会使用。存在非空 `agents[]` 时不继承顶层设置，字段放错位置会报错。[daemon 指南](/zh/guides/daemon-operations/)提供可复制的模型/思考/env 示例、扁平文件迁移、校验和密钥保护说明。值按字面传递，不展开 shell、不加载 dotenv、不查询密钥服务。Env 仅影响子进程；`CHORUS_*` 和嵌套 Claude 上下文名称 `CLAUDECODE` / `CLAUDE_CODE_ENTRYPOINT` 均保留，不区分大小写；配置这些名称会报错，而不是被静默删除。持久化参数不能覆盖已知的会话、提示词、协议、工作目录、MCP 或权限控制，也不能包含 `--` / `-` 标记或帮助/检查退出选项。显式前台参数保持原样，包括原生恢复命令。这些规则只防止已知冲突，不是沙箱。
+选中的 `agents[]` 条目可设置 `args`（字符串数组，默认 `[]`）和 `env`（字符串到字符串的对象，默认 `{}`），后台服务唤醒与前台启动都会使用。`agents[]` 非空时，条目不继承顶层的 `args` / `env`，在顶层设置它们会报错。可复制的模型/思考/env 示例、扁平文件迁移、校验和密钥保护注意事项，参见[后台服务指南](/zh/guides/daemon-operations/)。
 
-每次新的 `chorus agents run` 都会重读文件。daemon 更改需要 `chorus daemon restart`；两种方式都不会更新已运行的子进程。`--type` 选择用于校验和覆盖匹配的后端，不会翻译后端参数。
+值按字面传递：不做 shell 展开、不加载 dotenv、不查询密钥服务。`env` 只影响被启动的智能体。`CHORUS_*` 以及 Claude Code 嵌套变量 `CLAUDECODE` / `CLAUDE_CODE_ENTRYPOINT` 为保留名称（不区分大小写），配置它们会报错，而不是被静默丢弃。持久化参数不能覆盖由 Chorus 管理的选项（会话、提示词、协议、工作目录、MCP 或权限控制），也不能包含 `--` / `-` 分隔符，或只打印帮助、版本信息就退出的选项。启动时显式传入的参数会原样转发，包括原生恢复命令。这些检查只防范已知冲突，并不是沙箱。
 
-仅对下表中的选项，在选定命令作用域中显式传入时，才会移除配置中对应的选项及其值：
+每次运行 `chorus agents run` 都会重读文件；后台服务要在 `chorus daemon restart` 之后才会读取更改。两者都不影响已在运行的智能体。`--type` 选定的后端用于校验以及匹配覆盖项，不会转换后端参数。
+
+仅限下表中的选项：在所选命令作用域中显式传入其中一个，就会替换配置中的同名选项及其值：
 
 | 实际后端 | 可识别的覆盖项 |
 | --- | --- |
@@ -146,15 +146,21 @@ chorus agents run --name pi-worker -- --model anthropic/claude-sonnet-4-6 --thin
 chorus agents run --name codex-worker -- exec --model gpt-5.4 -c model_reasoning_effort=high
 ```
 
-**子命令**：持久化参数插入最深的已识别命令之后：Codex 的 `exec`、`exec resume` 或 `resume`，Kiro 的 `chat`，OpenClaw 的 `agent`。显式覆盖也应放在同一作用域，如 `exec --model chosen`，而非 `--model chosen exec`。根命令或父命令的模型选项不会移除子命令中配置的模型；Codex 的 `-c`/`--config` 键跨作用域生效。未识别到命令时，配置参数放在最前面。不推断其他命令路径；对这些路径，请去掉不兼容的持久化参数，改用原生透传。
+**子命令**：持久化参数插入最深的已识别命令之后：Codex 的 `exec`、`exec resume` 或 `resume`，Kiro 的 `chat`，OpenClaw 的 `agent`。显式覆盖也应放在同一作用域，如 `exec --model chosen`，而非 `--model chosen exec`。放在子命令之前的模型选项不会替换子命令中配置的模型；Codex 的 `-c`/`--config` 键跨作用域生效。未识别到命令时，配置参数放在最前面。其他命令路径不做推断；对这些路径，请去掉不兼容的持久化参数，改用原生透传。
 
-**未知选项**：持久化 `args` 允许普通未知选项，但无法猜测下一项是值还是提示词。后端支持时用 `["--future=value"]`，不要用 `["--future", "value"]`。已知选项必须提供其要求的值。未知或可重复选项在选定作用域内保持先配置、后显式的顺序，不保证后者覆盖前者。遇到有歧义的显式选项（未知且无内联值）后，Chorus 停止推断覆盖关系；请将已知覆盖项放在它之前，或使用受支持的内联值。移除外层 Chorus 分隔符后，分析也会在智能体参数中的第一个单独 `--` 处停止。命令识别遇到位置提示词、未知命令或有歧义的选项时停止，并跳过已知选项的值。所有显式参数仍原样透传；请自行确认后端参数及版本兼容性。Windows `.cmd`/`.bat` 限制见 daemon 指南。
+**未知选项**：
 
-Codex daemon 进一步将持久化参数限制为模型选项和允许的 `-c` / `--config` 覆盖。其他参数即使在前台可用，也会在 daemon 唤醒前报错。参见 [Codex daemon 配置](/zh/reference/agents/codex/#模型参数与会话连续性)。
+- 持久化 `args` 允许普通的未知选项，但无法判断下一项是值还是提示词。后端支持时请写成 `["--future=value"]`，而不是 `["--future", "value"]`。已知选项必须提供其要求的值。
+- 未知或可重复的选项在所选作用域内保持先配置、后显式的顺序；不保证后出现者生效。
+- 遇到有歧义的显式选项（未知且没有内联值）后，Chorus 不再查找覆盖项；请把已知覆盖项放在它之前，或使用受支持的内联值。移除外层 Chorus 分隔符后，分析也会在智能体参数中第一个单独的 `--` 处停止。
+- 命令识别遇到位置提示词、未知命令或有歧义的选项时停止，并跳过已知选项的值。
+- 所有显式参数仍会原样转发；后端参数及版本兼容性需由你自行确认。Windows `.cmd`/`.bat` 的限制见后台服务指南。
+
+Codex 后台服务进一步将持久化参数限制为模型选项和允许的 `-c` / `--config` 覆盖。其他参数即使在前台会话中可用，也会在后台服务唤醒智能体之前报错。参见 [Codex 后台服务配置](/zh/reference/agents/codex/#模型参数与会话连续性)。
 
 ## 从 shell 调用 MCP 工具：`chorus mcp`
 
-`chorus mcp` 是一个原生 MCP 客户端，一条从脚本或终端调用任意 Chorus 工具的免令牌路径。它取代了
+`chorus mcp` 是一个原生 MCP 客户端，可从脚本或终端调用任意 Chorus 工具，且无需消耗模型 token。它取代了
 早先的 `chorus-api.sh` / `chorus-mcp-call.sh` 封装脚本。
 
 ```sh
@@ -165,12 +171,12 @@ chorus mcp whoami                                 # print this agent's own UUID
 chorus mcp list                                   # list the tools this agent may call
 ```
 
-`--arg-file` 是让大段内容（如文档正文、OpenSpec 文件）不经模型重新逐字敲入就能送达工具的方式。
+`--arg-file` 让大段内容（如文档正文、OpenSpec 文件）无需经模型重新输入即可送达工具。
 成功时，`chorus mcp call` 会把工具结果原样打印到 stdout；工具或传输错误会输出到 stderr，并以
 非零退出码结束。
 
 身份按以下顺序解析：`--agent <name|uuid>` → 显式的 `--url` + `--api-key` 参数 →
-`CHORUS_AGENT_PROFILE` → `CHORUS_URL` + `CHORUS_API_KEY` → 仅存在一个已配置智能体时的那一个。
+`CHORUS_AGENT_PROFILE` → `CHORUS_URL` + `CHORUS_API_KEY` → 唯一的已配置智能体（仅当只有一个时）。
 
 ## 连接环境变量
 
@@ -180,13 +186,13 @@ chorus mcp list                                   # list the tools this agent ma
 | `CHORUS_API_KEY` | 智能体 API 密钥（`cho_…`）。 |
 | `CHORUS_AGENT_PROFILE` | 可选，要充当的已配置智能体的名称或 UUID。设置后，`chorus mcp` 会从 `~/.chorus/daemon.json` 读取该智能体的密钥，因此你无需导出 `CHORUS_API_KEY`。 |
 
-daemon 唤起的会话会自动获得 `CHORUS_AGENT_PROFILE`；只有当交互式 shell 需要充当某个特定的
+后台服务唤醒的会话会自动获得 `CHORUS_AGENT_PROFILE`；只有当交互式 shell 需要充当某个特定的
 已配置智能体时，你才需要手动设置它。
 
 ## 凭据写往何处
 
 `chorus agents add` 总是把校验后的凭据写入 `~/.chorus/daemon.json`（权限 `0600`；密钥绝不会
-回显）。对其中三种智能体，它还会把凭据播种进该智能体自己的配置，让交互式会话无需任何手动导出
+回显）。对其中三种智能体，它还会把凭据写入该智能体自己的配置，让交互式会话无需任何手动导出
 即可完成认证：
 
 | 智能体 | 额外的凭据落地位置 |
@@ -195,22 +201,22 @@ daemon 唤起的会话会自动获得 `CHORUS_AGENT_PROFILE`；只有当交互�
 | Codex | `~/.codex/.env`（遵循 `CODEX_HOME`）；Codex 通过一个不内置密钥的 `config.toml` 条目从环境变量读取密钥。 |
 | DeepSeek Harness | `$DSH_HOME/.env`。 |
 
-Kiro、opencode 和 OpenClaw 从各自已安装的配置读取凭据；对于 daemon 唤起的 Kiro，则从 daemon
-每次唤起时导出的环境变量读取。
+Kiro、OpenCode 和 OpenClaw 从各自已安装的配置读取凭据；对于后台服务唤醒的 Kiro，则从后台服务
+每次唤醒时导出的环境变量读取。
 
-## 面向 Agent
+## 面向智能体
 
 - **触发条件。** 你来到本页，是为了安装或升级命令行工具、配置某个智能体（`chorus agents add`），
   或从 shell 调用某个 Chorus 工具（`chorus mcp call`）。
 - **约束。** 对文档镜像等大段内容的调用，优先使用
   `chorus mcp call <tool> '<json>' --arg-file content=<file>`；仅当 `chorus` 不在 `PATH` 中时，
   才回退到 `chorus-api.sh` / `chorus-mcp-call.sh`。绝不要把 API 密钥粘贴到命令行或终端历史里，
-  让 `chorus agents add` / `chorus login` 来捕获它。
-- **引用来源。** 运行 `chorus --help` 和 `chorus <command> --help` 查看权威的参数面；它始终与
+  交由 `chorus agents add` / `chorus login` 接收密钥。
+- **引用来源。** 运行 `chorus --help` 和 `chorus <command> --help` 查看权威的参数说明；它始终与
   已安装的版本一致。
 
 ## 相关阅读
 
 - [连接智能体运行环境](/zh/guides/operator-onboarding/)：分步的设置演练。
 - [管理后台服务](/zh/guides/daemon-operations/)：让运行环境保持在线。
-- [MCP 工具目录](/zh/reference/mcp-tools/)：`chorus mcp` 调用的工具目录。
+- [MCP 工具目录](/zh/reference/mcp-tools/)：`chorus mcp` 可调用的全部工具。

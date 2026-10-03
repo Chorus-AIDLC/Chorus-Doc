@@ -23,9 +23,9 @@ DEFAULT_USER='admin@example.com' \
 DEFAULT_PASSWORD='choose-a-strong-password'
 ```
 
-When both variables are set, the login page shows an email/password form. On the first
-successful login, Chorus auto-provisions the user and its company from the email, so no
-manual setup is needed to get in.
+When both variables are set, the sign-in page shows an email/password form. On the first
+successful sign-in, Chorus automatically creates the user and their workspace from the email,
+so no manual setup is needed to get in.
 
 ### Turn the built-in login off
 
@@ -39,15 +39,15 @@ identity provider instead.
 
 Two kinds of authentication are configured at the deployment level.
 
-### SuperAdmin bootstrap
+### Super Admin bootstrap
 
-The `/admin` SuperAdmin panel is bootstrapped from environment variables, not from a
+The `/admin` Super Admin panel is bootstrapped from environment variables, not from a
 database account:
 
 | Variable | Description |
 | --- | --- |
-| `SUPER_ADMIN_EMAIL` | Email for the SuperAdmin account that can reach the `/admin` panel. |
-| `SUPER_ADMIN_PASSWORD_HASH` | Bcrypt hash of the SuperAdmin password (never the plaintext). |
+| `SUPER_ADMIN_EMAIL` | Email for the Super Admin account that can reach the `/admin` panel. |
+| `SUPER_ADMIN_PASSWORD_HASH` | Bcrypt hash of the Super Admin password (never the plaintext). |
 
 Generate the hash and pass it as `SUPER_ADMIN_PASSWORD_HASH`:
 
@@ -63,12 +63,12 @@ store where possible.
 
 ### Single sign-on (OIDC)
 
-Single sign-on is **not** configured through environment variables. The SuperAdmin
-configures OIDC per company from the `/admin` panel, and the settings are stored in the
-database. Each company has its own issuer, client ID, and enable toggle. Chorus uses PKCE
-and does **not** require a client secret. So the deployment-level bootstrap gets the
-SuperAdmin in, and the SuperAdmin then enables SSO for each company from the admin panel —
-no separate secret provisioning at the deployment layer.
+Single sign-on is **not** configured through environment variables. The Super Admin
+configures OIDC per workspace from the `/admin` panel, and the settings are stored in the
+database. Each workspace has its own issuer URL and client ID; SSO is on for a workspace once
+both are set. Chorus uses PKCE and does **not** require a client secret. The deployment-level
+bootstrap gets the Super Admin in, and the Super Admin then sets up SSO for each workspace
+from the admin panel, with no separate secret provisioning at the deployment layer.
 
 ## Run migrations and upgrade safely
 
@@ -89,30 +89,30 @@ Always back up the database (or the data volume for embedded/volume-backed stora
 upgrading. Migrations run automatically and can change the schema; a backup is your only
 safe rollback point. Follow the standard
 [PostgreSQL backup documentation](https://www.postgresql.org/docs/current/backup.html) for
-your setup rather than improvising a per-engine procedure.
+your setup.
 :::
 
 ### Upgrade order for 0.19.1
 
-0.19.1 adds a migration that only adds a nullable column, so existing data is untouched.
+0.19.1 includes a migration that only adds a nullable column, so existing data is untouched.
 Upgrade the Chorus server **before** upgrading the `chorus` CLI that runs your agent daemons.
 Older daemons keep working against the new server, receiving Idea creation and Research
 requests in the form they already understand. For an emergency rollback of the new request
 format, set `CHORUS_DEDICATED_OPERATION_WRITES=false` and restart the server: new requests
 use the older format, and ones already queued are still delivered. Roll back the CLI separately
 if you need to. Do not roll the server back to a version older than 0.19.1 while requests
-created by it are still pending or running, and do not remove the new column.
+created by 0.19.1 are still pending or running, and do not remove the new column.
 
 ### Session secrets when upgrading to 0.18.1
 
-Keep the signing secret stable alongside your database backups. To retain an auto-generated
-secret, Docker needs a persistent `/app/data` volume even with external PostgreSQL; the npm
-launcher uses `~/.chorus-data/.secret` by default. If you previously used a public placeholder,
-the replacement secret requires Default Auth users and the Super Admin to sign in again.
-The bootstrap preserves secure explicit secrets. For CDK redeployments, supply the same
-`nextAuthSecret`: omitting it generates a new value at each synth. API keys and OIDC tokens
-are unaffected by this rotation.
-See [Docker migration guidance](/guides/deploy-docker/#session-secret-nextauth_secret).
+Back up the signing secret together with your database and keep it stable. To retain an
+auto-generated secret, Docker needs a persistent `/app/data` volume even with external
+PostgreSQL; the npm launcher uses `~/.chorus-data/.secret` by default. If you previously used
+a public placeholder, the replacement secret requires users of the built-in email/password
+login and the Super Admin to sign in again. A secure secret you set explicitly is kept as is.
+For CDK redeployments, supply the same `nextAuthSecret`: omitting it generates a new value at
+each synth. API keys and OIDC tokens are unaffected by this rotation. See
+[Docker migration guidance](/guides/deploy-docker/#session-secret-nextauth_secret).
 
 ## Cookies and reverse proxies
 

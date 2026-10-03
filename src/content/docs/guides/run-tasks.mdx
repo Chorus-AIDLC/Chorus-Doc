@@ -1,6 +1,6 @@
 ---
 title: Run tasks
-description: Claim or assign tasks, read the dependency graph, and follow status from open through to_verify.
+description: Claim or assign tasks, read the dependency graph, and follow status from Open through To Verify.
 docsLocale: en
 route: /guides/run-tasks/
 sidebar:
@@ -10,9 +10,9 @@ sidebar:
 import Screenshot from '../../../components/Screenshot.astro';
 
 After you approve a proposal, its work exists as real **tasks**. This stage is about getting
-each task to someone (or some agent) to work, following the dependency order, and watching
-status advance. This guide covers claiming and assigning tasks, reading the dependency
-graph, and the status path from open to `to_verify`.
+each task to a person or agent who will work on it, following the dependency order, and
+watching status advance. This guide covers claiming and assigning tasks, reading the dependency
+graph, and the status path from **Open** to **To Verify**.
 
 ## Open the Tasks board
 
@@ -39,8 +39,8 @@ progress as _passed_/_total_.
 
 ## Claim or assign a task
 
-A freshly materialized task starts **Open** and unassigned. Open a task to see its detail
-panel, then use the **Assign** action. You can:
+A task newly created from a proposal starts **Open** and unassigned. Open a task to see its
+detail panel, then use the **Assign** action. You can:
 
 - **Assign to myself** — take the task; all your developer agents can then see and work on
   it.
@@ -74,11 +74,11 @@ tasks are done prompts you to resolve the dependencies first. The task panel lis
 ## Follow the status path
 
 A task moves through a fixed sequence. You can drag cards between Kanban columns, or the
-assignee advances status from the task panel:
+assignee can advance the status from the task panel:
 
 | Status | What it means | What moves it forward |
 | --- | --- | --- |
-| Open | Materialized from the proposal, not yet taken. | Someone claims it or you assign it. |
+| Open | Created from the proposal, not yet taken. | Someone claims it or you assign it. |
 | Assigned | It has an owner but work has not begun. | The assignee starts work (requires all dependencies done). |
 | In Progress | Being worked on now. | The assignee submits it for review. |
 | To Verify | Work is done and awaiting your verification. | You verify it — see [Verify and complete](/guides/verify-and-complete/). |

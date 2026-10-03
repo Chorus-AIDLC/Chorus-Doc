@@ -21,7 +21,7 @@ Stable anchors you can cite: [`#unified-authcontext`](#unified-authcontext),
 
 Every authenticated request resolves to one of three context types. Multi-tenancy is
 enforced through `companyUuid`: all data access is scoped to it, and only Super Admin
-operates across companies.
+operates across workspaces.
 
 | Context type | `type` | Key fields | Produced by |
 | --- | --- | --- | --- |
@@ -56,12 +56,12 @@ self-signed session token when it is `HS256`.
 
 `NEXTAUTH_SECRET` signs Default Auth's `user_session` and Super Admin's `admin_session`
 JWTs. Super Admin routes verify `admin_session` separately from normal user authentication.
-OIDC tokens are verified using the provider's keys; Agent API keys use their stored hash.
+OIDC tokens are verified with the provider's keys; agent API keys are checked against their stored hash.
 Rotating `NEXTAUTH_SECRET` invalidates Chorus-signed sessions, not API keys or OIDC tokens.
 
 The npm launcher persists a generated secret in `~/.chorus-data/.secret` by default; Docker uses
-`/app/data/.secret`. Both ignore known public placeholders in the environment and stop if a
-persisted key is a known placeholder. Direct app starts require you to provide the secret.
+`/app/data/.secret`. Both ignore known public placeholder values in the environment and refuse
+to start if the persisted secret is one of them. Direct app starts require you to provide the secret.
 See [Docker session secrets](/guides/deploy-docker/#session-secret-nextauth_secret) for
 0.18.1 migration, persistence, and replica configuration.
 
@@ -86,8 +86,8 @@ The contract:
   leading characters match.
 - **Rotation, revocation, expiry.** A key can be revoked or given an optional expiry; a
   revoked or expired key fails validation. Rotate by creating a replacement and revoking the
-  old one. Permissions live on the agent, not the key, so rotating a key preserves the
-  agent's permissions — editing the agent changes them.
+  old one. Permissions live on the agent, not the key, so rotating a key leaves the agent's
+  permissions unchanged; to change them, edit the agent.
 
 :::caution[The key is shown once]
 There is no way to recover a raw key after creation. Store it in a secret manager and treat
@@ -106,10 +106,10 @@ guides cover setup.
 
 ### OIDC (users)
 
-Enterprise SSO for human users, configured per company (issuer, client ID, enabled toggle)
-by a Super Admin. Login uses the Authorization Code flow with **PKCE** and no client secret.
-After the provider redirects back, Chorus finds-or-creates the user by
-`(companyUuid, oidcSub)` and sets HTTP-only cookies:
+Enterprise SSO for human users, configured per workspace (issuer, client ID, enabled toggle)
+by a Super Admin. Sign-in uses the Authorization Code flow with **PKCE** and no client secret.
+After the provider redirects back, Chorus looks up the user by
+`(companyUuid, oidcSub)`, creating the user if needed, and sets HTTP-only cookies:
 
 | Cookie | Purpose |
 | --- | --- |
@@ -123,7 +123,7 @@ an expiring access token transparently before requests reach the app.
 
 ### Default Auth (development)
 
-A single email/password login for development and demo deployments without OIDC. Enabled
+A single email/password sign-in for development and demo deployments without OIDC. Enabled
 only when `DEFAULT_USER` and `DEFAULT_PASSWORD` are both set:
 
 ```bash
@@ -131,13 +131,13 @@ DEFAULT_USER="dev@example.local"
 DEFAULT_PASSWORD="change-me"
 ```
 
-On login Chorus auto-provisions the company and user and issues one long-lived self-signed
-JWT in a `user_session` cookie. There is no refresh flow — when it expires, the user logs
+On sign-in Chorus auto-provisions the workspace and user and issues one long-lived self-signed
+JWT in a `user_session` cookie. There is no refresh flow — when it expires, the user signs
 in again. Do not enable Default Auth in production.
 
 ### Super Admin
 
-Platform-level administration across all companies (company management, per-company OIDC
+Platform-level administration across all workspaces (workspace management, per-workspace OIDC
 configuration). Configured with an email and a **bcrypt** password hash in the environment:
 
 ```bash
@@ -145,8 +145,8 @@ SUPER_ADMIN_EMAIL="admin@example.com"
 SUPER_ADMIN_PASSWORD_HASH="$2b$10$…"   # bcrypt hash
 ```
 
-A successful login sets an `admin_session` cookie. A Super Admin context has **no
-`companyUuid`** and is therefore not subject to company scoping — it is the only context
+A successful sign-in sets an `admin_session` cookie. A Super Admin context has **no
+`companyUuid`** and is therefore not subject to workspace scoping — it is the only context
 that reads across tenants.
 
 ## Permission model
@@ -167,15 +167,15 @@ possible bits:
 | **`task`** | view tasks | claim / release / submit / report; self-check acceptance criteria | verify / reopen / close / delete tasks; mark acceptance criteria |
 | **`project`** | view projects and groups | create / update / delete projects and groups; move projects | reserved (granted by `admin_agent`, not yet gated) |
 
-Actions are cumulative by convention but **not** automatically inherited: granting
+Actions are typically granted together, but **none implies another**: granting
 `task:admin` does not imply `task:read` or `task:write` — each bit is granted explicitly.
 
 :::caution[`*:admin` bits are human-level]
 The `admin` column covers actions that normally require a human reviewer — approving
 proposals, verifying tasks, and deleting entities. Granting an `*:admin` bit lets an agent
-substitute for that human judgment (and is not author-scoped: `task:admin` can verify any
-task in the company, not only ones the agent worked on). Grant admin bits only to agents
-that intentionally automate an approval workflow.
+substitute for that human judgment. Admin bits are not limited to the agent's own work:
+`task:admin` can verify any task in the workspace, not only ones the agent worked on. Grant
+admin bits only to agents that intentionally automate an approval workflow.
 :::
 
 ### Role presets
@@ -237,10 +237,10 @@ The same effective set drives both integration surfaces:
   required permission is in the effective set — otherwise the tool is simply absent from the
   agent's tool list. Public tools (discover / read / list / search / comment / session, and
   `chorus_create_tasks` / `chorus_update_task`) carry no gate and appear for every agent.
-- **REST gating.** Gated REST routes wrap their handler with
-  `requireAgentPermission("{resource}:{action}", …)`. An agent missing the bit gets
-  `403 Missing permission`. A human user is not subject to `requireAgentPermission` (human
-  routes use session-based checks), and a Super Admin bypasses all permission checks.
+- **REST gating.** Each gated REST route checks for one `{resource}:{action}` bit. An agent
+  missing the bit gets `403 Missing permission`. Human users are not subject to these agent
+  permission checks (their access is checked through their session), and a Super Admin
+  bypasses all permission checks.
 
 :::note[What the agent sees]
 An agent's tool list is exactly the union of the public tools and the gated tools its

@@ -7,10 +7,10 @@ sidebar:
   order: 21
 ---
 
-Chorus ships an official Docker image, **`chorusaidlc/chorus-app`**. This guide shows the two
-Compose shapes — standalone (embedded database) and production (external PostgreSQL + Redis) —
-a plain `docker run` against an existing database, the full environment-variable reference, and
-what the container does at startup.
+Chorus ships an official Docker image, **`chorusaidlc/chorus-app`**. This guide covers two
+Compose setups (standalone with an embedded database, and production with external PostgreSQL
+and Redis), a plain `docker run` against an existing database, the full environment-variable
+reference, and what the container does at startup.
 
 Pull the image first:
 
@@ -18,7 +18,7 @@ Pull the image first:
 docker pull chorusaidlc/chorus-app:latest
 ```
 
-For how to choose between the standalone and production forms, see the
+For help choosing between the standalone and production setups, see the
 [Deployment overview](/guides/deployment-overview/).
 
 ## Standalone (embedded database)
@@ -59,7 +59,7 @@ Then run:
 docker compose -f docker-compose.local.yml up -d
 ```
 
-Open `http://localhost:8637` and log in with `admin@example.com` / `changeme` (or override
+Open `http://localhost:8637` and sign in with `admin@example.com` / `changeme` (or override
 via the `DEFAULT_USER` / `DEFAULT_PASSWORD` environment variables).
 
 In standalone mode the container:
@@ -68,7 +68,7 @@ In standalone mode the container:
 - Stores data in the `chorus-local-data` Docker volume, so it persists across restarts.
 - Generates a random session-signing secret on first start and stores it in the same volume
   when `NEXTAUTH_SECRET` is left empty (see [Session secret](#session-secret-nextauth_secret)).
-- Disables Redis (falls back to the in-memory EventBus — single-instance only).
+- Disables Redis (falls back to in-memory event delivery — single-instance only).
 - Runs Prisma migrations automatically on startup.
 
 ## Production (external PostgreSQL + Redis)
@@ -146,7 +146,7 @@ Then run:
 docker compose up -d
 ```
 
-Open `http://localhost:8637` and log in with the credentials you set in `DEFAULT_USER` /
+Open `http://localhost:8637` and sign in with the credentials you set in `DEFAULT_USER` /
 `DEFAULT_PASSWORD`.
 
 :::caution[HTTPS and secure cookies]
@@ -210,7 +210,7 @@ If `DATABASE_URL` is not set, the entrypoint builds it from these individual var
 
 | Variable | Description |
 | --- | --- |
-| `DEFAULT_USER` | Email address for built-in login (bypasses OIDC). Auto-provisions the user and company on first login. |
+| `DEFAULT_USER` | Email address for built-in login (bypasses OIDC). Automatically creates the user and their workspace on first sign-in. |
 | `DEFAULT_PASSWORD` | Password for the default user (plain text, compared via bcrypt at runtime). |
 | `NEXTAUTH_URL` | Public-facing base URL of the app (default: `http://localhost:8637`). Set this when running behind a reverse proxy. |
 | `COOKIE_SECURE` | Set to `"false"` to disable secure cookies for HTTP-only deployments (default: `"false"` in docker-compose). Set to `"true"` when deploying with HTTPS in production. |
@@ -229,8 +229,8 @@ pretty output is only available in local development.
 
 | Variable | Description |
 | --- | --- |
-| `SUPER_ADMIN_EMAIL` | Email for the super admin account (has access to the `/admin` panel). |
-| `SUPER_ADMIN_PASSWORD_HASH` | Bcrypt hash of the super admin password. Generate with: `node -e "console.log(require('bcryptjs').hashSync('your-password', 10))"` |
+| `SUPER_ADMIN_EMAIL` | Email for the Super Admin account (has access to the `/admin` panel). |
+| `SUPER_ADMIN_PASSWORD_HASH` | Bcrypt hash of the Super Admin password. Generate with: `node -e "console.log(require('bcryptjs').hashSync('your-password', 10))"` |
 
 ## Startup behaviour
 
@@ -252,21 +252,21 @@ The container's entrypoint runs the same sequence every time it starts:
 You do not run migrations yourself. Applying pending migrations at startup is part of the
 entrypoint, so upgrading is just starting a newer image against the same database. Because a
 new image can migrate your schema on first boot, back up the database or data volume before
-upgrading — see [Operations](/guides/deploy-operations/).
+upgrading — see [Operate a self-hosted Chorus](/guides/deploy-operations/).
 :::
 
 ## Session secret (`NEXTAUTH_SECRET`)
 
-`NEXTAUTH_SECRET` signs Chorus's own `user_session` (Default Auth) and `admin_session`
-(Super Admin) JWTs. OIDC tokens are signed by the identity provider, and agent API keys are
-validated separately. Rotating this secret invalidates Chorus-signed sessions; it does not
-rotate API keys or invalidate the provider's OIDC tokens.
+`NEXTAUTH_SECRET` signs the sign-in sessions Chorus issues itself: built-in email/password
+logins and Super Admin sessions. OIDC tokens are signed by the identity provider, and agent
+API keys are validated separately. Rotating this secret signs out Chorus-issued sessions; it
+does not rotate API keys or invalidate the provider's OIDC tokens.
 
 :::caution[Upgrading from 0.18.0 or earlier]
 If your deployment used a public placeholder secret, 0.18.1 ignores that value and reuses
-or generates a private secret. Users of the affected Chorus-signed sessions must sign in
-again. The entrypoint preserves an explicitly supplied secure secret. Reusing that value
-avoids a sign-in caused by secret rotation. For CDK redeployments, explicitly preserve
+or generates a private secret, so users of the affected Chorus-signed sessions must sign in
+again. An explicitly supplied secure secret is preserved; keep that value and users will not
+have to sign in again. For CDK redeployments, explicitly preserve
 `nextAuthSecret`; see [CDK secret configuration](/guides/deploy-production/).
 
 An old Compose file without an `/app/data` volume loses the generated secret whenever the
@@ -284,21 +284,22 @@ container is recreated. Add the volume shown above or supply a persistent `NEXTA
   persisted placeholder is never silently accepted or replaced.
 
 The secret value is never logged. To retain an auto-generated secret, keep `/app/data`
-on a persistent volume. For multiple
-replicas, explicitly inject the **same** secret into every instance; the
-[AWS CDK stack](/guides/deploy-production/) already shares it through Secrets Manager.
+on a persistent volume. For multiple replicas, explicitly inject the **same** secret into
+every instance; the [AWS CDK stack](/guides/deploy-production/) already shares it through
+Secrets Manager.
 
 ### Setting and rotating the secret
 
 Generate a value once with `openssl rand -base64 32`, store it in your deployment's secret
 store or protected `.env`, and reuse it on subsequent starts. Changing the effective value
-requires Default Auth users and the Super Admin to sign in again. Deleting `.secret` only
-rotates an auto-generated secret; it has no effect when an explicit secret is configured.
+signs out users of the built-in email/password login and the Super Admin; they must sign in
+again. Deleting `.secret` only rotates an auto-generated secret; it has no effect when an
+explicit secret is configured.
 
 The Docker entrypoint and npm `chorus` launcher perform this bootstrap. Starting the app
 directly with `next start` or `node server.js` does not: provide a secure secret yourself.
-The app logs an error for a known placeholder, but that warning does not replace it; an
-unset secret prevents Chorus-signed session issuance.
+The app logs an error for a known placeholder but does not replace it; with no secret set,
+Chorus cannot issue its own sign-in sessions.
 
 ## Image details
 
@@ -308,7 +309,7 @@ unset secret prevents Chorus-signed session issuance.
 
 ## Next steps
 
-- **[Production deployment](/guides/deploy-production/)** — running from the global npm package
+- **[Deploy in production](/guides/deploy-production/)** — running from the global npm package
   and the full AWS CDK walkthrough.
-- **[Operations](/guides/deploy-operations/)** — first-login bootstrap, deployment-side
+- **[Operate a self-hosted Chorus](/guides/deploy-operations/)** — first-login bootstrap, deployment-side
   authentication, and backing up before you upgrade.

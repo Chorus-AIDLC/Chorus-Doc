@@ -1,11 +1,9 @@
 ---
-title: Generic MCP clients
+title: 汎用 MCP クライアント
 description: 互換性のある MCP クライアントを Chorus ツールに接続します。
 docsLocale: ja
 route: /ja/reference/agents/generic-mcp/
 ---
-
-# Generic MCP clients
 
 このオプションは、クライアントが Streamable HTTP MCP をサポートしているものの、専用の Chorus
 統合がない場合に使います。この接続は Chorus ツールのみを公開します。Chorus ワークフローを
@@ -18,7 +16,7 @@ MCP クライアントからではなく、スクリプトやターミナルか�
 :::
 
 設定の前に、[エージェントのアクセスを準備する](/ja/guides/administrator-setup/)に従って、その
-クライアントに必要な権限だけを持つエージェントキーを作成します。
+クライアントに必要な権限だけを持つ API キーを作成します。
 
 ## MCP サーバーを設定する
 
@@ -40,7 +38,7 @@ Authorization: Bearer cho_REDACTED
 
 ## 機能と制限
 
-- クライアントは、そのエージェントキーで許可された Chorus MCP ツールを呼び出せます。
+- クライアントは、その API キーで許可された Chorus MCP ツールを呼び出せます。
 - Chorus のスキル、フック、レビュアー、ワークフローの順序制御はインストールされません。
 - 汎用 MCP クライアントは Chorus デーモンのバックエンドではありません。
 - Chorus はクライアントをリモートで起動、制御、中断、再開することはできません。
@@ -48,11 +46,11 @@ Authorization: Bearer cho_REDACTED
 
 ## よくある問題
 
-- **`401 Unauthorized`：** エージェントキーをローテーションし、クライアントの認証情報を更新します。
+- **`401 Unauthorized`：** API キーをローテーションし、クライアントの認証情報を更新します。
 - **`404 Not Found`：** 正確な `/api/mcp` エンドポイントを使います。
 - **ツールは動くがワークフローが止まる：** クライアント自身が各ワークフローステップとレビュー
   ゲートを実行しなければなりません。
-- **クライアントが HTTP ヘッダーを設定できない：** この MCP エンドポイントに対して認証できません。
+- **クライアントが HTTP ヘッダーを設定できない：** そのクライアントはこの MCP エンドポイントに認証できません。
 
-一般的なキーと接続性の確認については、[トラブルシューティング](/ja/guides/troubleshooting/)を
+キーと接続に関する一般的な確認については、[エージェント接続のトラブルシューティング](/ja/guides/troubleshooting/)を
 参照してください。

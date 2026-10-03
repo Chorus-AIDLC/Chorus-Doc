@@ -7,6 +7,8 @@ sidebar:
   order: 1
 ---
 
+Each stage produces an output and ends when its exit condition is met.
+
 | Stage | Output | Exit condition |
 | --- | --- | --- |
 | Idea | Verified elaboration | The requester confirms the shared understanding |
@@ -17,4 +19,4 @@ sidebar:
 ## Task states
 
 Tasks progress from `open` to `assigned`, `in_progress`, `to_verify`, and `done`.
-Dependencies unblock only when their upstream tasks reach `done`.
+A dependent task unblocks only when its upstream tasks reach `done`.

@@ -1,17 +1,15 @@
 ---
 title: OpenClaw
-description: 第一者プラグインを通じて OpenClaw を Chorus に接続します。
+description: 公式プラグインを通じて OpenClaw を Chorus に接続します。
 docsLocale: ja
 route: /ja/reference/agents/openclaw/
 ---
 
-# OpenClaw
-
-OpenClaw には第一者の Chorus プラグインがあります。OpenClaw ゲートウェイとその native な
+OpenClaw には公式の Chorus プラグインがあります。OpenClaw ゲートウェイとそのネイティブの
 バックグラウンドサービスを通じて利用可能な状態を保ち、Chorus デーモンは使いません。
 
-インストール前に、OpenClaw `2026.4.27` 以降を使い、[エージェントのアクセスを準備する](/ja/guides/administrator-setup/)に
-従ってエージェントキーを作成します。
+始める前に、OpenClaw `2026.4.27` 以降であることを確認し、[エージェントのアクセスを準備する](/ja/guides/administrator-setup/)に
+従って API キーを作成します。
 
 ## プラグインをインストールする
 
@@ -29,9 +27,9 @@ openclaw plugins install npm:@chorus-aidlc/chorus-openclaw-plugin
 openclaw plugins enable chorus-openclaw-plugin
 ```
 
-いずれの方法でも、`~/.openclaw/openclaw.json` で認証情報を設定します。
+いずれの方法でも、`~/.openclaw/openclaw.json` を開いて認証情報を設定します。
 `plugins.entries.chorus-openclaw-plugin.config.chorusUrl` に Chorus URL を、`apiKey` に専用の
-エージェントキーを設定します。初回インストール後、または設定を変更したあとは、OpenClaw
+API キーを設定します。初回インストール後、または設定を変更したあとは、OpenClaw
 ゲートウェイを再起動します。
 
 ## 接続を確認する
@@ -46,20 +44,20 @@ OpenClaw がサンドボックスモードでエージェントを実行する�
 ## 機能と制限
 
 - プラグインは Chorus MCP ツールとワークフロースキルを提供します。
-- OpenClaw ゲートウェイは、常時の可用性、リモート起動、追加指示、中断、そして復旧を提供します。
-- OpenClaw は `chorus daemon --agent` では受け付けられません。代わりにゲートウェイを稼働させ続けて
+- OpenClaw ゲートウェイは、常時稼働、リモート起動、追加指示、中断、そして復旧を提供します。
+- `chorus daemon --agent` に OpenClaw は指定できません。代わりにゲートウェイを稼働させ続けて
   ください。
 - OpenClaw は、Claude Code と同じワークフローライフサイクルフックを公開しません。
 
-共通の運用手順については、[リモート制御](/ja/guides/remote-control/)と
-[セッションの復旧](/ja/guides/session-recovery/)を使ってください。
+共通の運用手順については、[リモートのエージェントで作業を始める](/ja/guides/remote-control/)と
+[セッションを中断して再開する](/ja/guides/session-recovery/)を参照してください。
 
 ## よくある問題
 
 - **プラグインは有効だがオフライン：** OpenClaw のバージョンを確認し、ゲートウェイを再起動します。
 - **サンドボックスで Chorus ツールが見当たらない：** サンドボックスの許可リストに `chorus__*` を
   追加します。
-- **チェックインが認可されない：** エージェントキーをローテーションし、`openclaw.json` を更新して、
+- **チェックインが認可されない：** API キーをローテーションし、`openclaw.json` を更新して、
   ゲートウェイを再起動します。
 - **リモート起動が失敗する：** ゲートウェイにメインセッションとモデルが設定されていることを確認し、
-  次に[トラブルシューティング](/ja/guides/troubleshooting/)を参照します。
+  次に[エージェント接続のトラブルシューティング](/ja/guides/troubleshooting/)を参照します。

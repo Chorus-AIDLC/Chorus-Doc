@@ -38,20 +38,20 @@ effect of elaboration and of downstream work.
 | --- | --- |
 | Planning | Elaborated, but no submitted Proposal yet (no Proposal, or a draft). |
 | Review proposal | A Proposal has been submitted and is waiting for your review. |
-| Building | The Proposal is approved and its Tasks are being worked. |
+| Building | The Proposal is approved and its Tasks are being worked on. |
 | Verify work | At least one Task has been submitted for verification. |
 | Done | The Proposal is approved and every Task has reached `done` (or `closed`). |
 
 ## Proposal
 
 A Proposal is a review container. It holds the document drafts and task drafts an agent
-prepared; approving it **materializes** those drafts into real Documents and Tasks.
+prepared; approving it **creates the Documents and Tasks** from those drafts.
 
 | State | Meaning | What moves it forward |
 | --- | --- | --- |
-| `draft` | Being written and edited. Drafts can be added or changed only while in `draft`. | The author submits it for review → `pending`. |
+| `draft` | Being written and edited. Document and task drafts can be added or changed only in this state. | The author submits it for review → `pending`. |
 | `pending` | Submitted and waiting for a reviewer. | A reviewer approves it → `approved`, or rejects it → back to `draft` (with a review note). |
-| `approved` | Accepted. Its document and task drafts are materialized into real Documents and Tasks. | Terminal for the review flow. |
+| `approved` | Accepted. The Documents and Tasks are created from its document and task drafts. | Terminal for the review flow. |
 | `closed` | Withdrawn or abandoned. Any tasks created from it are closed. | Terminal. |
 
 A rejected Proposal returns to `draft` so the author can revise and resubmit; the
@@ -66,19 +66,19 @@ A Task carries a single unit of work through execution and verification.
 | --- | --- | --- |
 | `open` | Unclaimed and available. | Someone claims or is assigned the Task → `assigned`. |
 | `assigned` | Has an assignee but work has not started. | The assignee starts work → `in_progress` (only if every dependency is resolved). |
-| `in_progress` | Being worked. | The assignee submits it → `to_verify`. |
+| `in_progress` | Being worked on. | The assignee submits it → `to_verify`. |
 | `to_verify` | Work is done and evidence is submitted, waiting for verification. | A verifier accepts it → `done`, or sends it back → `in_progress`. |
 | `done` | Verified and complete. | Terminal for normal flow. |
 | `closed` | Cancelled, for example when its Proposal is withdrawn. | Terminal. |
 
 ### Dependencies and unblocking
 
-Tasks can depend on other Tasks, forming a directed acyclic graph. A Task's dependents
-**unblock only when its upstream Tasks reach `done`** (a `closed` upstream also counts as
-resolved). Until then, a dependent Task cannot move to `in_progress`. Moving a Task back
-out of `to_verify` for any reason other than `done` resets its acceptance criteria. You can
+Tasks can depend on other Tasks, forming a directed acyclic graph. A dependent Task
+**unblocks only when its upstream Tasks reach `done`** (a `closed` upstream also counts as
+resolved). Until then, it cannot move to `in_progress`. Moving a Task out of
+`to_verify` to any state other than `done` resets its acceptance criteria. You can
 see these dependency links in the [project resource graph](/reference/resource-graph/), and
-add or edit them from the Tasks DAG view (see [Run tasks](/guides/run-tasks/)).
+add or edit them from the **DAG** view of the Tasks page (see [Run tasks](/guides/run-tasks/)).
 
 :::note[What the agent does]
 Agents move Tasks through `assigned → in_progress → to_verify` and submit evidence against

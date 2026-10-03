@@ -9,16 +9,16 @@ sidebar:
 
 import Screenshot from '../../../../components/Screenshot.astro';
 
-## 准备连接信息
+Chorus 管理员给你智能体 API 密钥之后，请按本指南操作。它会把 Claude Code、Codex 或 Kiro 连接为常驻运行环境，供 Chorus 远程发起工作。
 
-开始前请确认你已经获得：
+## 开始之前
+
+你需要：
 
 - Chorus 网址和智能体 API 密钥；
-- 管理员允许使用的工作目录；
-- 已安装的 Claude Code、Codex 或 Kiro 命令行工具；
-- Node.js 22 或更高版本。
-
-其他智能体平台的安装方法和能力不同，请查看[智能体平台参考](/zh/reference/agents/)，不要直接套用本页命令。
+- Node.js 22 或更高版本；
+- 已安装并完成认证的所选智能体命令行工具；
+- 至少一个获准的工作目录。
 
 安装 Chorus 命令行工具（0.17.2 或更高版本）：
 
@@ -47,23 +47,28 @@ chorus agents add --agents claude,codex \
 
 如果你只需要保存凭据而不安装插件（例如在智能体已经配置好的机器上），改用 `chorus login` 即可：它会校验网址和密钥，并把连接写入 `~/.chorus/daemon.json`（权限 `0600`）。
 
-完整的 `chorus agents` 与 `chorus mcp` 命令面，参见 [chorus 命令行工具](/zh/reference/cli/)。
+`chorus agents` 与 `chorus mcp` 的完整命令说明，参见 [chorus 命令行工具](/zh/reference/cli/)。
 
-## 启动智能体
+## 启动运行环境
 
-下面以 Claude Code 为例，在获准的工作目录中启动：
+先用一个获准的工作目录启动：
 
 ```sh
 chorus daemon --agent claude-code --cwd /home/demo/workspace --chorus-only
 ```
 
-使用 Codex 或 Kiro 时，把 `claude-code` 分别替换为 `codex` 或 `kiro`。`--chorus-only` 会限制智能体只能使用 Chorus 提供的协作工具，适合首次验证；需要完整命令执行能力时，应先确认主机隔离和团队安全策略。
+使用 Codex 或 Kiro 时，把 `claude-code` 分别替换为 `codex` 或 `kiro`。`--chorus-only` 会限制智能体只能使用 Chorus 工具。只有在你确实希望智能体使用完整的本地工具集、并已评估过安全影响时，才省略这个参数。
 
-保持该终端运行，同时确认连接是否正常。若想安装一个开机服务，让 daemon 在登录时自动启动，可给 `chorus agents add` 加上 `--daemon-autostart`，或参阅[管理后台服务](/zh/guides/daemon-operations/)。
+保持该终端运行，同时确认连接是否正常。若想安装一个服务，让后台服务在登录时自动启动，可给 `chorus agents add` 加上 `--daemon-autostart`，或参阅[管理后台服务](/zh/guides/daemon-operations/)。
 
-## 确认智能体在线
+## 确认连接
 
-在 Chorus 打开设置（Settings），展开在线智能体（Online Agents），检查运行后端、主机和工作目录。
+在 Chorus 中打开**设置 → 智能体**，检查这条智能体连接，确认：
+
+- 状态为**在线**；
+- 运行后端与你选择的命令行工具一致；
+- 主机是你正在操作的机器；
+- 工作目录是你获准使用的目录。
 
 <Screenshot
   src="/images/agent-operations/connection-online.webp"
@@ -75,4 +80,4 @@ chorus daemon --agent claude-code --cwd /home/demo/workspace --chorus-only
 
 随时可以运行 `chorus agents` 列出本机已配置的智能体（名称、UUID 和运行后端；绝不会打印 API 密钥），并用 `chorus agents remove <name|uuid>` 移除其中一个。
 
-状态为在线且三项信息都正确后，智能体即可接收工作。若状态一直离线，请参阅[排查智能体连接故障](/zh/guides/troubleshooting/)。
+确认无误后，用 `Ctrl+C` 停止前台运行的运行环境。如需让它在重新登录或重启后依然可用，请继续阅读[管理后台服务](/zh/guides/daemon-operations/)。

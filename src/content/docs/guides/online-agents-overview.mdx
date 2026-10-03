@@ -1,6 +1,6 @@
 ---
 title: Online agents overview
-description: Understand the online-agent model — live daemon connections, directory anchoring, one session per idea, and the interrupt/resume/takeover lifecycle — and where each capability lives.
+description: Understand the online-agent model — live daemon connections, fixed working directories, one session per idea, and the interrupt/resume/takeover lifecycle — and where each capability lives.
 docsLocale: en
 route: /guides/online-agents-overview/
 sidebar:
@@ -10,7 +10,7 @@ sidebar:
 import Screenshot from '../../../components/Screenshot.astro';
 
 Chorus can start and steer agent work on machines you keep online. This page explains that
-model — what an online agent is, how a project pins work to one, how a single conversation
+model — what an online agent is, how a project fixes work to one, how a single conversation
 follows an idea, and how you interrupt, resume, or take over — then points to the page where
 you actually do each thing. For the collaboration workflow those agents run, see
 [The AI-DLC workflow](/guides/ai-dlc-workflow/); for the plugin commands they expose, see
@@ -27,9 +27,8 @@ Each connection is addressed by three things: the **agent** identity (the API ke
 **host** it runs on, and the **working directory** (`cwd`) it serves. One daemon can host
 several independent agents — each with its own key and identity — and serve several
 directories per agent; every registered `(agent, host, directory)` combination becomes its
-own addressable target. Chorus
-shows every connection's presence — online or offline, with its backend, host, and directory
-— in **Settings → Agents**.
+own addressable target. Chorus shows every connection's presence (online or offline, with its
+backend, host, and directory) in **Settings → Agents**.
 
 <Screenshot
   src="/images/agent-operations/presence-online-agents.webp"
@@ -39,26 +38,26 @@ shows every connection's presence — online or offline, with its backend, host,
   caption="The presence panel lists each online connection by agent, backend, host, and working directory."
 />
 
-## How a project pins to a directory
+## How a project gets a fixed directory
 
-A project can be **fixed** to a specific online agent and working directory. Once anchored,
+A project can be **fixed** to a specific online agent and working directory. Once fixed,
 agent work started from that project's UI routes to the same connection and directory, and
-the working-directory picker is suppressed — you do not re-choose the target each time. See
+the working-directory picker is hidden — you do not re-choose the target each time. See
 [Create a project](/guides/create-a-project/) for how to set, replace, or clear that
 preference.
 
 ## One session per idea
 
-A direct idea has a single canonical conversation, and its session id **is** the idea's own
-identifier — so every wake for that idea reaches the same conversation. If you wake the idea
-from a different working directory, Chorus **re-points** that one session to the new directory
-rather than forking a second conversation, so the idea keeps one continuous history.
+Each idea has a single conversation, so every time you start agent work on that idea it
+reaches the same conversation. If you start work on the idea from a different working
+directory, Chorus **moves** that one session to the new directory rather than starting a
+second conversation, so the idea keeps one continuous history.
 
 ## Interrupt, resume, and take over
 
 While an agent is working you can **interrupt** the current turn, **resume** a stopped
 conversation with added context, or **take over** the conversation from a terminal using its
-copied session id. These controls act on an existing conversation rather than starting a new
+copied session ID. These controls act on an existing conversation rather than starting a new
 one. See [Interrupt and resume a session](/guides/session-recovery/).
 
 OpenClaw connects through the OpenClaw gateway rather than `chorus daemon`, so it is a
@@ -71,10 +70,10 @@ documents it in full.
 
 | Capability | Where you do it | Read more |
 | --- | --- | --- |
-| Reverse control (interrupt, resume) | The conversation's **Interrupt** and **Resume** controls; the daemon receives them over `POST /api/daemon/control` | [Interrupt and resume a session](/guides/session-recovery/) |
-| Wake and wake-queue | Start or continue agent work from a project item; a wake for a busy directory is queued until it is free | [Start work on a remote agent](/guides/remote-control/) |
+| Interrupt and resume | The conversation's **Interrupt** and **Resume** controls | [Interrupt and resume a session](/guides/session-recovery/) |
+| Start work (queued while busy) | Start or continue agent work from a project item; a request for a busy directory is queued until it is free | [Start work on a remote agent](/guides/remote-control/) |
 | `(agent, host, cwd)` addressing | Register each working directory when you start the daemon (repeatable `--cwd`) | [Operate the Chorus daemon](/guides/daemon-operations/) |
 | Presence | **Settings → Agents** shows each connection's online state, backend, host, and directory | [Connect an agent runtime](/guides/operator-onboarding/) |
 | Remote start | Pick an online directory, enter an instruction, then **Start session** | [Start work on a remote agent](/guides/remote-control/) |
 | Ad-hoc "continue in an online directory" | Hand a new idea to an online agent from the new-idea dialog's conversational mode | [Capture an idea](/guides/capture-an-idea/) |
-| Multi-backend (Claude Code, Codex, Kiro) | Choose the backend per connection with `--agent` | [Agent platforms](/reference/agents/) |
+| Multi-backend (Claude Code, Codex, Kiro, Pi, DeepSeek Harness) | Choose the backend per connection with `--agent` | [Agent platforms](/reference/agents/) |

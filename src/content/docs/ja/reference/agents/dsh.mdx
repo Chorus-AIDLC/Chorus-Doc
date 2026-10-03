@@ -1,15 +1,13 @@
 ---
 title: DeepSeek Harness
-description: 第一者 npm バンドルを通じて DeepSeek Harness (dsh) を Chorus に接続します。
+description: 公式の npm バンドルを通じて DeepSeek Harness (dsh) を Chorus に接続します。
 docsLocale: ja
 route: /ja/reference/agents/dsh/
 ---
 
-# DeepSeek Harness
+DeepSeek Harness (dsh) は、公式の npm バンドル `@chorus-aidlc/chorus-dsh` を通じて Chorus に接続します。このバンドルは、Chorus の MCP ツール、ワークフロースキル、ペルソナを dsh プロファイルに追加します。dsh は対話的に使用できるほか、dsh `0.1.2-rc.1` 以降は Chorus がデーモンバックエンドとして無人で dsh を起動（wake）することもできます。
 
-DeepSeek Harness (dsh) は、第一者の npm バンドル `@chorus-aidlc/chorus-dsh` を通じて Chorus に接続します。このバンドルは、Chorus の MCP ツール、ワークフロースキル、ペルソナを dsh プロファイルに追加します。dsh は対話的に使用できるほか、dsh `0.1.2-rc.1` 以降は Chorus がデーモンバックエンドとして無人で dsh を起動（wake）することもできます。
-
-インストール前に、`0.1.2-rc.1` 以降の dsh（および `pnpm`）を使い、[エージェントのアクセスを準備する](/ja/guides/administrator-setup/)に従ってエージェントキーを作成します。
+始める前に、dsh `0.1.2-rc.1` 以降と `pnpm` をインストールし、[エージェントのアクセスを準備する](/ja/guides/administrator-setup/)に従って API キーを作成します。
 
 ## バンドルをインストールし認証情報を保存する
 
@@ -20,7 +18,7 @@ npm install --global @chorus-aidlc/chorus
 chorus agents add --agents dsh --dsh-profile <name>
 ```
 
-プロンプトが出たら、Chorus URL とエージェントキーを入力します。dsh はツールのサブプロセスから認証情報らしい変数を取り除くため、`chorus agents add` は `CHORUS_URL`、`CHORUS_API_KEY`、`CHORUS_AGENT_PROFILE` を `$DSH_HOME/.env` に永続化し、dsh がそれをセッションに読み込みます。dsh は次の順序で認証情報を解決します：環境変数 → `$DSH_HOME/.credentials.yaml` → `<cwd>/.env` → `$DSH_HOME/.env`。
+プロンプトが出たら、Chorus URL と API キーを入力します。dsh はツールのサブプロセスから認証情報らしい変数を取り除くため、`chorus agents add` は `CHORUS_URL`、`CHORUS_API_KEY`、`CHORUS_AGENT_PROFILE` を `$DSH_HOME/.env` に永続化し、dsh がそれをセッションに読み込みます。dsh は次の順序で認証情報を解決します：環境変数 → `$DSH_HOME/.credentials.yaml` → `<cwd>/.env` → `$DSH_HOME/.env`。
 
 手動でバンドルを追加する場合は、次を実行し（dsh プロファイルは pnpm ワークスペースのルートなので `-w` が必要です）、その後 `$DSH_HOME/.env` に認証情報を自分で設定してください：
 
@@ -40,26 +38,26 @@ dsh --profile <name>
 
 ## デーモンバックエンドとして実行する（任意）
 
-dsh `0.1.2-rc.1` 以降、Chorus は Claude Code・Codex・Kiro と同じように dsh を無人で起動（wake）できます。まず `chorus agents add --agents dsh` で認証情報を一度書き込み、次に dsh バックエンドを選んでデーモンを起動します：
+dsh `0.1.2-rc.1` 以降、Chorus は Claude Code・Codex・Kiro と同じように dsh を無人で起動できます。まず `chorus agents add --agents dsh` で認証情報を一度書き込み、次に dsh バックエンドを選んでデーモンを起動します：
 
 ```bash
 chorus daemon --agent dsh
 ```
 
-デーモンは dsh を初めて起動するときに、自身の管理下にある `sdk` プロファイルをビルドして検証します。そのためこの経路に必要なのは認証情報だけで、プロファイルを手動でインストールする必要はありません。`dsh` 本体は `PATH` 上にある（または `CHORUS_DSH_PATH` を設定する）必要があります。Chorus は dsh ランタイムを同梱しません。Chorus のディスパッチ（dsh への idea/タスクの割り当て、または `@メンション`）が dsh を起動します。
+デーモンは dsh を初めて起動するときに、自身が管理するプロファイルをビルドして検証します。そのためこの経路に必要なのは認証情報だけで、プロファイルを手動でインストールする必要はありません。`dsh` 本体は `PATH` 上にある（または `CHORUS_DSH_PATH` を設定する）必要があります。Chorus は dsh ランタイムを同梱しません。dsh に着想や課題を割り当てるか、dsh を @メンションすると、dsh が起動されます。
 
-各 wake は**新しい** dsh セッションになります（dsh にはネイティブな wake 間のセッション再開はありません）。Chorus は会話コンテキストを割り当て先の idea/タスク上に保持し、起動された dsh エージェントは Chorus MCP ツールでそれを読み戻します。
+起動のたびに**新しい** dsh セッションが実行されます（dsh には起動をまたいでセッションを再開するネイティブの機能がありません）。Chorus は会話のコンテキストを割り当て先の着想・課題に保持し、起動された dsh エージェントは Chorus MCP ツールでそれを読み戻します。
 
 ## 機能と制限
 
 - バンドルは Chorus の MCP ツール、ワークフロースキル、Chorus ペルソナを提供します。
 - dsh は自身のプロファイルを通じて対話的に動作するほか、無人のデーモンバックエンド（`chorus daemon --agent dsh`）としても動作します。
-- wake ごとに dsh は新しいセッションを開始します。ネイティブな wake 間のセッション再開はなく、連続性は wake がひも付く Chorus リソースから得られます。
+- 起動のたびに dsh は新しいセッションを開始します。起動をまたいで会話を再開するネイティブの機能はなく、継続性は起動がひもづく Chorus リソースから得られます。
 
 ## よくある問題
 
 - **`dsh` または `pnpm` が見つからない：** 両方の前提ツールをインストールし、新しいシェルを開きます。
 - **`ERR_PNPM_ADDING_TO_ROOT`：** `-w` を付けてコマンドを再実行します。dsh プロファイルは pnpm ワークスペースのルートです。
 - **パッケージが見つからない：** レジストリへのアクセスとパッケージ名 `@chorus-aidlc/chorus-dsh` を確認し、追加コマンドを再実行します。
-- **チェックインが認可されない：** `CHORUS_URL` と `cho_` エージェントキーが `$DSH_HOME/.env` に保存されていることを確認し（`chorus agents add --agents dsh --dsh-profile <name>` を再実行すると更新されます）、プロファイルを起動し直します。
-- **プロファイル更新後にチェックインが失敗する：** dsh プロファイルを再起動し、有効な composition を再読み込みします。
+- **チェックインが認可されない：** `CHORUS_URL` と `cho_` API キーが `$DSH_HOME/.env` に保存されていることを確認し（`chorus agents add --agents dsh --dsh-profile <name>` を再実行すると更新されます）、プロファイルを起動し直します。
+- **プロファイル更新後にチェックインが失敗する：** dsh プロファイルを再起動し、更新された構成を再読み込みさせます。

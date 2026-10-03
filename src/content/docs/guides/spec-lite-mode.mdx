@@ -18,8 +18,8 @@ files changes.
 ## When you get it
 
 Look for `CHORUS_SPEC_MODE=lite` in the runtime's spec-mode result. Claude Code, Codex,
-Kiro, and Pi report it in startup context; dsh provides it on the first agent step after
-plugin load. OpenClaw resolves it during the stage skill instead of injecting startup
+Kiro, and Pi report it in startup context; DeepSeek Harness (`dsh`) provides it on the first
+agent step after plugin load. OpenClaw resolves it during the stage skill instead of injecting startup
 context; use `/chorus spec` or `/chorus status` to inspect it.
 
 You land on `lite` either because OpenSpec is not usable in this repository — which is the
@@ -51,22 +51,23 @@ meant to be committed:
 change. It is the cumulative "current truth": intent, requirements with acceptance points, and
 non-goals. Every change edits it in place, and its git history is the whole record — there is
 no changelog section to maintain. It is **never** copied into Chorus and carries no Chorus
-identifiers. Its `status` (`draft`, `active`, `done`) describes the capability: `active` while a
-change is in flight, `done` once delivered with no open change remaining; a new change reopens it.
+identifiers. Its `status` (`draft`, `active`, `done`) describes the capability: `active` while
+a change is in flight, `done` once delivered with no open change remaining; a new change
+reopens it.
 
 **One dated folder per change — `<capability-slug>/<YYYY-MM-DD>-<change-slug>/`.** The date
-sorts folders chronologically; use distinct change slugs for changes made on the same day. Each file in
-it is one Chorus document type: `prd.md` is required, and `tech_design.md`, `adr.md`,
-`guide.md`, or a change-scoped `spec.md` are added only when they earn their place. These files
-**are** mirrored into Chorus, one file to one persistent document, byte-for-byte rather than
-retyped by the model, so the local file and the Chorus document stay identical. After approval,
-every mirrored edit increments that document's version, which is the change's record inside Chorus
-alongside git.
+sorts folders chronologically; use distinct change slugs for changes made on the same day.
+Each file in the folder is one Chorus document type: `prd.md` is required, and
+`tech_design.md`, `adr.md`, `guide.md`, or a change-scoped `spec.md` are added only when they
+earn their place. These files **are** mirrored into Chorus, one file to one persistent
+document, byte-for-byte rather than retyped by the model, so the local file and the Chorus
+document stay identical. After approval, every mirrored edit increments that document's
+version, which is the change's record inside Chorus alongside git.
 
 There is no `tasks.md`. Tasks live in Chorus as task drafts, and the acceptance points in
 `spec.md` are intent, not a tracker.
 
-So a later session can find the change, the proposal description carries one exact line:
+So that a later session can find the change, the proposal description carries one exact line:
 
 ```text
 Spec-lite: .chorus/specs/<capability-slug>/<YYYY-MM-DD>-<change-slug>/
@@ -76,18 +77,20 @@ Spec-lite: .chorus/specs/<capability-slug>/<YYYY-MM-DD>-<change-slug>/
 
 The agent handles the sync in stages:
 
-1. **Before approval:** put `proposalUuid` in each change document's frontmatter and leave
-   `documentUuid` empty. Mirror it into a proposal draft; later edits update that draft.
-2. **On approval:** the draft becomes a persistent Document. Resolve it by `(proposalUuid,
-   type)`, record its `documentUuid` locally, then mirror once more so the stored content
-   includes the identifier too.
-3. **After approval:** edit the local file and update that same Document by `documentUuid`.
-   These updates increment its version. The durable capability-level `spec.md` never enters
+1. **Before approval:** the agent puts `proposalUuid` in each change document's frontmatter,
+   leaves `documentUuid` empty, and mirrors the file into a proposal draft; later edits update
+   that draft.
+2. **On approval:** the draft becomes a persistent Document. The agent resolves it by
+   `(proposalUuid, type)`, records its `documentUuid` locally, then mirrors once more so the
+   stored content includes the identifier too.
+3. **After approval:** the agent edits the local file and updates that same Document by
+   `documentUuid`. These updates increment its version. The durable capability-level `spec.md` never enters
    this process.
 
-A lookup with no match or multiple matches stops the sync for investigation; it must not
-create a replacement or guess by title. This is agent-driven mirroring, not a background
-file watcher. The frontmatter appears as a [metadata card when reading the document](/guides/documents/#metadata-at-the-top-of-a-document).
+A lookup with no match or multiple matches stops the sync for investigation; the agent must
+not create a replacement or guess by title. This is agent-driven mirroring, not a background
+file watcher. The frontmatter appears as a
+[metadata card when reading the document](/guides/documents/#metadata-at-the-top-of-a-document).
 
 ## The two files named `spec.md`
 
@@ -112,7 +115,7 @@ sessions at once.
 Spec-lite ships with the Chorus plugin on Claude Code, Codex, Kiro, Pi, OpenClaw, and dsh.
 They share the same mode rules, not the same startup mechanism; see the
 [OpenSpec guide](/guides/openspec-mode/) for the runtime differences. The standalone skill
-distribution does not include spec-mode routing and continues to author free-form.
+distribution does not include spec-mode routing and keeps writing free-form documents.
 
 ## For agents
 
@@ -129,6 +132,3 @@ distribution does not include spec-mode routing and continues to author free-for
   `openspec/changes/`. The proposal description must carry the exact
   `Spec-lite: .chorus/specs/<slug>/<YYYY-MM-DD>-<change-slug>/` locator line, on its own line
   with no trailing punctuation.
-- **Cite.** `public/chorus-plugin/skills/spec-lite/SKILL.md` (authoritative skill, with both
-  starting templates inline) and `public/chorus-plugin/bin/resolve-spec-mode.sh` (the
-  single-source mode resolution).

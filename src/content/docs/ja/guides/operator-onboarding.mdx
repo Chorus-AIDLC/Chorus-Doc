@@ -9,11 +9,11 @@ sidebar:
 
 import Screenshot from '../../../../components/Screenshot.astro';
 
-Chorus の管理者からエージェントの API キーを受け取った後に、このガイドを使ってください。Claude Code、Codex、Kiro を、Chorus がリモートから起こせる常駐ランタイムとして接続します。
+Chorus の管理者からエージェントの API キーを受け取った後に、このガイドを使ってください。Claude Code、Codex、Kiro を、Chorus からリモートで作業を始められる常駐ランタイムとして接続します。
 
 ## 始める前に
 
-必要なもの。
+次のものが必要です。
 
 - Chorus の URL とエージェントの API キー。
 - Node.js 22 以降。
@@ -28,13 +28,13 @@ npm install --global @chorus-aidlc/chorus
 
 ## エージェントを設定する
 
-`chorus agents add` は、このマシンのエージェントを Chorus に接続する唯一のコマンドです。すでにインストールしているエージェントを検出し、それぞれの Chorus プラグインをインストールし、Chorus の URL と API キーを一度だけ `~/.chorus/daemon.json` に取り込みます。Claude Code、Codex、DeepSeek Harness については、認証情報をそのエージェント自身の設定にも書き込むため、対話的なセッションが手動の環境設定なしで認証されます。
+`chorus agents add` は、このマシンのエージェントを 1 つのコマンドで Chorus に接続します。すでにインストールしているエージェントを検出し、それぞれの Chorus プラグインをインストールし、Chorus の URL と API キーを `~/.chorus/daemon.json` に一度だけ保存します。Claude Code、Codex、DeepSeek Harness については、認証情報をそのエージェント自身の設定にも書き込むため、対話型のセッションでも、環境変数を手動で設定しなくても認証されます。
 
 ```sh
 chorus agents add
 ```
 
-プロンプトが出たら、Chorus の URL と API キーを入力し、設定するエージェントを選びます。このコマンドは冪等です — エージェントの追加、プラグインの更新、キーのローテーションのために、いつでも再実行できます。プロンプトなしで特定のエージェントを設定するには、次のようにします。
+プロンプトが出たら、Chorus の URL と API キーを入力し、設定するエージェントを選びます。このコマンドは冪等なので、エージェントの追加、プラグインの更新、キーの交換のためにいつでも再実行できます。プロンプトなしで特定のエージェントを設定するには、次のようにします。
 
 ```sh
 chorus agents add --agents claude,codex \
@@ -42,12 +42,12 @@ chorus agents add --agents claude,codex \
 ```
 
 :::caution[API キーを守る]
-キーがシェル履歴に残らないよう、対話的なプロンプトを優先してください。`--api-key` を渡す必要がある場合は、履歴を記録しないよう設定したシェルで実行し、キーをコミットされるファイルやサポートへのメッセージには決して追加しないでください。
+キーがシェル履歴に残らないよう、対話的なプロンプトを優先してください。`--api-key` を渡す必要がある場合は、履歴を記録しないよう設定したシェルで実行し、キーをコミットするファイルやサポートへの問い合わせには決して含めないでください。
 :::
 
-プラグインをインストールせずに認証情報だけを保存したい場合 — 例えば、エージェントがすでにセットアップ済みのマシンでは — 代わりに `chorus login` を実行してください。URL とキーを検証し、接続を `~/.chorus/daemon.json`（モード `0600`）に書き込みます。
+プラグインをインストールせずに認証情報だけを保存したい場合（例えば、エージェントがすでにセットアップ済みのマシンなど）は、代わりに `chorus login` を実行してください。URL とキーを検証し、接続を `~/.chorus/daemon.json`（モード `0600`）に書き込みます。
 
-`chorus agents` と `chorus mcp` の全体像については、[chorus CLI](/ja/reference/cli/)を参照してください。
+`chorus agents` と `chorus mcp` のすべてのオプションについては、[chorus CLI](/ja/reference/cli/)を参照してください。
 
 ## ランタイムを起動する
 
@@ -57,9 +57,9 @@ chorus agents add --agents claude,codex \
 chorus daemon --agent claude-code --cwd /path/to/your/project --chorus-only
 ```
 
-必要に応じて `claude-code` を `codex` または `kiro` に置き換えます。`--chorus-only` は、起こされたエージェントを Chorus のツールに制限します。省略するのは、エージェントにローカルのツール一式を意図的に使わせたく、そのセキュリティ上の影響を確認済みのときだけにしてください。
+必要に応じて `claude-code` を `codex` または `kiro` に置き換えます。`--chorus-only` は、エージェントが使えるツールを Chorus のツールに制限します。このオプションを省略するのは、エージェントにローカルのツールをすべて使わせることを意図していて、そのセキュリティ上の影響を確認済みの場合だけにしてください。
 
-接続を確認する間、このコマンドは実行したままにします。ログイン時にデーモンが起動する起動サービスをインストールするには、`chorus agents add` に `--daemon-autostart` を追加するか、[Chorus デーモンを運用する](/ja/guides/daemon-operations/)を参照してください。
+接続を確認する間、このコマンドは実行したままにします。ログイン時にデーモンが起動するようサービスをインストールするには、`chorus agents add` に `--daemon-autostart` を追加するか、[Chorus デーモンを運用する](/ja/guides/daemon-operations/)を参照してください。
 
 ## 接続を確認する
 
@@ -75,9 +75,9 @@ Chorus で **設定 → エージェント**（Settings → Agents）を開き�
   alt="Codex バックエンド、ホスト、作業ディレクトリを表示しているオンラインのエージェント接続"
   width={1440}
   height={900}
-  caption="オンラインのランタイムは、そのバックエンド、ホスト、登録済みの作業ディレクトリを一覧します。"
+  caption="オンラインのランタイムには、バックエンド、ホスト、登録済みの作業ディレクトリが表示されます。"
 />
 
-このマシンに設定されたエージェントを一覧するには、いつでも `chorus agents` を実行します（名前、UUID、バックエンドが表示され、API キーは決して出力されません）。1 つを削除するには `chorus agents remove <name|uuid>` を使います。
+このマシンに設定されたエージェントは、いつでも `chorus agents` で一覧できます（名前、UUID、バックエンドが表示され、API キーは決して出力されません）。1 つを削除するには `chorus agents remove <name|uuid>` を使います。
 
 確認後は `Ctrl+C` でフォアグラウンドのランタイムを停止します。ログインや再起動をまたいで使えるようにするには、[Chorus デーモンを運用する](/ja/guides/daemon-operations/)へ進んでください。

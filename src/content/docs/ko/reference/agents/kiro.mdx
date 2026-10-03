@@ -5,12 +5,10 @@ docsLocale: ko
 route: /ko/reference/agents/kiro/
 ---
 
-# Kiro
-
-Kiro CLI에는 도구, 워크플로 스킬, 에이전트, 훅을 갖춘 제1자 Chorus 통합이 있습니다. Kiro는
+Kiro CLI에는 도구, 워크플로 스킬, 검토 에이전트, 훅을 갖춘 공식 Chorus 통합이 있습니다. Kiro는
 지원되는 Chorus 데몬 백엔드이기도 합니다.
 
-설치 전에 Kiro CLI v2를 설치하고 [에이전트 액세스 준비](/ko/guides/administrator-setup/)에
+시작하기 전에 Kiro CLI v2를 설치하고 [에이전트 액세스 준비](/ko/guides/administrator-setup/)에
 따라 에이전트 키를 만드세요.
 
 ## 통합 설치
@@ -26,9 +24,9 @@ chorus agents add --agents kiro
 
 ## 원격 시작 활성화
 
-대화식 Kiro 세션에서만 Chorus를 사용한다면 이 섹션을 건너뛰세요. 그렇지 않다면
-[런타임 연결](/ko/guides/operator-onboarding/)에 따라 백엔드로 `kiro`를 선택합니다.
-[데몬 운영](/ko/guides/daemon-operations/)으로 온라인 상태를 유지하기 전에, 포그라운드에서
+대화형 Kiro 세션에서만 Chorus를 사용한다면 이 섹션을 건너뛰세요. 그렇지 않다면
+[에이전트 런타임 연결](/ko/guides/operator-onboarding/)에 따라 백엔드로 `kiro`를 선택합니다.
+[Chorus 데몬 운영](/ko/guides/daemon-operations/)으로 온라인 상태를 유지하기 전에, 포그라운드에서
 연결을 확인하세요.
 
 ## 연결 확인
@@ -47,13 +45,13 @@ chorus agents add --agents kiro
 - 워크스페이스 구성이 사용자 전체 Kiro 구성보다 우선합니다.
 - 원격 작업은 로컬 사용자의 접근 권한을 상속합니다. 신뢰하는 작업 디렉터리만 등록하세요.
 
-공통 운영 절차는 [원격 제어](/ko/guides/remote-control/)와
-[세션 복구](/ko/guides/session-recovery/)를 사용하세요.
+공통 운영 절차는 [원격 에이전트에서 작업 시작](/ko/guides/remote-control/)과
+[세션 중단과 재개](/ko/guides/session-recovery/)를 사용하세요.
 
 ## 터미널에서 재개하기
 
 자신의 터미널에서 진행 중인 대화를 넘겨받으려면, 채팅 UI에서 해당 세션 ID를 복사한 뒤
-(대화 기록 헤더의 **Copy session ID**), 그 대화의 작업 디렉터리에서 실행합니다.
+(대화 기록 헤더의 **세션 ID 복사**), 그 대화의 작업 디렉터리에서 실행합니다.
 
 ```bash
 kiro-cli chat --resume-id <sessionId>
@@ -67,7 +65,7 @@ kiro-cli chat --resume-id <sessionId>
 - **Kiro CLI를 찾을 수 없음:** Kiro CLI v2를 설치하고 `chorus agents add`를 다시 실행합니다.
 - **스킬이 없음:** 워크스페이스 설치가 사용자 전체 설치를 덮어쓰고 있지 않은지 확인한 뒤 Kiro를
   재시작합니다.
-- **체크인이 승인되지 않음:** `chorus agents add`를 다시 실행해 `mcp.json`과 인증 정보를 새로
-  고칩니다. 데몬 모드에서는 데몬이 깨울 때마다 키를 공급합니다.
+- **체크인이 승인되지 않음:** `chorus agents add`를 다시 실행해 `mcp.json`과 인증 정보를
+  갱신합니다. 데몬 모드에서는 데몬이 깨울 때마다 키를 제공합니다.
 - **데몬이 오프라인:** `chorus daemon status`를 실행한 뒤
-  [문제 해결](/ko/guides/troubleshooting/)을 참고합니다.
+  [에이전트 연결 문제 해결](/ko/guides/troubleshooting/)을 참고합니다.

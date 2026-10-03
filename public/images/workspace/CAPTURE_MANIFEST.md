@@ -351,6 +351,34 @@ search for it rather than trusting a line number.
 
 ---
 
+## Project access captures (2026-10-03)
+
+Five captures for [Control who can see a project](/guides/project-access/) and
+[Create a project](/guides/create-a-project/), taken on 2026-10-03 against a local dev
+instance (`pnpm dev`, fresh Postgres database, default-auth) driven with Playwright. The UI
+was English, the viewport 1440×900, the theme light. The fictitious **Demo Workspace** contained:
+
+- signed-in user **Demo Reviewer** (`reviewer@demo.example`), plus **Dana Lee**, **Sam Ortiz**
+  and **Priya Shah** (`*@demo.example`), inserted as company users;
+- public group **Skylark Apps** with public projects **Skylark Notes** and **Skylark Sync**;
+- private group **Skylark Labs** (Dana Lee Editor, Sam Ortiz Viewer) with private project
+  **Roadmap Experiments** (direct grants: Priya Shah Viewer, Sam Ortiz Editor);
+- ungrouped private project **Pricing Research**.
+
+| File | Page | State captured |
+| --- | --- | --- |
+| `projects-private-badges.webp` | project-access | Projects list: public group, private group with its lock and hover tooltip, **Private project** badges. |
+| `project-access-tab.webp` | project-access | Roadmap Experiments → Settings → Project settings → **Access**: Visibility Private; members with inherited, direct and combined sources. |
+| `group-access-settings.webp` | project-access | Skylark Labs → View Dashboard → **Manage Group**, scrolled to Visibility and Members. |
+| `group-visibility-impact.webp` | project-access | Skylark Apps → Manage Group → Private → **Make this group private?** with the Access impact summary (then cancelled). |
+| `create-project-visibility.webp` | create-a-project | **New Project** from Skylark Apps with the Visibility choice and the inheritance hint. |
+
+Only fictitious `@demo.example` addresses are visible; no UUIDs, hostnames or URL bar. PNG
+originals were kept as capture evidence outside the repo. A human full-resolution redaction
+review is still recommended before publishing.
+
+---
+
 ## Post-capture checklist (per image)
 
 1. Captured from a **real browser**, English UI, ≥ 1440×900. No synthetic/redrawn UI.

@@ -16,7 +16,7 @@ should read [Account and workspace](/guides/account-and-workspace/).
 
 ## Enable the Super Admin
 
-The Super Admin is a platform-level login, separate from any workspace. You enable it on
+The Super Admin is a platform-level account, separate from any workspace. You enable it on
 the server with two environment variables — the admin email and a bcrypt hash of the admin
 password:
 
@@ -31,7 +31,10 @@ Generate the hash with a one-off command, for example:
 node -e "console.log(require('bcryptjs').hashSync('your-password', 10))"
 ```
 
-Keep the bcrypt hash in your deployment's secret store. Admin sessions also need a secure `NEXTAUTH_SECRET`: the npm `chorus` launcher and Docker entrypoint can generate and persist it for one instance. Set the same value explicitly on all replicas. See [Docker session secrets](/guides/deploy-docker/#session-secret-nextauth_secret).
+Keep the bcrypt hash in your deployment's secret store. Admin sessions also need a secure
+`NEXTAUTH_SECRET`: for a single instance, the npm `chorus` launcher and the Docker entrypoint
+can generate and persist it for you. With more than one replica, set the same value
+explicitly on all of them. See [Docker session secrets](/guides/deploy-docker/#session-secret-nextauth_secret).
 
 ## Sign in as Super Admin
 
@@ -87,22 +90,22 @@ the standard `openid profile email` scopes.
   alt="Workspace edit page in the Super Admin panel showing the OIDC Configuration card with Issuer URL and Client ID fields"
   width={1440}
   height={900}
-  caption="Each workspace's OIDC settings live on its edit page; SSO enables once both the Issuer URL and Client ID are set."
+  caption="Each workspace's OIDC settings live on its edit page; SSO is enabled once both the Issuer URL and Client ID are set."
 />
 
-At your identity provider, register Chorus as an application and whitelist its **redirect
-(callback) URL**, which is your Chorus site's address followed by `/login/callback`. The
-Companies list shows the exact URL to copy — it is built from the address you actually visit
-Chorus at, so open the Companies page from your production URL and copy the value shown
-there.
+At your identity provider, register Chorus as an application and add its **redirect
+(callback) URL** to the allowed list: your Chorus site's address followed by
+`/login/callback`. The Companies list shows the exact URL to copy. Because it is built from
+the address you used to open Chorus, open the Companies page from your production URL and
+copy the value shown there.
 
 ### How this reaches your users
 
 Once a workspace has SSO configured, a person signing in with an email on one of its
 domains is sent to your identity provider and back — the flow described in
 [Account and workspace](/guides/account-and-workspace/). A user whose email matches more
-than one SSO workspace is asked to pick one. Someone already added to a workspace resolves
-to it even if their email domain differs.
+than one SSO workspace is asked to pick one. Someone already added to a workspace is signed
+in to it even if their email domain differs.
 
 ## Next
 

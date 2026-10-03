@@ -1,6 +1,6 @@
 ---
 title: Spec-lite モード
-description: Chorus 独自の軽量な仕様モード。能力ごとに 1 つの継続的なローカル仕様と、変更ごとに 1 つの日付付きフォルダの同期文書。
+description: Chorus 独自の軽量な仕様モード。能力ごとに 1 つの継続的なローカル仕様と、変更ごとの日付付きフォルダに置かれ Chorus と同期される文書。
 docsLocale: ja
 route: /ja/guides/spec-lite-mode/
 ---
@@ -17,7 +17,7 @@ Spec-lite は Chorus 独自の軽量な仕様モードです。git で追跡さ�
 ## いつ選ばれるか
 
 実行環境の仕様モードの結果が `CHORUS_SPEC_MODE=lite` か確認してください。Claude Code、Codex、Kiro、Pi は
-開始時のコンテキスト、dsh はプラグイン読み込み後の最初のエージェントステップで報告します。OpenClaw は開始時に
+開始時のコンテキストで、DeepSeek Harness（`dsh`）はプラグイン読み込み後の最初のエージェントステップで報告します。OpenClaw は開始時に
 注入せず、ステージスキルの実行時に解決します。`/chorus spec` または `/chorus status` で確認できます。
 
 `lite` になる理由は 2 つあります。このリポジトリで OpenSpec が使えない場合（`openspec/` ディレクトリと
@@ -43,16 +43,16 @@ export CHORUS_SPEC_MODE=lite
 ```
 
 **継続的な仕様 `<capability-slug>/spec.md`。** 能力や機能ごとに 1 つで、変更ごとでは*ありません*。
-意図、受け入れ観点付きの要件、非目標をまとめた累積的な「現在の真実」です。どの変更もこれをその場で
+意図、受け入れ観点付きの要件、非目標をまとめた累積的な「現在の正となる仕様」です。どの変更もこれをその場で
 編集し、git の履歴がそのまま記録になります。変更履歴のセクションを維持する必要はありません。Chorus へ
 コピーされることは**なく**、Chorus の識別子も持ちません。`status`（`draft`、`active`、`done`）は能力
-そのものを表します。変更が進行中なら `active`、デリバリー後に未完了の変更がなくなれば `done`、新しい変更が再び開きます。
+そのものを表します。変更が進行中なら `active`、デリバリー後に未完了の変更がなくなれば `done` になり、新しい変更が始まると再び `active` に戻ります。
 
-**変更ごとに 1 つの日付付きフォルダ `<capability-slug>/<YYYY-MM-DD>-<change-slug>/`。** 日付で時系列に
+**変更ごとに 1 つの日付付きフォルダ `<capability-slug>/<YYYY-MM-DD>-<change-slug>/`。** フォルダは日付で時系列に
 並びます。同日の異なる変更には異なる change slug を使ってください。中の各ファイルが Chorus の文書タイプ 1 つに対応し、
 `prd.md` は必須、`tech_design.md`、`adr.md`、`guide.md`、あるいは変更範囲の `spec.md` は必要なときだけ
 加えます。これらのファイルは Chorus へ**ミラーされます**。1 ファイルが 1 つの永続文書に対応し、モデルが
-打ち直すのではなくバイト単位で書き込まれるため、ローカルファイルと Chorus 文書は同一に保たれます。
+打ち直すのではなくファイルの内容がそのまま書き込まれるため、ローカルファイルと Chorus 文書は同一に保たれます。
 承認後の編集をミラーするたびにその文書のバージョンが上がり、それが git と並ぶ Chorus 側の記録になります。
 
 `tasks.md` はありません。課題は課題ドラフトとして Chorus に存在し、`spec.md` の受け入れ観点は意図の
@@ -100,7 +100,7 @@ Chorus 経由で進捗を報告します。こうすることで、共有フォ�
 
 Spec-lite は Chorus プラグインとともに Claude Code、Codex、Kiro、Pi、OpenClaw、dsh で提供されます。
 モードの規則は共通ですが、開始の仕組みは異なります。[OpenSpec ガイド](/ja/guides/openspec-mode/)を
-参照してください。スタンドアロンのスキル配布物には仕様モードのルーティングがなく、引き続き自由形式で編集します。
+参照してください。スタンドアロンのスキル配布物には仕様モードのルーティングがなく、引き続き自由形式の文書を書きます。
 
 ## エージェント向け
 
@@ -117,5 +117,3 @@ Spec-lite は Chorus プラグインとともに Claude Code、Codex、Kiro、Pi
   `openspec/changes/` もスキャフォールドしないでください。提案の説明には正確な
   `Spec-lite: .chorus/specs/<slug>/<YYYY-MM-DD>-<change-slug>/` の位置指定行を、独立した 1 行として
   末尾に句読点なしで付ける必要があります。
-- **出典。** `public/chorus-plugin/skills/spec-lite/SKILL.md`（権威あるスキル。2 つの開始用テンプレートを
-  ファイル内に掲載）と `public/chorus-plugin/bin/resolve-spec-mode.sh`（モード解決の単一の真実の源）。

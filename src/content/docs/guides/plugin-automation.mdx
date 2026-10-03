@@ -30,7 +30,7 @@ Reviewers inspect the work rather than change it. The proposal reviewer may use 
 shell commands such as `ls`, `rg`, `find`, and `git log/show/diff`, and must confirm a path is
 missing before reporting it as a blocker. It must not modify files, perform Git write
 operations, install dependencies, or run tests/builds. Task and code reviewers may also run
-the project's own test, build, and lint commands, on every surface including Kiro, where a
+the project's own test, build, and lint commands, on every runtime including Kiro, where a
 list of blocked commands stops file changes, Git writes, and installs.
 
 | Reviewer | Fires after | Reviews | Verdict posted on |
@@ -41,8 +41,7 @@ list of blocked commands stops file changes, Git writes, and installs.
 
 The code reviewer is the final ship-time gate: it runs only when the *last* task of an
 idea-rooted proposal is verified, and reviews the whole feature at once rather than a single
-task. The three matchers that trigger these prompts live in
-`public/chorus-plugin/hooks/hooks.json`.
+task.
 
 ### Follow findings across rounds
 
@@ -55,9 +54,9 @@ earlier finding under **Prior findings** with one of three states: `fixed`, `sti
 is still open *or* could not be re-verified keeps the verdict at `FAIL`; an open note never
 makes it worse than `PASS WITH NOTES`.
 
-Verdicts have no length cap: blocker evidence is written in full. Instead, the first round
-reports at most five notes and later rounds add no new notes, so each comment stays focused
-on what needs action.
+Verdicts have no length limit, so blocker evidence is written in full. To keep each comment
+focused on what needs action, the first round reports at most five notes and later rounds add
+no new notes.
 
 ### Wait for the current round's verdict
 
@@ -83,8 +82,7 @@ elaboration are audit context, not authorization to change the scope.
 Added scope, dropped requirements, or acceptance criteria that pass while missing the
 original requirement are blockers unless a cited human comment, answer, or explicit human
 override authorizes the change. The proposal reviewer checks the plan, the task reviewer
-checks the implementation, and the code reviewer checks the whole feature. This is a review
-skill rule using existing Idea, elaboration, and comment reads, not a new MCP tool.
+checks the implementation, and the code reviewer checks the whole feature.
 
 ### Turn reviewers on or off
 
@@ -102,10 +100,10 @@ to a human instead of looping:
 | `maxTaskReviewRounds` | number | `3` | Maximum task review rounds before escalating (`0` = unlimited) |
 | `maxCodeReviewRounds` | number | `3` | Maximum code-review rounds before escalating (`0` = unlimited) |
 
-Turning a reviewer off removes its independent quality check but reduces token usage. A
+Turning a reviewer off saves tokens but removes its independent quality check. A
 separate `enableOpenSpec` toggle governs OpenSpec mode, covered on its own page.
 
-:::caution[Only the toggle surface is Claude Code only]
+:::caution[Reviewer toggles exist only on Claude Code]
 Both Claude Code and Codex ship all three reviewers and fire the same three review prompts.
 What is Claude Code only is the `userConfig` **toggle surface** — the `enable*` switches and
 the round-limit settings in the table above. Codex has no `userConfig`, so on Codex these
@@ -122,8 +120,11 @@ judgment or prompting involved:
 
 - **`SessionStart`** — checks connectivity, checks the agent in, and discovers any session
   the plugin pre-created for it.
-- **`SubagentStart`** — creates or reuses a Chorus session named for the worker's agent type before it starts. Same-type workers can share it.
-- **`SubagentStop`** — releases the exiting worker's hold. Automatic task checkout, session closure, and eligible automatic verification wait until the last worker sharing that session exits.
+- **`SubagentStart`** — before a worker starts, creates or reuses a Chorus session named for
+  the worker's agent type. Workers of the same type can share it.
+- **`SubagentStop`** — releases the exiting worker's hold on the session. Automatic task
+  checkout, session closure, and eligible automatic verification wait until the last worker
+  sharing that session exits.
 - **Heartbeat and reminders** — an idle worker sends a heartbeat so its session is not
   marked inactive during long runs, and `PostToolUse` reminders nudge the main agent at the
   review points described above.
@@ -145,7 +146,7 @@ Instead, the agent routes every decision back **through Chorus**, where the resp
 human can respond asynchronously:
 
 - Post an evidence-rich **comment** on the task or proposal and **@mention** the responsible
-  human with the exact action you need (for example, admin verification).
+  human with the exact action the agent needs (for example, admin verification).
 - Use **elaboration** to record open questions on an idea rather than blocking on a live
   answer.
 
@@ -165,20 +166,21 @@ mechanics, not the set of reviewers:
 - **No `userConfig` toggle surface.** Codex exposes no `enable*` reviewer switches and no
   round-limit settings. The reviewer prompts are driven by Codex's skills and hooks
   directly, so they cannot be turned off at install time the way they can on Claude Code —
-  the code-review gateway, for instance, defaults on and has no toggle to disable it.
+  the code-review prompt, for instance, defaults on and has no toggle to disable it.
 - **Native spawning.** The main agent invokes a reviewer through Codex's own
   `spawn_agent` / `wait_agent` rather than Claude Code's Agent Teams, and there are no
   Codex equivalents for the `TeammateIdle` and `TaskCompleted` hooks.
 
-For the OpenClaw, Kiro, and Pi runtimes, treat automation as a difference-and-pointer: see
-each runtime's page under the [agent platforms reference](/reference/agents/) for what it
-supports rather than assuming the Claude Code behavior.
+Automation differs on the OpenClaw, Kiro, and Pi runtimes. Rather than assuming the Claude
+Code behavior, check each runtime's page under the
+[agent platforms reference](/reference/agents/) for what it supports.
 
 ## For agents
 
 - **Triggers:**
   - After `chorus_pm_submit_proposal`, a `PostToolUse` hook prompts you to spawn
-    `chorus:proposal-reviewer`; wait for completion, then read this round's `VERDICT:` comment on the proposal.
+    `chorus:proposal-reviewer`; wait for completion, then read this round's `VERDICT:`
+    comment on the proposal.
   - After `chorus_submit_for_verify`, spawn `chorus:task-reviewer`; read its `VERDICT:`
     comment on the task.
   - After `chorus_admin_verify_task` on the **last** task of an idea-rooted proposal, spawn
@@ -200,16 +202,3 @@ supports rather than assuming the Claude Code behavior.
     lifecycle hooks (`SessionStart`, `SubagentStart`, `SubagentStop`) manage it.
   - A **headless** daemon session must **not** use interactive prompts (`AskUserQuestion`
     and similar). Route decisions through Chorus comments + `@mention` and elaboration.
-- **Cite:**
-  - Hook events and `PostToolUse` matchers: `public/chorus-plugin/hooks/hooks.json`.
-  - Reviewer roles: `public/chorus-plugin/agents/proposal-reviewer.md`,
-    `public/chorus-plugin/agents/task-reviewer.md`,
-    `public/chorus-plugin/agents/code-reviewer.md`.
-  - `userConfig` toggles and round limits (Claude Code only):
-    `public/chorus-plugin/.claude-plugin/plugin.json`.
-  - Codex ships the same three reviewers with no `userConfig` surface:
-    `plugins/chorus/skills/chorus-code-reviewer/SKILL.md`,
-    `plugins/chorus/hooks/on-post-verify-task.sh` (the code-review gateway nudge), and
-    `plugins/chorus/.codex-plugin/plugin.json`.
-  - Hook-and-skill division: `docs/chorus-plugin.md`.
-  - Headless interaction guard: `docs/DAEMON.md` and the `develop` / `quick-dev` skills.

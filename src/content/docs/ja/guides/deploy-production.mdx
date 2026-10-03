@@ -7,7 +7,7 @@ sidebar:
   order: 22
 ---
 
-このガイドでは二つの本番デプロイ経路を扱います。グローバル npm パッケージを自前の PostgreSQL と Redis に対して実行する方法、そしてリポジトリのインストーラーで同梱の AWS スタックをプロビジョニングする方法です。単一マシンでの試用には、代わりに[はじめに](/ja/guides/getting-started/)を使ってください。コンテナデプロイについては、[Docker でデプロイ](/ja/guides/deploy-docker/)を参照してください。ブートストラップ資格情報、シングルサインオン、安全なアップグレードは[セルフホストの Chorus を運用する](/ja/guides/deploy-operations/)で扱います。
+このガイドでは二つの本番デプロイ方法を扱います。グローバル npm パッケージを自前の PostgreSQL と Redis に接続して実行する方法と、リポジトリのインストーラーで同梱の AWS スタックをプロビジョニングする方法です。単一マシンでの試用には、代わりに[はじめに](/ja/guides/getting-started/)を使ってください。コンテナデプロイについては、[Docker でデプロイ](/ja/guides/deploy-docker/)を参照してください。ブートストラップ用の認証情報、シングルサインオン、安全なアップグレードは[セルフホストの Chorus を運用する](/ja/guides/deploy-operations/)で扱います。
 
 ## 外部 PostgreSQL に対してグローバルパッケージを実行する
 
@@ -17,7 +17,7 @@ Web アプリケーションを実行するホスト上に、Chorus コマンド
 npm install --global @chorus-aidlc/chorus
 ```
 
-`DATABASE_URL` で既存の PostgreSQL データベースを Chorus に指し示し、必要な認証と秘密鍵の変数を与えてから起動します。
+`DATABASE_URL` で Chorus の接続先を既存の PostgreSQL データベースに指定し、必要な認証と秘密鍵の変数を設定してから起動します。
 
 ```sh
 DATABASE_URL='postgresql://chorus:password@db.internal:5432/chorus' \
@@ -27,7 +27,7 @@ SUPER_ADMIN_PASSWORD_HASH='$2b$10$...' \
 chorus
 ```
 
-起動時、Chorus は保留中のデータベースマイグレーションを自動的に適用し（`prisma migrate deploy`。`db:migrate` スクリプトとして公開されています）、その後 Web アプリケーションを `8637` ポートで提供します。データベースはすでに存在し到達可能でなければなりません。この経路では、Chorus はサーバーをあなたのために作成しません。
+起動時、Chorus は保留中のデータベースマイグレーションを自動的に適用し（`prisma migrate deploy`）、その後 Web アプリケーションを `8637` ポートで提供します。データベースはあらかじめ作成され、接続可能になっている必要があります。この方法では、Chorus はデータベースを作成しません。
 
 Chorus が本番実行で読み取る変数：
 
@@ -37,18 +37,18 @@ Chorus が本番実行で読み取る変数：
 | --- | --- | --- |
 | `DATABASE_URL` | はい | PostgreSQL 接続文字列、`postgresql://user:password@host:port/dbname`。 |
 | `NEXTAUTH_SECRET` | 複数インスタンスで必須 | 全レプリカが共有する署名用の秘密鍵。単一 npm インスタンスでは省略でき、`chorus` が既定で `~/.chorus-data/.secret` に生成・保存します。環境変数の既知のプレースホルダーは警告して無視します。保存済みの鍵が空または公開プレースホルダーなら起動を停止します。 |
-| `SUPER_ADMIN_EMAIL` | はい | `/admin` の SuperAdmin パネルをブートストラップするメール。 |
-| `SUPER_ADMIN_PASSWORD_HASH` | はい | SuperAdmin パスワードの bcrypt ハッシュ。 |
+| `SUPER_ADMIN_EMAIL` | はい | `/admin` のスーパー管理者パネルをブートストラップするメール。 |
+| `SUPER_ADMIN_PASSWORD_HASH` | はい | スーパー管理者パスワードの bcrypt ハッシュ。 |
 | `DEFAULT_USER` | 任意 | 初回アクセス用の組み込みメール／パスワードログインを有効にします。 |
 | `DEFAULT_PASSWORD` | 任意 | 組み込みログインのパスワード。 |
 | `REDIS_URL` | 任意 | Redis 接続文字列。複数のインスタンスを実行する場合は必須です（下記参照）。 |
 
 </div>
 
-これらのブートストラップ資格情報の仕組み、bcrypt ハッシュの生成方法、そして組み込みログインを無効にする方法については、[セルフホストの Chorus を運用する](/ja/guides/deploy-operations/)を参照してください。
+これらのブートストラップ用の認証情報の仕組み、bcrypt ハッシュの生成方法、そして組み込みログインを無効にする方法については、[セルフホストの Chorus を運用する](/ja/guides/deploy-operations/)を参照してください。
 
 :::caution[秘密情報は慎重に扱う]
-`NEXTAUTH_SECRET` と SuperAdmin の資格情報は完全なアクセス権を与えます。これらをシェルの履歴やソース管理から遠ざけ、共有ホスト上でインラインに入力するのではなく、プロセスマネージャー、systemd ユニット、または秘密ストア経由で与えてください。
+`NEXTAUTH_SECRET` とスーパー管理者の認証情報は完全なアクセス権を与えます。シェルの履歴やソース管理に残さないようにし、共有ホスト上でコマンドラインに直接入力するのではなく、プロセスマネージャー、systemd ユニット、またはシークレットストア経由で渡してください。
 :::
 
 ## 複数のインスタンスを実行する
@@ -59,17 +59,17 @@ Chorus は Redis を通じて、インスタンス間でライブ更新（SSE �
 REDIS_URL='redis://default:password@redis.internal:6379'
 ```
 
-**インスタンス間のイベント伝播には Redis が必須です。** `REDIS_URL` がないと、Chorus は単一プロセスにスコープされたメモリ内イベントバスにフォールバックします。あるインスタンスで行われた更新は、他のインスタンスには決して届きません。単一インスタンスのデプロイはそのメモリ内フォールバックで Redis なしに実行できますが、複数のインスタンスを持つデプロイは共有の Redis を必ず設定しなければなりません。
+**インスタンス間のイベント伝播には Redis が必須です。** `REDIS_URL` がないと、Chorus は単一プロセス内でのみ機能するメモリ内のイベントバスにフォールバックします。あるインスタンスで行われた更新は、他のインスタンスには決して届きません。単一インスタンスのデプロイなら、このメモリ内フォールバックを使って Redis なしで実行できますが、複数のインスタンスで動かすデプロイでは共有の Redis が必須です。
 
 全インスタンスに同じ安全な `NEXTAUTH_SECRET` も設定し、どのインスタンスでも Chorus 署名のセッションを検証できるようにしてください。
 
 ## AWS CDK スタックをデプロイする
 
-Chorus は `packages/chorus-cdk` の下に AWS CDK スタックを同梱し、それを対話的に駆動するリポジトリルートの `install.sh` を提供します。このスタックは、マネージドの PostgreSQL と Redis を備えた、HTTPS で前置された完全なデプロイを立ち上げます。
+Chorus には `packages/chorus-cdk` に AWS CDK スタックが同梱されており、リポジトリルートの `install.sh` で対話的にデプロイできます。このスタックは、マネージドの PostgreSQL と Redis を使い、HTTPS で公開される完全なデプロイを構築します。
 
 ### 前提条件
 
-`install.sh` は `aws`、`node`、`pnpm` と AWS 資格情報を確認します。先に `aws configure`
+`install.sh` は `aws`、`node`、`pnpm` と AWS 認証情報を確認します。先に `aws configure`
 または `AWS_PROFILE` を設定してください。証明書の要件は次のモードによって異なります。
 
 ### デプロイモードを選ぶ
@@ -79,15 +79,15 @@ Chorus は `packages/chorus-cdk` の下に AWS CDK スタックを同梱し、�
 - **`cloudfront`**：CloudFront が公開 HTTPS を提供し、VPC origin 経由でプライベート ALB の
   HTTP ポート 80 に転送します。既定の `*.cloudfront.net` ドメインには証明書の準備は不要です。
   カスタムドメインにはドメインと **`us-east-1`** の ACM 証明書を両方指定します。
-  キャッシュは無効で、認証済みページや API 応答はキャッシュしません。
+  認証済みページと API 応答のキャッシュは無効です。
 
-`./install.sh` で選ぶか、CDK に `-c deployMode=cloudfront` を渡します。`default_deploy.sh` も
-選択を保存します。非対話インストールでは `CHORUS_INSTALL_NONINTERACTIVE=1`、
+`./install.sh` で選ぶか、CDK に `-c deployMode=cloudfront` を渡します。選択は
+`default_deploy.sh` にも保存されます。非対話インストールでは `CHORUS_INSTALL_NONINTERACTIVE=1`、
 `DEPLOY_MODE=alb|cloudfront` と他の必須変数を設定します。DNS レコードは自動作成しません。
 カスタムドメインを `AlbDnsName` または `CloudFrontDomainName` の出力に向け、OIDC コールバック URL も更新します。
 
 :::caution[既存デプロイのモード変更]
-切り替えは ALB を置き換え、DNS 名も変更します。新しいスタックをデプロイし、データと DNS を移行して
+モードを切り替えると ALB が置き換えられ、DNS 名も変わります。新しいスタックをデプロイし、データと DNS を移行して
 検証した後、旧スタックを削除してください。`alb` を維持すれば既存の構成を維持できます。
 `cloudfront` の ALB は非公開なので、CloudFront URL、ECS ログ、ターゲットグループの状態で診断します。
 デプロイ先リージョンで CloudFront VPC origin が利用できることも確認してください。
@@ -111,32 +111,32 @@ Chorus は `packages/chorus-cdk` の下に AWS CDK スタックを同梱し、�
 | Stack name | いいえ | デフォルトは `Chorus`。 |
 | ACM Certificate ARN | モード次第 | `alb` はデプロイ先リージョンで必須。`cloudfront` はカスタムドメイン利用時のみ `us-east-1` の証明書が必須。 |
 | Custom domain | いいえ | `cloudfront` では `us-east-1` の証明書と同時に指定。省略時は配布ドメインを使用。 |
-| Super admin email | はい | `/admin` の SuperAdmin アカウントをブートストラップします。 |
+| Super admin email | はい | `/admin` のスーパー管理者アカウントをブートストラップします。 |
 | Super admin password | はい | 最低 8 文字。synth 時に bcrypt でハッシュされ、平文はテンプレートに保存されません。 |
 | NextAuth secret | いいえ | 空欄の場合は synth ごとに生成されます。再デプロイ後もセッションを維持するには、同じ永続的な値を指定してください。 |
 
-スタックは Secrets Manager で `NEXTAUTH_SECRET` を共有しますが、synth 時に既存値を読み戻しません。
-毎回、インストーラーか CDK の `nextAuthSecret` context に同じ値を指定してください。
-以前は空欄にしていた場合、再デプロイ前に Secrets Manager の既存値を引き継ぎ、意図しない変更を防いでください。
-
 </div>
+
+スタックは Secrets Manager で `NEXTAUTH_SECRET` を共有しますが、synth 時に既存の値を読み戻しません。
+デプロイのたびに、インストーラーか CDK の `nextAuthSecret` context に同じ値を指定してください。
+以前に空欄にしていた場合は、再デプロイの前に Secrets Manager の既存の値を控えて指定し、値が変わらないようにしてください。
 
 回答を集め終えると、`install.sh` は CDK パッケージをインストールしてビルドし、CDK 環境をブートストラップして、スタックをデプロイします。また、あなたの回答を含む再実行可能な `default_deploy.sh` を書き出すので、以降のデプロイでは再度尋ねられません。
 
 ### スタックがプロビジョニングするもの
 
-このスタック（`packages/chorus-cdk/lib/{chorus-stack,service,database,cache}.ts`）は以下を作成します。
+このスタックは以下を作成します。
 
 <div class="table-scroll" role="region" aria-label="CDK スタックのコンポーネント" tabindex="0">
 
-| コンポーネント | 何であるか | 主な設定 |
+| コンポーネント | 概要 | 主な設定 |
 | --- | --- | --- |
 | Application Load Balancer | `alb` は公開 HTTPS:443、`cloudfront` はプライベート HTTP:80 オリジン。 | ECS へ転送。アイドルタイムアウト 60 分。 |
 | CloudFront | `cloudfront` モードのみで作成する公開 HTTPS 入口。 | プライベート VPC origin、キャッシュ無効、任意のカスタムドメイン。 |
 | ECS Fargate サービス | プライベートサブネットで Chorus コンテナを実行します。 | 希望数 2、1024 CPU ユニット／2048 MiB、自動ロールバック付きのデプロイサーキットブレーカー。 |
-| Aurora Serverless v2（PostgreSQL） | マネージドの PostgreSQL クラスター。 | 暗号化ストレージ。資格情報は自動生成され Secrets Manager に格納。バックアップ保持 1 日。 |
+| Aurora Serverless v2（PostgreSQL） | マネージドの PostgreSQL クラスター。 | 暗号化ストレージ。認証情報は自動生成され Secrets Manager に格納。バックアップ保持 1 日。 |
 | ElastiCache Serverless（Redis） | インスタンス間イベント用のマネージド Redis。 | RBAC ユーザー。パスワードは Secrets Manager に格納。 |
-| Secrets Manager | 生成されたデータベースおよび Redis の資格情報と、アプリの秘密情報を保持します。 | 実行時に ECS タスクへ注入されます。 |
+| Secrets Manager | 生成されたデータベースおよび Redis の認証情報と、アプリの秘密情報を保持します。 | 実行時に ECS タスクへ注入されます。 |
 
 </div>
 
@@ -152,4 +152,4 @@ Chorus は `packages/chorus-cdk` の下に AWS CDK スタックを同梱し、�
 
 </div>
 
-`packages/chorus-cdk` がこのスタックの権威ある出典です。正確なリソース定義が必要なとき、あるいは容量、保持期間、ネットワーキングを調整したいときは、そこを参照してください。
+`packages/chorus-cdk` がこのスタックの正となる定義です。正確なリソース定義が必要なとき、あるいは容量、保持期間、ネットワーキングを調整したいときは、そこを参照してください。

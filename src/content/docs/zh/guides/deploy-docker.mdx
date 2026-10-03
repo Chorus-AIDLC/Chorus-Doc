@@ -7,9 +7,9 @@ sidebar:
   order: 21
 ---
 
-Chorus 提供了官方 Docker 镜像 **`chorusaidlc/chorus-app`**。本指南展示两种 Compose 形态：
-独立（内置数据库）与生产（外部 PostgreSQL + Redis），一个对接现有数据库的 `docker run`
-示例、完整的环境变量参考，以及容器启动时的行为。
+Chorus 提供了官方 Docker 镜像 **`chorusaidlc/chorus-app`**。本指南包括：两种 Compose 形态，
+即独立（内置数据库）与生产（外部 PostgreSQL + Redis）；一个对接现有数据库的 `docker run`
+示例；完整的环境变量参考；以及容器启动时的行为。
 
 先拉取镜像：
 
@@ -22,7 +22,7 @@ docker pull chorusaidlc/chorus-app:latest
 ## 独立（内置数据库）
 
 无需外部数据库。镜像内置了 [PGlite](https://pglite.dev)（嵌入式 PostgreSQL），并会自动启动
-一切。数据保存在 Docker 卷中，可在容器重启后持久保留。
+所需的一切。数据保存在 Docker 卷中，可在容器重启后持久保留。
 
 创建 `docker-compose.local.yml`：
 
@@ -63,9 +63,9 @@ docker compose -f docker-compose.local.yml up -d
 
 - 在内部端口（`5433`）上启动 PGlite，不对外暴露。
 - 将数据存放在 `chorus-local-data` Docker 卷中，因此可在重启后持久保留。
-- 当 `NEXTAUTH_SECRET` 留空时，在首次启动生成一个随机的会话签名密钥并保存在同一个卷中（参见
+- 当 `NEXTAUTH_SECRET` 留空时，在首次启动时生成一个随机的会话签名密钥并保存在同一个卷中（参见
   [会话密钥](#会话密钥nextauth_secret)）。
-- 禁用 Redis（回退到内存 EventBus，仅支持单实例）。
+- 禁用 Redis（回退到进程内的内存事件总线，仅支持单实例）。
 - 在启动时自动执行 Prisma 迁移。
 
 ## 生产（外部 PostgreSQL + Redis）
@@ -219,7 +219,7 @@ docker run -d \
 
   | 变量 | 说明 |
   | --- | --- |
-  | `DEFAULT_USER` | 内置登录的邮箱地址（绕过 OIDC）。首次登录时自动创建该用户及公司。 |
+  | `DEFAULT_USER` | 内置登录的邮箱地址（绕过 OIDC）。首次登录时自动创建该用户及其工作区。 |
   | `DEFAULT_PASSWORD` | 默认用户的密码（明文，运行时通过 bcrypt 比对）。 |
   | `NEXTAUTH_URL` | 应用对外的基础 URL（默认：`http://localhost:8637`）。在反向代理后运行时请设置此项。 |
   | `COOKIE_SECURE` | 设为 `"false"` 可为纯 HTTP 部署禁用安全 Cookie（docker-compose 中默认为 `"false"`）。以 HTTPS 部署到生产环境时设为 `"true"`。 |
@@ -267,19 +267,19 @@ docker run -d \
 :::note[迁移自动执行]
 你无需自行执行迁移。在启动时应用待处理的迁移是入口脚本的一部分，因此升级就是用新版镜像对接
 同一个数据库并启动它。由于新镜像可能在首次启动时迁移你的数据库结构，请在升级前备份数据库或
-数据卷，参见[运维](/zh/guides/deploy-operations/)。
+数据卷，参见[运维自托管的 Chorus](/zh/guides/deploy-operations/)。
 :::
 
 ## 会话密钥（`NEXTAUTH_SECRET`）
 
-`NEXTAUTH_SECRET` 签发 Chorus 自己的 `user_session`（内置登录）和 `admin_session`（超级管理员）JWT。
-OIDC token 由身份提供方签名，Agent API key 也单独校验。轮换此密钥会使 Chorus 自签名会话失效，
-不会轮换 API key，也不会使身份提供方的 OIDC token 失效。
+`NEXTAUTH_SECRET` 用于签发 Chorus 自己的会话 JWT（内置登录和超级管理员登录）。
+OIDC 令牌由身份提供方签名，智能体 API 密钥也单独校验。轮换此密钥会使 Chorus 自签名会话失效，
+不会轮换 API 密钥，也不会使身份提供方的 OIDC 令牌失效。
 
 :::caution[从 0.18.0 或更早版本升级]
 如果部署此前使用公开占位密钥，0.18.1 会忽略该值，改为复用或生成私有密钥。
-使用受影响的 Chorus 自签名会话的用户需要重新登录。入口脚本会保留显式传入的安全密钥，
-复用同一值即可避免因密钥轮换要求重新登录。CDK 重新部署时需显式保留 `nextAuthSecret`，
+受影响的 Chorus 自签名会话随之失效，相关用户需要重新登录。显式传入的安全密钥会原样保留，
+继续使用该值，用户就无需重新登录。CDK 重新部署时需显式保留 `nextAuthSecret`，
 参见 [CDK 密钥配置](/zh/guides/deploy-production/)。
 
 旧 Compose 文件若未挂载 `/app/data`，每次容器重建都会丢失生成的密钥。
@@ -300,11 +300,11 @@ OIDC token 由身份提供方签名，Agent API key 也单独校验。轮换此�
 ### 设置与轮换密钥
 
 用 `openssl rand -base64 32` 生成一次，存入部署的密钥库或受保护的 `.env`，后续启动复用。
-有效密钥改变后，内置登录用户和超级管理员需要重新登录。删除 `.secret` 只会影响自动生成的密钥；
+有效密钥改变后，内置邮箱／密码登录的用户和超级管理员需要重新登录。删除 `.secret` 只会影响自动生成的密钥；
 已显式配置密钥时，删除该文件不会轮换密钥。
 
 Docker 入口脚本和 npm `chorus` 启动器会自动处理密钥。直接用 `next start` 或 `node server.js`
-启动时不会自动生成，需自行配置安全密钥。应用发现已知占位值会记录错误，但警告本身不会替换该值；
+启动时不会自动生成，需自行配置安全密钥。应用遇到已知占位值时会记录错误，但不会替换该值；
 未设置密钥时，无法签发 Chorus 自签名会话。
 
 ## 镜像细节
@@ -315,7 +315,7 @@ Docker 入口脚本和 npm `chorus` 启动器会自动处理密钥。直接用 `
 
 ## 后续步骤
 
-- **[生产部署](/zh/guides/deploy-production/)**：从全局 npm 包运行，以及完整的 AWS CDK
+- **[生产环境部署](/zh/guides/deploy-production/)**：从全局 npm 包运行，以及完整的 AWS CDK
   演练。
-- **[运维](/zh/guides/deploy-operations/)**：首次登录引导、部署侧身份认证，以及升级前的
+- **[运维自托管的 Chorus](/zh/guides/deploy-operations/)**：首次登录引导、部署侧身份认证，以及升级前的
   备份。

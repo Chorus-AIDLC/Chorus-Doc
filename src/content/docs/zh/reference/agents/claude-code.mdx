@@ -1,13 +1,13 @@
 ---
 title: Claude Code
-description: 安装并验证 Claude Code 的 Chorus 第一方集成。
+description: 把 Claude Code 连接到 Chorus，并可选择让它接受远程工作。
 docsLocale: zh
 route: /zh/reference/agents/claude-code/
 ---
 
-# Claude Code
+Claude Code 有 Chorus 官方插件。它在交互式 Claude Code 会话中提供 Chorus 工具和工作流技能，也可以作为受支持的 Chorus 后台服务后端运行。
 
-Claude Code 是 Chorus 第一方支持的运行后端。安装插件后，你可以在 Claude Code 中使用 Chorus 工具和技能；安装 Chorus 后台服务后，还可以从 Chorus 远程启动、查看、中断和恢复会话。
+安装前，请按照[为智能体创建访问权限](/zh/guides/administrator-setup/)创建智能体密钥。
 
 ## 安装插件
 
@@ -41,52 +41,53 @@ export CHORUS_API_KEY="cho_REDACTED"
 
 ## 启用远程启动
 
-如果只在 Claude Code 终端中使用 Chorus，可以跳过这一步。需要从 Chorus
-远程发起工作时，请按照[连接智能体运行环境](/zh/guides/operator-onboarding/)
-选择 `claude-code` 运行后端。先在前台确认连接无误，再按照
-[管理后台服务](/zh/guides/daemon-operations/)让它保持在线。
+如果只在交互式 Claude Code 会话中使用 Chorus，可以跳过这一节。否则，请按照
+[连接智能体运行环境](/zh/guides/operator-onboarding/)选择 `claude-code` 作为运行后端。
+先在前台确认连接无误，再按照[管理后台服务](/zh/guides/daemon-operations/)让它保持在线。
 
 ## 0.20.0 的 daemon 行为
 
-每次唤醒仍启动一个 `claude -p` 进程，回合结束后退出。Chorus 现在使用双向 **stream-json** 输入输出，保持连接以处理控制响应。已有会话与 `claude --resume` 仍可使用；没有纯文本回退或传输切换选项。已在 Linux 上使用 Claude Code **2.1.283 和 2.1.284** 做真实运行验证；这是已验证版本，不代表所有 Claude 版本的最低兼容承诺。
+每次唤醒仍启动一个 `claude -p` 进程，回合结束后退出。Chorus 现在使用双向 **stream-json** 输入输出，保持连接以处理控制响应。已有会话与 `claude --resume` 仍可使用；没有纯文本回退或传输切换选项。该行为已在 Linux 上用 Claude Code **2.1.283 和 2.1.284** 实际验证；请把它们视为已测试的版本，而不是对所有 Claude Code 版本的最低版本保证。
 
-- **中断**：daemon 先发送协议中断。若进程未在 `sigintTimeoutMs` 内停止，则强制终止进程树，现有默认值为 10 秒。Windows 清理有平台测试覆盖，未做真实 Windows 运行验证。
+- **打断**：后台服务先发送协议中断。若进程未在 `sigintTimeoutMs` 内停止，则强制终止进程树。默认值仍为 10 秒。
 - **受限工具**：`--chorus-only` 模式会明确拒绝非 Chorus 工具，并提示智能体使用 Chorus 工具或通过 Chorus 评论提问。日志只标出被拒绝的工具名称，不记录其输入。YOLO 行为不变。
-- **提问**：所有 daemon 唤醒（包括 YOLO）都会禁用 `AskUserQuestion`，因为终端前无人回答。智能体应使用 Chorus 评论或澄清流程；交互式 Claude Code 会话仍使用正常提问流程。
+- **提问**：所有后台服务唤醒（包括 YOLO）都会禁用 `AskUserQuestion`，因为终端前无人回答。智能体应通过 Chorus 评论或需求细化提问；交互式 Claude Code 会话仍保留正常的提问流程。
 
-升级后，请用主机上实际安装的 Claude Code 版本验证签到、追加一轮消息，以及中断和恢复。协议问题可通过 [daemon 日志](/zh/guides/daemon-operations/)排查，继续会话的步骤见[会话恢复](/zh/guides/session-recovery/)。
+升级后，请用主机上实际安装的 Claude Code 版本验证签到、追加一轮对话，以及中断和恢复。协议故障可通过[后台服务日志](/zh/guides/daemon-operations/)排查；如何继续会话，见[中断与恢复会话](/zh/guides/session-recovery/)。
 
 ## 验证连接
 
-1. 在 Claude Code 中运行 `/plugin list`，确认 `chorus@chorus-plugins` 已启用。
-2. 输入 `check in to chorus`，确认 `chorus_checkin` 返回正确的智能体身份和权限。
-3. 如果启用了远程启动，在 Chorus 的在线智能体列表中确认运行后端和工作目录均已显示。
+在 Claude Code 中运行 `/plugin list`，确认 `chorus@chorus-plugins` 已启用。然后让 Claude Code
+执行 `check in to chorus`。成功的响应会显示所连接的智能体及其权限。
+
+使用后台服务模式时，在 Chorus 中打开**设置 → 智能体**，确认预期的主机和工作目录处于在线状态。
 
 ## 能力与限制
 
-- Chorus 官方维护插件、MCP 工具、工作流技能和生命周期钩子。
-- 后台服务支持远程启动会话、追加指令、中断和恢复。
-- 远程任务继承运行后台服务的本地用户权限，因此只注册必要的工作目录。
-- 管理员预设适合需要审批方案或验证任务的智能体；普通开发工作优先使用开发者预设。
+- 插件提供 Chorus MCP 工具、工作流技能和生命周期集成。
+- 后台服务模式支持远程启动、追加指令、中断和恢复。
+- 远程工作可以访问本地操作系统用户在已注册工作目录内能访问的一切。只注册你信任的目录。
+
+通用的操作流程见[从 Chorus 发起远程工作](/zh/guides/remote-control/)和[中断与恢复会话](/zh/guides/session-recovery/)。
 
 ## 从终端恢复会话
 
-要在自己的终端里接管正在进行的会话，先在对话界面复制它的 session id（对话记录顶部的复制 session ID），然后在该会话原本的工作目录下运行：
+要在自己的终端里接管正在进行的对话，先在对话界面复制它的会话 ID（对话记录顶部的**复制 session ID**），然后在该对话的工作目录下运行：
 
 ```bash
 claude --resume <sessionId>
 ```
 
-复制到的 id 与 Chorus 恢复会话时传给 Claude Code 的 id 一致；对于 Claude Code 运行后端，它就是对应直接想法的 UUID。完整流程见[中断与恢复会话](/zh/guides/session-recovery/#从终端接管会话)。
+复制的 ID 与 Chorus 恢复会话时传给 Claude Code 的 ID 相同；对于 Claude Code 运行后端，它就是该会话所属想法的 UUID。完整流程见[中断与恢复会话](/zh/guides/session-recovery/#从终端接管会话)。
 
 ## 常见问题
 
-- **插件命令不存在**：重新启动 Claude Code，并用 `/plugin list` 检查插件是否启用。
-- **`chorus_checkin` 返回 `401`**：创建或轮换智能体密钥，然后重新运行 `chorus agents add`（或更新 `~/.claude/settings.json` 中的 `env` 块），再重新启动 Claude Code。
-- **在线智能体列表中没有 Claude Code**：运行 `chorus daemon status`；需要进一步排查时运行 `chorus daemon logs`。
-- **工作目录错误**：使用正确的绝对路径重新执行 `chorus daemon install --agent claude-code --cwd ...`。
+- **插件没有出现**：重新启动 Claude Code，然后检查 `/plugin list`。
+- **签到返回未授权**：创建或轮换智能体密钥，然后重新运行 `chorus agents add`（或更新 `~/.claude/settings.json` 中的 `env` 块），再重新启动 Claude Code。
+- **后台服务离线**：运行 `chorus daemon status`，然后参阅[排查智能体连接故障](/zh/guides/troubleshooting/)。
+- **在线的工作目录不对**：用正确的绝对路径作为 `--cwd` 重新安装后台服务。
 
-## 子代理会话
+## 子智能体会话
 
-插件管理的子代理会话使用 Agent 类型作为名称。同类型的并行子代理可以共享 Chorus 会话，
-最后一个子代理结束后才会关闭，避免一个子代理退出时提前结束其他子代理的工作记录。
+插件管理的子智能体会话以智能体类型作为名称。同类型的并行子智能体可以共享一个 Chorus 会话，
+该会话在最后一个子智能体结束后才会关闭，从而避免一个子智能体退出时提前结束其他子智能体被追踪的工作。

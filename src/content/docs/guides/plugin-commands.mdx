@@ -38,7 +38,7 @@ $yolo
 
 Throughout this page commands are written in the Claude Code form (`/chorus:develop`). On
 Codex, substitute the `$` form (`$develop`). The other runtimes — OpenClaw, Kiro, Pi —
-carry the same skills; see their pages under [Set up agents](/reference/agents/) for any
+carry the same skills; see their pages under [Agent platforms](/reference/agents/) for any
 runtime-specific invocation notes.
 
 ## `/chorus` — routing and setup
@@ -63,7 +63,7 @@ At a glance:
 | `/chorus:idea` | `idea:write` (resolving elaboration needs `idea:admin`) | A claimed idea with resolved elaboration, ready to plan |
 | `/chorus:proposal` | `proposal:write` + `document:write` | A submitted proposal — document drafts + task DAG (`draft` → `pending`) |
 | `/chorus:develop` | `task:write` | A task carried to `to_verify` with work reports and self-checked acceptance criteria |
-| `/chorus:review` | `proposal:admin` + `task:admin` | Approved proposals (drafts materialize) and verified tasks (→ `done`) |
+| `/chorus:review` | `proposal:admin` + `task:admin` | Approved proposals (drafts become real documents and tasks) and verified tasks (→ `done`) |
 | `/chorus:quick-dev` | `task:write` (self-verify needs `task:admin`) | Standalone or proposal-attached tasks driven to `to_verify` / `done` |
 | `/chorus:yolo` | Admin-preset key (write on every resource + `proposal:admin` + `task:admin`) | A whole idea driven from prompt to done, plus a completion report |
 
@@ -77,7 +77,7 @@ $idea            # Codex
 - **Trigger:** You have an open idea to shape into requirements — claim it, then run
   structured elaboration rounds.
 - **Requires:** `idea:write` to claim and run elaboration. Resolving the elaboration (the
-  commit gate) additionally needs `idea:admin`; a `pm_agent`-preset key must hand that
+  commit gate) additionally needs `idea:admin`; a **PM**-preset key must hand that
   step to an admin-preset key.
 - **Produces:** A claimed idea with answered, resolved elaboration rounds — ready for
   `/chorus:proposal`. See [Capture an idea](/guides/capture-an-idea/).
@@ -104,14 +104,14 @@ $proposal        # Codex
 $develop         # Codex
 ```
 
-- **Trigger:** Approved tasks exist and you are ready to implement one. A
-  `start_development` wake asks you to clear all remaining tasks of an idea in dependency
-  order.
+- **Trigger:** Approved tasks exist and you are ready to implement one. When a human starts
+  development on an idea from Chorus (a `start_development` request), the agent works through
+  all of the idea's remaining tasks in dependency order.
 - **Requires:** `task:write` to claim, report work, self-check acceptance criteria, and
   submit.
-- **Produces:** A task moved `claim → in_progress → to_verify`, with work reports and
-  self-checked acceptance criteria. On submit, the hook prompts spawning the task
-  reviewer. See [Run tasks](/guides/run-tasks/).
+- **Produces:** A task claimed and moved `in_progress` → `to_verify`, with work reports and
+  self-checked acceptance criteria. On submit, a hook prompts the main agent to spawn the
+  task reviewer. See [Run tasks](/guides/run-tasks/).
 
 ### `/chorus:review` — review and governance
 
@@ -124,9 +124,9 @@ $review          # Codex
   admin (the human proxy role).
 - **Requires:** `proposal:admin` to approve or close proposals, and `task:admin` to
   verify, reopen, or close tasks and mark acceptance criteria. A full admin-preset key
-  holds both, plus the governance bits for closing ideas and documents.
-- **Produces:** Approved proposals (their document and task drafts materialize into real
-  entities) and verified tasks (`to_verify` → `done`), or rejected and reopened items with
+  holds both, plus the governance permissions for closing ideas and documents.
+- **Produces:** Approved proposals (their document and task drafts become real documents
+  and tasks) and verified tasks (`to_verify` → `done`), or rejected and reopened items with
   feedback. See [Review a proposal](/guides/review-a-proposal/) and
   [Verify and complete](/guides/verify-and-complete/).
 
@@ -154,11 +154,12 @@ $yolo <prompt>                               # Codex
 ```
 
 - **Trigger:** You want the whole pipeline run unattended from a natural-language prompt.
-  A `yolo_requested` wake resumes an existing idea from whatever phase it is in.
+  A `yolo_requested` request from Chorus resumes an existing idea from whatever phase it is
+  in.
 - **Requires:** An **Admin-preset** API key — write on every resource plus `proposal:admin`
   and `task:admin` (concretely `idea:write`, `proposal:write` + `proposal:admin`,
   `task:write` + `task:admin`, and `project:write`). The skill aborts at startup if any
-  bit is missing.
+  permission is missing.
 - **Produces:** A complete run — project (if none is given), idea, self-elaboration,
   proposal, wave-based task execution, reviewer loops, admin verification, and a mandatory
   completion report. It never merges or pushes a PR without explicit human approval.
@@ -166,9 +167,9 @@ $yolo <prompt>                               # Codex
 ## For agents
 
 - **Triggers:** `/chorus` (`$chorus`) for routing and role discovery; each stage command
-  fires when its stage is reached, or on a human wake — `start_development` resumes
-  `/chorus:develop` for all remaining tasks of an idea, and `yolo_requested` resumes
-  `/chorus:yolo` from the idea's current phase.
+  fires when its stage is reached, or when a human starts it from Chorus:
+  `start_development` resumes `/chorus:develop` for all remaining tasks of an idea, and
+  `yolo_requested` resumes `/chorus:yolo` from the idea's current phase.
 - **Constraints:**
   - Tool *visibility* follows the key's permission set, but handler guards still apply —
     for example only a task's assignee can `chorus_submit_for_verify` even with
@@ -180,7 +181,3 @@ $yolo <prompt>                               # Codex
     surface differs by runtime — see [Automation behaviors](/guides/plugin-automation/).
   - Never merge or push a PR without explicit human approval, including under
     `/chorus:yolo`.
-- **Cite:** the Skill Routing and preset/permission tables in
-  `public/chorus-plugin/skills/chorus/SKILL.md`; the per-stage skills
-  `public/chorus-plugin/skills/{idea,proposal,develop,review,yolo,quick-dev}/SKILL.md`; and
-  the Codex `$`-command cheat sheet in `plugins/chorus/README.md`.

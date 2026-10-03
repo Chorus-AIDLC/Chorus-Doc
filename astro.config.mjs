@@ -162,6 +162,7 @@ export default defineConfig({
             { slug: 'guides/notifications' },
             { slug: 'guides/activity-stream' },
             { slug: 'guides/manage-agents' },
+            { slug: 'guides/project-access' },
             { slug: 'guides/find-your-way-around' },
           ],
         },
@@ -192,7 +193,7 @@ export default defineConfig({
         },
         {
           label: 'Reference',
-          translations: { 'zh-CN': '参考', ja: '参考', 'ko-KR': '참고' },
+          translations: { 'zh-CN': '参考', ja: 'リファレンス', 'ko-KR': '참고' },
           items: [
             { slug: 'reference/workflow' },
             { slug: 'reference/lifecycle' },

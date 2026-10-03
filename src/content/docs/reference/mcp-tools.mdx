@@ -29,7 +29,7 @@ by a fresh per-request server instance — there is no server-side session, no
 recover a "session not found" state; it simply sends its key on every request. Two
 consequences follow:
 
-- **Permissions are recomputed per request.** Rotating an agent's permissions in the UI
+- **Permissions are recomputed per request.** Changing an agent's permissions in the UI
   takes effect on the very next call, with no reconnect.
 - **The agent key alone determines the tool list.** The set of tools returned by
   `tools/list` is derived from the key's effective permissions on each request.
@@ -50,20 +50,20 @@ Configure it in a client's MCP config as an `http` server. A minimal `.mcp.json`
 }
 ```
 
-From a shell, the `chorus mcp call <tool>` command calls any of these tools with the same
-agent credential — a token-free path for scripts and one-off calls. See
+From a shell, `chorus mcp call <tool>` calls any of these tools with the same agent
+credential, so scripts and one-off calls can use them without spending model tokens. See
 [The chorus CLI](/reference/cli/).
 
 :::note
-The MCP transport session is unrelated to a Chorus **AgentSession**. AgentSessions are a
-separate observability construct for swarm-mode sub-agents, created and tracked through the
+The MCP transport session is unrelated to a Chorus **agent session**. Agent sessions track
+swarm-mode sub-agents so you can see their work, and are created and managed through the
 session tools below.
 :::
 
 ## Scoping by project
 
-An agent that works across many projects can narrow every scope-aware result to a subset by
-sending scoping headers on the MCP connection:
+An agent that works across many projects can limit results to certain projects by sending
+scoping headers on the MCP connection:
 
 <div class="table-scroll" role="region" aria-label="Project scoping headers" tabindex="0">
 
@@ -75,8 +75,8 @@ sending scoping headers on the MCP connection:
 </div>
 
 With no header, results span all projects (the default). When **both** headers are present,
-`X-Chorus-Project-Group` wins. Scoping affects `chorus_get_my_assignments`, which returns a
-per-project tracker filtered to the scoped project(s). `chorus_checkin`'s `ideaTracker` is
+`X-Chorus-Project-Group` wins. Only `chorus_get_my_assignments` honors these headers; it
+returns a per-project tracker filtered to the scoped project(s). `chorus_checkin`'s `ideaTracker` is
 **not** header-filtered — it always returns the agent's most recent ideas across every
 project (capped at ten). Every other tool takes an explicit `projectUuid` argument and is
 not header-scoped.
@@ -118,8 +118,42 @@ added on top:
 </div>
 
 Visibility is not the same as authorization. A tool can be visible yet still refuse an
-operation at the handler level — for example, the operational status transitions on a task
+operation when it runs — for example, the operational status transitions on a task
 require the caller to be that task's assignee, regardless of who can see the tool.
+
+## Project access
+
+Permission bits decide which tools an agent has. **Project access** decides where it can use
+them. An agent acts with its owner's access to each project (see
+[Control who can see a project](/guides/project-access/)); an agent without an owner can only
+use public projects. Both checks apply on every call.
+
+- **Hidden means not found.** If the owner cannot access a private project, the project and
+  everything in it (ideas, proposals, documents, tasks, and comments) are left out of lists
+  and search, and return the same not-found error as an ID that does not exist.
+- **Too low a role means forbidden.** Where the owner's role is too low (for example, a
+  Viewer writing, or an Editor doing an Admin-only action in a private project), the call
+  fails with a forbidden error; reads still work. Retrying will not help until the owner's
+  role changes.
+- `chorus_get_project` reports the project's `visibility` and the caller's `accessLevel`
+  (`viewer`, `editor`, or `admin`).
+- `chorus_admin_create_project` and `chorus_admin_create_project_group` accept
+  `visibility` (`public` or `private`). The owner becomes the Admin of what is created. A
+  project created in a private group is private.
+- `chorus_admin_update_project_group` can change a group's `visibility` and manage one
+  explicit group member at a time (`memberAction`: `add`, `update`, or `remove`, with
+  `userUuid` and `role`). `chorus_admin_move_project_to_group` moves or ungroups a project.
+  When you change a group's `visibility` or move a project, call the tool with
+  `preview: true` first to get the access impact and a `confirmationToken`, then repeat the
+  same change with that token. Member changes apply directly, without a preview.
+- Changing a group's visibility or members needs the owner to be a group Admin. Moving a
+  private project, moving a project into or out of a private group, or widening anyone's
+  access needs Admin; other moves need Editor.
+- `chorus_search_mentionables` takes optional `entityType` and `entityUuid`. Pass them when
+  mentioning from an idea, proposal, document, or task so only people who can see it are
+  suggested.
+- Project members and an existing project's visibility are managed in the web UI; there is
+  no MCP tool for them.
 
 ## Tool categories
 
@@ -128,7 +162,7 @@ require the caller to be that task's assignee, regardless of who can see the too
   | Category | Gate | What it covers |
   | --- | --- | --- |
   | **Public** | None — always visible | Discovery and reads (`chorus_get_*`, `chorus_list_*`, `chorus_search*`), `chorus_checkin`, `chorus_get_my_assignments`, comments, elaboration answers, notifications, plus `chorus_create_tasks` and `chorus_update_task`. |
-  | **Session** | None — always visible | AgentSession lifecycle for swarm-mode workers: `chorus_create_session`, `chorus_session_checkin_task` / `chorus_session_checkout_task`, `chorus_session_heartbeat`, `chorus_close_session`, `chorus_reopen_session`, `chorus_list_sessions`, `chorus_get_session`. |
+  | **Session** | None — always visible | Agent session lifecycle for swarm-mode workers: `chorus_create_session`, `chorus_session_checkin_task` / `chorus_session_checkout_task`, `chorus_session_heartbeat`, `chorus_close_session`, `chorus_reopen_session`, `chorus_list_sessions`, `chorus_get_session`. |
   | **Developer** | `task:write` | Claim, release, report on, and submit tasks for verification. |
   | **PM** | `idea:write`, `proposal:write`, `document:write`, `project:write` | Author and run ideas, elaboration, proposals, documents, and references. |
   | **Admin** | `*:admin` (and `project:write` for project/group creation) | Approve proposals, verify/reopen/close tasks, mark acceptance criteria, delete entities, manage projects and groups. |
@@ -136,22 +170,20 @@ require the caller to be that task's assignee, regardless of who can see the too
 </div>
 
 :::caution
-`chorus_create_report` looks public — it has no `pm_` prefix and lives in the public-namespaced
-module — but it **is gated on `document:write`**. It appears only for agents that hold that
-bit (the `pm_agent` / `admin_agent` presets, or a developer agent with `document:write` added
-as a custom permission). Do not treat it as an ungated public tool.
+`chorus_create_report` looks public — it has no `pm_` prefix — but it **is gated on
+`document:write`**. It appears only for agents that hold that bit (the `pm_agent` /
+`admin_agent` presets, or a developer agent with `document:write` added as a custom
+permission). Do not treat it as an ungated public tool.
 :::
 
-`chorus_create_tasks` and `chorus_update_task` are genuinely public: field, dependency, and
-acceptance-criteria edits are open to any agent because handler-level assignee guards enforce
-who can actually mutate operational state. A task's `in_progress` / `to_verify` status
-transitions still require the caller to be the assignee.
+`chorus_create_tasks` and `chorus_update_task` are genuinely public: any agent can edit a
+task's fields, dependencies, and acceptance criteria, but only the task's assignee can move
+it to `in_progress` or `to_verify`.
 
 ## High-frequency tools
 
-A representative subset, with input, return shape, and the required permission. The complete
-per-tool contract for every tool lives in the source of truth described at the end of this
-page.
+A representative subset, with input, return shape, and the required permission. For the
+complete contract of every tool, see the note at the end of this page.
 
 ### chorus_checkin — public
 
@@ -236,9 +268,9 @@ Return: updated Task (or an error when the acceptance-criteria gate blocks it)
 
 ## Gated-tool → required-permission matrix
 
-Every permission-gated tool and its single required bit. Possessing the bit — via preset or
-custom permission — is the necessary condition for the tool to appear; handler-level guards
-(ownership, assignee, status) may still apply on top.
+Every permission-gated tool and its single required bit. Holding the bit, through a preset
+or a custom permission, is required for the tool to appear; the tool may still check
+ownership, assignee, or status when it runs.
 
 <div class="table-scroll" role="region" aria-label="Gated tool to required permission" tabindex="0">
 
@@ -258,7 +290,6 @@ custom permission — is the necessary condition for the tool to appear; handler
 
 :::note
 The **authoritative, complete** tool list is the running server's own `tools/list` response
-— each tool's live self-description — together with `docs/MCP_TOOLS.md` in the repository.
-This page is a categorized guide to that surface, not a byte-for-byte transcription of every
-tool. When a self-description and this page disagree, the server is correct.
+— each tool's live self-description. This page is a categorized guide to that surface, not a
+byte-for-byte transcription of every tool. When a self-description and this page disagree, the server is correct.
 :::

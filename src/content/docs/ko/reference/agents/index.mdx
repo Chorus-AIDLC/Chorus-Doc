@@ -5,29 +5,27 @@ docsLocale: ko
 route: /ko/reference/agents/
 ---
 
-# 에이전트 플랫폼
-
-이미 사용하는 에이전트를 먼저 고른 다음, 그 에이전트에서 Chorus로 원격으로 작업을
+이미 사용하는 에이전트를 먼저 고른 다음, Chorus에서 그 에이전트로 원격으로 작업을
 시작해야 하는지도 함께 결정합니다.
 
-| 플랫폼 | 지원 제공 | 적합한 용도 | 원격 시작 | 상시 런타임 |
+| 플랫폼 | 지원 주체 | 적합한 용도 | 원격 시작 | 상시 런타임 |
 | --- | --- | --- | --- | --- |
 | [Claude Code](./claude-code/) | Chorus 팀 | 완전한 Chorus 워크플로를 원하는 Claude Code 사용자 | 지원(Chorus 데몬 사용) | Chorus 데몬 |
 | [Codex](./codex/) | Chorus 팀 | 완전한 Chorus 워크플로를 원하는 Codex 사용자 | 지원(Chorus 데몬 사용) | Chorus 데몬 |
 | [Kiro](./kiro/) | Chorus 팀 | 완전한 Chorus 워크플로를 원하는 Kiro CLI 사용자 | 지원(Chorus 데몬 사용) | Chorus 데몬 |
 | [OpenClaw](./openclaw/) | Chorus 팀 | 이미 게이트웨이를 운영 중인 OpenClaw 사용자 | 지원(OpenClaw 사용) | OpenClaw 게이트웨이 |
-| [DeepSeek Harness](./dsh/) | Chorus 팀 | Chorus 워크플로를 원하는 DeepSeek Harness 사용자 | 지원(Chorus 데몬 사용) | Chorus 데몬 |
+| [DeepSeek Harness](./dsh/) | Chorus 팀 | 완전한 Chorus 워크플로를 원하는 DeepSeek Harness 사용자 | 지원(Chorus 데몬 사용) | Chorus 데몬 |
 | [OpenCode](./opencode/) | 커뮤니티 | 커뮤니티 지원에 익숙한 OpenCode 사용자 | 미지원 | 미지원 |
 | [Pi](./pi/) | Chorus 팀 | 완전한 Chorus 워크플로를 원하는 Pi 사용자 | 지원(Chorus 데몬 사용) | Chorus 데몬 |
-| [Generic MCP client](./generic-mcp/) | MCP 호환만 | 다른 MCP 클라이언트에서 Chorus 도구 호출 | 미지원 | 미지원 |
+| [범용 MCP 클라이언트](./generic-mcp/) | MCP 호환성만 | 다른 MCP 클라이언트에서 Chorus 도구 호출 | 미지원 | 미지원 |
 
 Claude Code, Codex, Kiro, Pi, DeepSeek Harness가 지원되는 Chorus 데몬 백엔드입니다. OpenClaw는 자체
-게이트웨이와 플러그인을 통해 온라인 상태를 유지합니다. OpenCode 및 범용 MCP 클라이언트는 대화식으로
+게이트웨이와 플러그인을 통해 온라인 상태를 유지합니다. OpenCode 및 범용 MCP 클라이언트는 대화형으로
 연결하며 Chorus 데몬 백엔드로 선택할 수 없습니다.
 
-액세스 키와 권한은 [에이전트 액세스 준비](/ko/guides/administrator-setup/)부터 확인하세요.
+API 키와 권한은 [에이전트 액세스 준비](/ko/guides/administrator-setup/)부터 확인하세요.
 Claude Code, Codex, Kiro, Pi, DeepSeek Harness를 원격으로 사용할 수 있게 하려면 플랫폼 설정을 마친 뒤
-[데몬 운영](/ko/guides/daemon-operations/)으로 이어서 진행하세요.
+[Chorus 데몬 운영](/ko/guides/daemon-operations/)으로 이어서 진행하세요.
 
 ## 플러그인이 포함하는 것
 
@@ -36,23 +34,23 @@ Claude Code, Codex, Kiro, Pi, DeepSeek Harness를 원격으로 사용할 수 있
 반복하지 않습니다.
 
 플러그인은 AI 코딩 런타임을 Chorus 협업자로 바꿉니다. Chorus MCP 도구, 단계별 워크플로 스킬,
-검토용 서브 에이전트, 그리고 세션 수명 주기 자동화를 제공합니다. 런타임마다 한 번씩 게시되며
-이름은 모두 `chorus`입니다. 아래에서는 Claude Code와 Codex를 전부 설명합니다. OpenClaw, Kiro,
-Pi는 기능이 더 좁거나 형태가 다른 포팅판이므로, 동등한 것으로가 아니라 차이점과 안내 링크를
-제시하는 방식으로 다룹니다.
+검토용 서브에이전트, 그리고 세션 수명 주기 자동화를 제공합니다. 런타임별로 따로 게시되며
+이름은 모두 `chorus`입니다. 아래에서는 Claude Code와 Codex를 자세히 설명합니다. OpenClaw, Kiro,
+Pi는 기능 범위가 더 좁거나 형태가 다르므로, 짧은 설명과 링크만
+제시합니다.
 
 ### Claude Code
 
 Claude Code 플러그인(`chorus@chorus-plugins`)은 다음을 포함합니다.
 
 - **Chorus MCP 도구**: `CHORUS_URL`과 `CHORUS_API_KEY`로 Chorus MCP 서버를 구성하는 `.mcp.json`
-  템플릿. `chorus agents add`는 이 값들을 `~/.claude/settings.json`의 `env` 블록에 쓰므로, 대화식
+  템플릿. `chorus agents add`는 이 값들을 `~/.claude/settings.json`의 `env` 블록에 쓰므로, 대화형
   세션이 수동 내보내기 없이 인증합니다.
 - **워크플로 스킬**: `/chorus` 개요와 함께 `/chorus:idea`, `/chorus:proposal`, `/chorus:develop`,
   `/chorus:review`, `/chorus:quick-dev`, `/chorus:yolo`로 호출하는 단계별 스킬.
-- **검토용 서브 에이전트**: 세 개의 읽기 전용 검토자 `chorus:proposal-reviewer`,
-  `chorus:task-reviewer`, `chorus:code-reviewer`. 각각 `VERDICT` 코멘트를 남깁니다.
-- **세션 수명 주기 훅**: 체크인, 세션 발견과 생성, 하트비트 전송, 그리고 체크아웃과 세션 종료를
+- **검토용 서브에이전트**: 세 개의 읽기 전용 검토자 `chorus:proposal-reviewer`,
+  `chorus:task-reviewer`, `chorus:code-reviewer`. 각각 `VERDICT` 댓글을 남깁니다.
+- **세션 수명 주기 훅**: 체크인, 세션 찾기와 생성, 하트비트 전송, 그리고 체크아웃과 세션 종료를
   자동으로 수행하는 훅. 여기에 더해, 제출 후 메인 에이전트에게 검토자 실행을 상기시키는
   `PostToolUse` 훅.
 - **구성 토글**: 각 검토자를 켜거나 끄고, 검토 횟수를 제한하며, OpenSpec 모드를 켜고 끄는
@@ -65,23 +63,23 @@ Codex 플러그인(Codex용 `chorus@chorus-plugins`)은 다음을 포함합니�
 - **워크플로 스킬**: `$` 접두사로 호출하는 일곱 개의 스킬 `$chorus`, `$idea`, `$proposal`,
   `$develop`, `$review`, `$quick-dev`, `$yolo`. 네임스페이스가 붙어 있어 정규화된 이름은
   `chorus:<skill>`입니다.
-- **검토용 서브 에이전트**: Claude Code와 동일한 세 개의 읽기 전용 검토자
+- **검토용 서브에이전트**: Claude Code와 동일한 세 개의 읽기 전용 검토자
   `chorus-proposal-reviewer`, `chorus-task-reviewer`, `chorus-code-reviewer`.
 - **세션 인식 훅**: 세션 시작 시 체크인, 턴마다 알림, 그리고 제안 제출, 작업 제출, 또는
-  아이디어 제안의 마지막 작업이 검증된 후에 나오는 `PostToolUse` 검토자 알림. Codex에는 Claude
+  아이디어에서 나온 제안의 마지막 작업이 검증된 후에 나오는 `PostToolUse` 검토자 알림. Codex에는 Claude
   Code의 `TeammateIdle` 및 `TaskCompleted` 훅에 해당하는 것이 없습니다.
 
 Codex의 MCP 서버는 플러그인에 포함되지 **않습니다**. Codex는 플러그인 MCP 구성에서 `${VAR}`를
-확장하지 않으므로, `chorus agents add`는 대신 Codex를 keyless로 구성합니다. `CHORUS_URL` /
+확장하지 않으므로, `chorus agents add`는 대신 구성 파일에 키를 저장하지 않는 방식으로 Codex를 구성합니다. `CHORUS_URL` /
 `CHORUS_API_KEY` / `CHORUS_AGENT_PROFILE`를 `~/.codex/.env`(Codex가 시작할 때 로드함)에 쓰고
 `~/.codex/config.toml`에 `bearer_token_env_var = "CHORUS_API_KEY"`를 설정하므로, 디스크에 리터럴
-키가 저장되지 않습니다. Codex에는 `userConfig` 표면도 없으므로, 검토와 OpenSpec 동작은 플러그인
-토글이 아니라 스킬 로직으로 제어됩니다.
+키가 저장되지 않습니다. Codex에는 플러그인 설정(`userConfig`)도 없으므로, 검토자와 OpenSpec 동작은 플러그인
+토글이 아니라 스킬이 제어합니다.
 
-### 포팅판: OpenClaw, Kiro, Pi
+### 그 밖의 공식 통합: OpenClaw, Kiro, Pi
 
-이 런타임들에는 제1자 통합이 있지만, 기능은 Claude Code 및 Codex와 다릅니다. 아래 설명은 동등함을
-주장하는 것이 아니라 안내 링크로 여기세요.
+이 런타임들에는 공식 통합이 있지만, 기능은 Claude Code 및 Codex와 다릅니다. 아래 내용은 기능이 동등하다는
+뜻이 아니라, 각 페이지로 가는 안내입니다.
 
 - **OpenClaw**: Chorus MCP 도구와 워크플로 스킬을 갖춘 플러그인. Chorus 데몬이 아니라 OpenClaw
   게이트웨이를 통해 사용 가능한 상태를 유지하며, 동일한 워크플로 수명 주기 훅은 노출하지 않습니다.
@@ -89,19 +87,17 @@ Codex의 MCP 서버는 플러그인에 포함되지 **않습니다**. Codex는 �
 - **Kiro**: 도구, 워크플로 스킬, 검토 에이전트, 훅을 갖춘 통합으로, 워크스페이스 단위 또는
   사용자 전체로 설치할 수 있습니다. [Kiro](/ko/reference/agents/kiro/)를 참고하세요.
 - **Pi**: 게시된 `@chorus-aidlc/chorus-pi` npm 패키지(`pi install npm:@chorus-aidlc/chorus-pi`)로,
-  Chorus MCP 도구(`pi-mcp-adapter`를 통해), 워크플로 스킬, 패키지 상대 경로 검토 에이전트, 공식
-  pi `subagent` 도구, 그리고 Pi 기본 이벤트 훅을 갖춥니다. Pi는 **깨울 수 있는 Chorus 데몬
+  Chorus MCP 도구(`pi-mcp-adapter`를 통해), 워크플로 스킬, 패키지에 포함된 검토 에이전트, Pi의 공식
+  `subagent` 도구, 그리고 Pi 네이티브 이벤트 훅을 갖춥니다. Pi는 **깨울 수 있는 Chorus 데몬
   백엔드**(`chorus daemon --agent pi`)이지만, 자체적인 기본 MCP나 권한 시스템은 없습니다.
   [Pi](/ko/reference/agents/pi/)를 참고하세요.
 
 ## 플러그인 업그레이드
 
-설정된 Claude Code, Codex, Kiro, Pi에는 `chorus upgrade --plugins`를 사용할 수 있습니다. 에이전트 재등록이나 자격 증명 교체 없이 CLI와 Chorus 플러그인을 갱신합니다. [CLI 업데이트 범위와 완료 상태](/ko/reference/cli/#cli와-플러그인-업그레이드)를 참고하세요. 아래 설정 절차는 에이전트 선택이나 자격 증명 변경에도 사용할 수 있습니다.
-
-제자리에서 업그레이드하며, 에이전트 키와 Chorus URL은 영향을 받지 않습니다.
+업그레이드는 제자리에서 이루어지며, 에이전트 키와 Chorus URL은 영향을 받지 않습니다. 설정된 Claude Code, Codex, Kiro, Pi 프로필에는 `chorus upgrade --plugins`를 사용할 수 있습니다. 에이전트를 다시 등록하거나 인증 정보를 교체하지 않고 CLI와 Chorus 플러그인을 갱신합니다. [CLI 업데이트 범위와 완료 상태](/ko/reference/cli/#cli와-플러그인-업그레이드)를 참고하세요. 아래 설정 절차는 에이전트를 선택하거나 인증 정보를 변경할 때도 여전히 유용합니다.
 
 - **모든 에이전트**: `--update-installed`로 설정을 실행하고 갱신할 에이전트를 선택하세요.
-  이 플래그가 없으면 완전한 기존 설치는 건너뛸 수 있습니다.
+  이 플래그 없이 실행하면 이미 완전히 설치된 에이전트는 건너뛰어질 수 있습니다.
 
   ```bash
   chorus agents add --update-installed
@@ -117,8 +113,8 @@ Codex의 MCP 서버는 플러그인에 포함되지 **않습니다**. Codex는 �
 
   Claude Code를 재시작한 뒤 `/plugin list`를 실행해 새 버전이 활성화되었는지 확인합니다.
 
-- **Codex**: `chorus agents add --update-installed`를 다시 실행하면 플러그인과 `~/.codex/.env` 인증 정보가 새로
-  고쳐집니다. 이는 에이전트 키를 교체하는 방법이기도 합니다. 마지막으로 Codex 안에서 `/plugins`를
+- **Codex**: `chorus agents add --update-installed`를 다시 실행하면 플러그인과 `~/.codex/.env` 인증 정보가
+  갱신됩니다. 이는 에이전트 키를 교체하는 방법이기도 합니다. 마지막으로 Codex 안에서 `/plugins`를
   실행합니다.
 
 OpenClaw, Kiro, Pi는 `chorus agents add --update-installed`를 다시 실행하거나, 설치할 때 사용한 것과 같은 방식으로
@@ -127,8 +123,8 @@ OpenClaw, Kiro, Pi는 `chorus agents add --update-installed`를 다시 실행하
 ## 플러그인 제거
 
 - **Claude Code**: `/plugin` 메뉴를 열고 `chorus@chorus-plugins`를 비활성화하거나 제거합니다.
-  플러그인을 제거하면 해당 훅과 검토용 서브 에이전트도 함께 제거됩니다. 환경의 에이전트 키는
-  플러그인 산출물이 아니므로, 더 이상 필요 없다면 별도로 삭제하세요.
+  플러그인을 제거하면 해당 훅과 검토용 서브에이전트도 함께 제거됩니다. 환경의 에이전트 키는
+  플러그인에 포함된 것이 아니므로, 더 이상 필요 없다면 별도로 삭제하세요.
 - **Codex**: `/plugins` 메뉴에서 플러그인을 비활성화하거나 제거합니다. MCP 서버는 별도로
   구성되어 있으므로, 완전히 연결을 끊으려면 `~/.codex/config.toml`에서 `[mcp_servers.chorus]`
   섹션과 `~/.codex/.env`에서 Chorus 키들을 삭제하세요. 일회성 백업이 `config.toml.chorus-bak`에
@@ -141,27 +137,26 @@ OpenClaw, Kiro, Pi는 위의 각 플랫폼 페이지에 설명된 대로 런타�
 
 플러그인과 여기에 포함된 스킬은 함께 버전 관리되며 **단일 Chorus 애플리케이션 버전**을 따릅니다.
 플러그인 매니페스트의 `version` 필드는 실행 중인 Chorus 릴리스와 일치하고, 스킬 frontmatter의
-`version`도 그에 맞춰 움직이므로, 플러그인 릴리스는 대상으로 하는 애플리케이션과 정렬됩니다.
+`version`도 그에 맞춰 움직이므로, 플러그인 릴리스는 대상으로 하는 애플리케이션과 맞춰집니다.
 Chorus를 업그레이드할 때는 플러그인도 일치하는 버전으로 업그레이드하세요. 플러그인이 보고하는
 버전은 곧 그 스킬 버전이기도 합니다.
 
-스킬을 따로 관리할 필요는 없습니다. Claude Code에서는 스킬이 플러그인에 포함되어 플러그인 업데이트와
-함께 배포되고, Codex에서는 스킬이 플러그인 패키지 안에 담겨 있습니다. 별도로 동기화를 유지해야 하는
-스킬 설치는 없습니다.
+Claude Code와 Codex 모두 스킬이 플러그인 안에 포함되어 플러그인과 함께 업데이트되므로, 따로 설치하거나
+동기화할 것이 없습니다.
 
 ## 다음 단계
 
 - [명령과 스킬 라우팅](/ko/guides/plugin-commands/): 어떤 명령이 각 워크플로 단계를 실행하고
   무엇을 산출하는지.
-- [자동화 동작](/ko/guides/plugin-automation/): 검토용 서브 에이전트, 세션 훅, 헤드리스 제약이
+- [자동화 동작](/ko/guides/plugin-automation/): 검토용 서브에이전트, 세션 훅, 헤드리스 제약이
   어떻게 동작하는지.
-- [OpenSpec 모드](/ko/guides/openspec-mode/): 세션의 사양 모드가 어떻게 결정되는지, 그리고
+- [OpenSpec 모드](/ko/guides/openspec-mode/): 세션의 명세 모드가 어떻게 결정되는지, 그리고
   OpenSpec 작성 경로.
 - [Spec-lite 모드](/ko/guides/spec-lite-mode/): OpenSpec을 쓰지 않을 때 사용하는 Chorus 자체의
-  경량 사양 기록.
+  경량 명세 기록.
 
 이 명령들이 구동하는 워크플로는 [AI-DLC 워크플로](/ko/guides/ai-dlc-workflow/)를,
-런타임을 백그라운드 서비스로 실행하는 방법은 [데몬 운영](/ko/guides/daemon-operations/)을
+런타임을 백그라운드 서비스로 실행하는 방법은 [Chorus 데몬 운영](/ko/guides/daemon-operations/)을
 참고하세요.
 
 ## 에이전트용
@@ -172,12 +167,9 @@ Chorus를 업그레이드할 때는 플러그인도 일치하는 버전으로 �
 - **제약:**
   - 최초 설치 단계를 반복하지 말고, 해당 플랫폼 페이지로 링크한다.
   - Claude Code와 Codex의 기능을 정확히 서술한다. 둘 다 세 검토자(제안·작업·코드)를 모두
-    포함한다. `userConfig` 토글 표면을 노출하는 것은 Claude Code뿐이며, Codex에서는 그 동작을
+    포함한다. `userConfig` 토글을 노출하는 것은 Claude Code뿐이며, Codex에서는 그 동작을
     스킬과 훅이 직접 관장한다. OpenClaw, Kiro, Pi를 주요 런타임과 동등한 것처럼 제시하지 않는다.
   - 플러그인과 스킬 버전은 Chorus 애플리케이션 버전을 따르는 단일 번호다. 독립적인 스킬 설치를
     설명하지 않는다.
-- **참조 출처:** Claude Code 매니페스트와 토글:
-  `public/chorus-plugin/.claude-plugin/plugin.json`. Codex 매니페스트:
-  `plugins/chorus/.codex-plugin/plugin.json` 및 `plugins/chorus/README.md`. 훅과 스킬 분담:
-  `docs/chorus-plugin.md`. 이 경로들은 모두
-  [Chorus 리포지토리](https://github.com/Chorus-AIDLC/Chorus)에 있습니다.
+- **참조 출처:** [Chorus 저장소](https://github.com/Chorus-AIDLC/Chorus)의 Claude Code 및 Codex 플러그인
+  매니페스트와 문서.

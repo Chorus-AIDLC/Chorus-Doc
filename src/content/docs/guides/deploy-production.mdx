@@ -34,9 +34,8 @@ chorus
 ```
 
 On startup Chorus applies any pending database migrations automatically
-(`prisma migrate deploy`, exposed as the `db:migrate` script) and then serves the web
-application on port `8637`. The database must already exist and be reachable; Chorus
-does not create the server for you on this path.
+(`prisma migrate deploy`) and then serves the web application on port `8637`. The database must already exist and be reachable; Chorus
+does not create the database for you on this path.
 
 The variables Chorus reads in a production run:
 
@@ -44,8 +43,8 @@ The variables Chorus reads in a production run:
 | --- | --- | --- |
 | `DATABASE_URL` | Yes | PostgreSQL connection string, `postgresql://user:password@host:port/dbname`. |
 | `NEXTAUTH_SECRET` | For multiple instances | Signing secret shared by all replicas. For a single npm instance, it may be omitted: `chorus` persists one in `~/.chorus-data/.secret` by default. Known placeholders in the environment are ignored with a warning; a persisted placeholder or empty key stops startup. |
-| `SUPER_ADMIN_EMAIL` | Yes | Email that bootstraps the `/admin` SuperAdmin panel. |
-| `SUPER_ADMIN_PASSWORD_HASH` | Yes | Bcrypt hash of the SuperAdmin password. |
+| `SUPER_ADMIN_EMAIL` | Yes | Email that bootstraps the `/admin` Super Admin panel. |
+| `SUPER_ADMIN_PASSWORD_HASH` | Yes | Bcrypt hash of the Super Admin password. |
 | `DEFAULT_USER` | Optional | Enables a built-in email/password login for first access. |
 | `DEFAULT_PASSWORD` | Optional | Password for the built-in login. |
 | `REDIS_URL` | Optional | Redis connection string. Required once you run more than one instance (see below). |
@@ -54,7 +53,7 @@ See [Operate a self-hosted Chorus](/guides/deploy-operations/) for how these boo
 credentials work, how to generate the bcrypt hash, and how to turn the built-in login off.
 
 :::caution[Handle secrets carefully]
-`NEXTAUTH_SECRET` and the SuperAdmin credentials grant full access. Keep them out of shell
+`NEXTAUTH_SECRET` and the Super Admin credentials grant full access. Keep them out of shell
 history and source control — supply them through your process manager, systemd unit, or a
 secret store rather than typing them inline on a shared host.
 :::
@@ -74,7 +73,8 @@ one instance never reach the others. A single-instance deployment can run withou
 that in-memory fallback, but any deployment with more than one instance must configure a
 shared Redis.
 
-All instances must also share the same secure `NEXTAUTH_SECRET`, so Chorus-signed sessions remain valid whichever instance receives a request.
+All instances must also share the same secure `NEXTAUTH_SECRET`, so that Chorus-signed
+sessions remain valid whichever instance receives a request.
 
 ## Deploy the AWS CDK stack
 
@@ -93,8 +93,8 @@ deployment with managed PostgreSQL and Redis.
   the deployment region. A custom domain is optional.
 - **`cloudfront`**: public HTTPS through CloudFront, forwarding to a private ALB on HTTP
   port 80 through a VPC origin. No certificate is needed for the default `*.cloudfront.net`
-  domain. For a custom domain, supply both the domain and an ACM certificate in **`us-east-1`**.
-  Caching is disabled for authenticated pages and API responses.
+  domain. For a custom domain, supply both the domain and an ACM certificate in
+  **`us-east-1`**. Caching is disabled for authenticated pages and API responses.
 
 Choose the mode in `./install.sh`, or pass `-c deployMode=cloudfront` to CDK.
 `default_deploy.sh` preserves the choice. Non-interactive installs use
@@ -125,7 +125,7 @@ The installer prompts for the deployment configuration:
 | Stack name | No | Defaults to `Chorus`. |
 | ACM Certificate ARN | Mode-dependent | Required in the deployment region for `alb`; required in `us-east-1` only with a custom domain for `cloudfront`. |
 | Custom domain | No | For `cloudfront`, pair with a `us-east-1` certificate; otherwise use the distribution domain. |
-| Super admin email | Yes | Bootstraps the `/admin` SuperAdmin account. |
+| Super admin email | Yes | Bootstraps the `/admin` Super Admin account. |
 | Super admin password | Yes | Minimum 8 characters. Hashed with bcrypt at synth time; the plaintext is never stored in the template. |
 | NextAuth secret | No | Generated at each synth if left blank. Supply one persistent value to keep sessions valid across redeployments. |
 
@@ -140,7 +140,7 @@ the CDK environment, and deploys the stack. It also writes a re-runnable
 
 ### What the stack provisions
 
-The stack (`packages/chorus-cdk/lib/{chorus-stack,service,database,cache}.ts`) creates:
+The stack creates:
 
 | Component | What it is | Key configuration |
 | --- | --- | --- |

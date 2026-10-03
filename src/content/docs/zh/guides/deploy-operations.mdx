@@ -7,7 +7,7 @@ sidebar:
   order: 23
 ---
 
-本指南介绍部署完成后如何运维自托管的 Chorus：让第一个人登录进来、配置认证、安全升级，以及在 HTTPS 后面需要关注的 Cookie 与反向代理设置。关于如何把部署搭建起来，请参阅[生产环境部署](/zh/guides/deploy-production/)或[使用 Docker 部署](/zh/guides/deploy-docker/)。
+本指南介绍部署完成后如何运维自托管的 Chorus：让第一个人登录进来、配置认证、安全升级，以及通过 HTTPS 提供服务时需要关注的 Cookie 与反向代理设置。关于如何把部署搭建起来，请参阅[生产环境部署](/zh/guides/deploy-production/)或[使用 Docker 部署](/zh/guides/deploy-docker/)。
 
 ## 引导首次访问
 
@@ -18,11 +18,11 @@ DEFAULT_USER='admin@example.com' \
 DEFAULT_PASSWORD='choose-a-strong-password'
 ```
 
-两个变量都设置后，登录页会显示邮箱／密码表单。首次登录成功时，Chorus 会根据邮箱自动创建该用户及其所属公司，因此无需任何手动配置即可进入。
+两个变量都设置后，登录页会显示邮箱／密码表单。首次登录成功时，Chorus 会根据邮箱自动创建该用户及其所属工作区，因此无需任何手动配置即可进入。
 
 ### 关闭内置登录
 
-内置登录是一种引导机制，而非长期使用的账号体系。一旦已有真实账号，或已经配置了单点登录，就应通过取消设置 `DEFAULT_USER` 和 `DEFAULT_PASSWORD` 两个变量并重启 Chorus 来关闭它。移除这一对变量后，内置的邮箱／密码表单不再出现，访问将改为经由你配置的身份提供方。
+内置登录是一种引导机制，而非长期使用的账号体系。一旦已有真实账号，或已经配置了单点登录，就应取消设置 `DEFAULT_USER` 和 `DEFAULT_PASSWORD` 这两个变量并重启 Chorus，以关闭内置登录。移除这一对变量后，内置的邮箱／密码表单不再出现，访问将改为经由你配置的身份提供方。
 
 ## 配置部署侧的认证
 
@@ -30,7 +30,7 @@ DEFAULT_PASSWORD='choose-a-strong-password'
 
 ### 超级管理员引导
 
-`/admin` 超级管理员面板由环境变量引导，而不是数据库中的账号：
+`/admin` 超级管理员面板通过环境变量引导，而不是依赖数据库中的账号：
 
 <div class="table-scroll" role="region" aria-label="超级管理员环境变量" tabindex="0">
 
@@ -53,11 +53,11 @@ node -e "console.log(require('bcryptjs').hashSync('your-password', 10))"
 
 ### 单点登录（OIDC）
 
-单点登录**不**通过环境变量配置。超级管理员在 `/admin` 面板中按公司分别配置 OIDC，相关设置存储在数据库中。每家公司都有各自的颁发者（issuer）、客户端 ID 和启用开关。Chorus 使用 PKCE，**不**需要客户端密钥（client secret）。因此，部署层面的引导只负责让超级管理员登录进来，随后由超级管理员在管理面板中为各公司启用单点登录，部署层面无需再单独配置密钥。
+单点登录**不**通过环境变量配置。超级管理员在 `/admin` 面板中按工作区分别配置 OIDC，相关设置存储在数据库中。每个工作区都有各自的颁发者（issuer）URL 和客户端 ID，两者都填写后该工作区即启用单点登录。Chorus 使用 PKCE，**不**需要客户端密钥（client secret）。因此，部署层面的引导只负责让超级管理员登录进来，随后由超级管理员在管理面板中为各工作区配置单点登录，部署层无需另行准备任何密钥。
 
 ## 运行迁移与安全升级
 
-Chorus 在启动时会自动应用待执行的数据库迁移（`prisma migrate deploy`）。你无需手动运行迁移，启动新版本时，会先应用所有未完成的迁移，然后 Web 应用才开始提供服务。
+Chorus 在启动时会自动应用待执行的数据库迁移（`prisma migrate deploy`）。你无需手动运行迁移：启动新版本时，Chorus 会先应用所有未完成的迁移，然后 Web 应用才开始提供服务。
 
 升级步骤：
 
@@ -66,23 +66,23 @@ Chorus 在启动时会自动应用待执行的数据库迁移（`prisma migrate 
 3. 重启 Chorus。迁移会在启动时自动应用，随后应用开始运行。
 
 :::caution[升级前先备份]
-升级前务必备份数据库（内嵌或基于卷的存储则备份数据卷）。迁移会自动运行并可能修改表结构，备份是你唯一可靠的回滚点。请按照标准的 [PostgreSQL 备份文档](https://www.postgresql.org/docs/current/backup.html)操作，而不要自行拼凑针对特定引擎的流程。
+升级前务必备份数据库（内嵌或基于卷的存储则备份数据卷）。迁移会自动运行并可能修改表结构，备份是你唯一可靠的回滚点。请按照标准的 [PostgreSQL 备份文档](https://www.postgresql.org/docs/current/backup.html)，为你的环境制定备份方案。
 :::
 
 ### 0.19.1 的升级顺序
 
-0.19.1 新增的迁移只添加一个可为空的列，现有数据不受影响。请**先**升级 Chorus 服务端，**再**升级运行智能体守护进程的 `chorus` CLI。旧版守护进程仍可与新服务端配合工作，并以它们已能理解的格式接收想法创建和调研请求。如需紧急回滚新的请求格式，请设置 `CHORUS_DEDICATED_OPERATION_WRITES=false` 并重启服务端：新请求会改用旧格式，已排队的请求仍会正常投递。如有需要，请单独回滚 CLI。只要仍有由新版服务端创建的请求处于待处理或运行中，就不要把服务端回滚到早于 0.19.1 的版本，也不要删除新增的列。
+0.19.1 包含的迁移只添加一个可为空的列，现有数据不受影响。请**先**升级 Chorus 服务端，**再**升级运行智能体后台服务的 `chorus` CLI。旧版后台服务仍可与新服务端配合工作，并以它们已能理解的格式接收想法创建和调研请求。如需紧急回滚新的请求格式，请设置 `CHORUS_DEDICATED_OPERATION_WRITES=false` 并重启服务端：新请求会改用旧格式，已排队的请求仍会正常投递。如有需要，请单独回滚 CLI。只要仍有由新版服务端创建的请求处于待处理或运行中，就不要把服务端回滚到早于 0.19.1 的版本，也不要删除新增的列。
 
 ### 升级到 0.18.1 时的会话密钥
 
-备份数据库时也要妥善保管签名密钥。若依赖自动生成的密钥，即使使用外部 PostgreSQL，Docker 仍需
-持久的 `/app/data` 卷。npm 启动器默认使用 `~/.chorus-data/.secret`。若此前使用公开占位值，更换密钥后
-内置登录用户和超级管理员需要重新登录。启动器会保留显式配置的安全密钥。CDK 重新部署时需传入
-同一个 `nextAuthSecret`，省略它会在每次 synth 时生成新值。API key 和 OIDC token 不受此轮换影响。参见 [Docker 升级说明](/zh/guides/deploy-docker/#会话密钥nextauth_secret)。
+请将签名密钥与数据库一并备份，并保持其不变。若要保留自动生成的密钥，即使使用外部 PostgreSQL，Docker
+仍需持久的 `/app/data` 卷。npm 启动器默认使用 `~/.chorus-data/.secret`。若此前使用公开占位值，更换密钥后
+内置邮箱／密码登录的用户和超级管理员需要重新登录。你显式设置的安全密钥会原样保留。CDK 重新部署时需传入
+同一个 `nextAuthSecret`，省略它会在每次 synth 时生成新值。API 密钥和 OIDC 令牌不受此轮换影响。参见 [Docker 升级说明](/zh/guides/deploy-docker/#会话密钥nextauth_secret)。
 
 ## Cookie 与反向代理
 
-当 Chorus 运行在 TLS 终止或反向代理之后时，有两个设置需要关注：
+当 Chorus 运行在终止 TLS 的代理或反向代理之后时，有两个设置需要关注：
 
 <div class="table-scroll" role="region" aria-label="Cookie 与反向代理设置" tabindex="0">
 

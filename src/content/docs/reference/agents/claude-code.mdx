@@ -5,12 +5,10 @@ docsLocale: en
 route: /reference/agents/claude-code/
 ---
 
-# Claude Code
-
-Claude Code has a first-party Chorus plugin. It supports Chorus tools and workflow skills
+Claude Code has a first-party Chorus plugin. It provides Chorus tools and workflow skills
 in an interactive Claude Code session, and it can run as a supported Chorus daemon backend.
 
-Before installation, create an agent key by following
+Before you install, create an agent key by following
 [Prepare agent access](/guides/administrator-setup/).
 
 ## Install the plugin
@@ -50,7 +48,7 @@ Restart Claude Code after installation.
 Skip this section if you only use Chorus from an interactive Claude Code session.
 Otherwise, follow [Connect an agent runtime](/guides/operator-onboarding/) and select
 `claude-code` as the backend. Verify the connection in the foreground before using
-[Daemon operations](/guides/daemon-operations/) to keep it online.
+[Operate the Chorus daemon](/guides/daemon-operations/) to keep it online.
 
 ## Daemon behavior in 0.20.0
 
@@ -58,12 +56,12 @@ Each wake still starts one `claude -p` process and exits after its turn. Chorus 
 bidirectional **stream-json** input and output, keeping the connection open for control
 responses. Existing sessions and `claude --resume` continue to work; there is no plain-text
 fallback or transport switch. This behavior was verified live on Linux with Claude Code
-**2.1.283 and 2.1.284**; those are verified versions, not a guaranteed minimum for every
-Claude release.
+**2.1.283 and 2.1.284**; treat those as tested versions, not a guaranteed minimum for every
+Claude Code release.
 
 - **Interrupt:** the daemon sends a protocol interrupt first. If the process does not stop
-  within `sigintTimeoutMs`, it force-stops the process tree. The existing default is
-  10 seconds. Windows cleanup is covered by platform tests, not a live Windows run.
+  within `sigintTimeoutMs`, it force-stops the process tree. The default remains
+  10 seconds.
 - **Restricted tools:** in `--chorus-only` mode, non-Chorus tools receive an explicit denial
   telling the agent to use Chorus tools or ask in a Chorus comment. Logs identify the denied
   tool by name without its input. YOLO behavior is unchanged.
@@ -73,7 +71,8 @@ Claude release.
 
 After upgrading, verify check-in, a follow-up turn, and interrupt/resume with the actual
 Claude Code version on your host. Use [daemon logs](/guides/daemon-operations/) to diagnose
-a protocol failure; [session recovery](/guides/session-recovery/) explains how to continue.
+a protocol failure; [Interrupt and resume a session](/guides/session-recovery/) explains how
+to continue.
 
 ## Verify the connection
 
@@ -91,12 +90,12 @@ and working directory are online.
 - Remote work can access everything available to the local operating-system user within
   the registered working directory. Register only directories you trust.
 
-Use [Remote control](/guides/remote-control/) and
-[Session recovery](/guides/session-recovery/) for shared operating procedures.
+Use [Start work on a remote agent](/guides/remote-control/) and
+[Interrupt and resume a session](/guides/session-recovery/) for shared operating procedures.
 
 ## Resume from the terminal
 
-To take over a live conversation from your own terminal, copy its session id from the chat
+To take over a live conversation from your own terminal, copy its session ID from the chat
 UI (**Copy session ID** in the transcript header) and run, from the conversation's working
 directory:
 
@@ -104,8 +103,8 @@ directory:
 claude --resume <sessionId>
 ```
 
-The copied id is the same id Chorus passes to Claude Code when it resumes a session; for a
-Claude Code backend it is the direct idea's UUID. See
+The copied ID is the same ID Chorus passes to Claude Code when it resumes a session; for a
+Claude Code backend it is the UUID of the Idea the session belongs to. See
 [Interrupt and resume a session](/guides/session-recovery/#take-over-from-a-terminal) for
 the full flow.
 
@@ -116,12 +115,12 @@ the full flow.
   `chorus agents add` (or update the `env` block in `~/.claude/settings.json`), and restart
   Claude Code.
 - **Daemon is offline:** run `chorus daemon status`, then see
-  [Troubleshooting](/guides/troubleshooting/).
-- **Wrong project is available:** reinstall the daemon with the intended absolute
+  [Troubleshoot agent connections](/guides/troubleshooting/).
+- **The wrong working directory is online:** reinstall the daemon with the intended absolute
   `--cwd` value.
 
-## Subagent sessions
+## Sub-agent sessions
 
-Plugin-managed subagent sessions use the agent type as their name. Parallel subagents
+Plugin-managed sub-agent sessions use the agent type as their name. Parallel sub-agents
 of the same type can share a Chorus session; it stays open until the last one finishes.
 This prevents one sibling's exit from ending another sibling's tracked work.

@@ -5,8 +5,6 @@ docsLocale: en
 route: /reference/cli/
 ---
 
-# The `chorus` CLI
-
 The `chorus` command (published as `@chorus-aidlc/chorus`) does three jobs: it runs the
 Chorus server, configures the coding agents on your machine, and calls the Chorus MCP
 endpoint from the shell. Install it globally:
@@ -44,48 +42,48 @@ chorus upgrade --plugins   # CLI, then configured Chorus plugins
 chorus update --plugins    # alias of upgrade
 ```
 
-The command supports a verified **npm global installation** of `@chorus-aidlc/chorus`.
+The command works only with a global **npm installation** of `@chorus-aidlc/chorus`.
 It checks npm's latest stable release, updates the active installation in the same npm
-prefix, and verifies the installed version. If already current or newer, it does not
-reinstall or downgrade; `--plugins` still runs. Source checkouts, linked installs, and
-installs managed by other package managers are unsupported. For an older CLI without this
-command, install the new release first with `npm install --global @chorus-aidlc/chorus@latest`.
+prefix, and verifies the installed version. If the installed version is already current or
+newer, it neither reinstalls nor downgrades; `--plugins` still runs. Source checkouts, linked
+installs, and installs managed by other package managers are not supported. For an older CLI
+without this command, install the new release first with `npm install --global @chorus-aidlc/chorus@latest`.
 
 ### What `--plugins` refreshes
 
-It reads `~/.chorus/daemon.json` and refreshes explicitly typed Claude Code, Codex, Kiro,
-and Pi entries, including those with daemon waking disabled. Each entry's `env`, `PATH`,
+It reads `~/.chorus/daemon.json` and refreshes entries whose type is explicitly set to Claude
+Code, Codex, Kiro, or Pi, including those with daemon waking disabled. Each entry's `env`, `PATH`,
 and custom config home determine the target. Shared destinations are updated once;
-distinct homes are handled separately. This command currently reads the default file,
-not `CHORUS_DAEMON_CONFIG_PATH`.
+distinct homes are handled separately. The command currently reads only the default file,
+not the path set in `CHORUS_DAEMON_CONFIG_PATH`.
 
 - **Claude Code and Codex:** refresh the Chorus plugin using the host's plugin mechanism.
 - **Kiro:** refresh Chorus templates from the entry's configured Chorus instance. Upgrade
-  that server first to receive its new templates. Conflicting instance URLs for one shared
+  that server first so it serves the new templates. Conflicting instance URLs for one shared
   destination are reported as incomplete.
-- **Pi:** update only `@chorus-aidlc/chorus-pi` and `pi-mcp-adapter`. Version pins, ranges, and
-  non-latest tags are preserved and always reported as incomplete; remove the constraint to
-  allow the latest update. If Pi cannot
-  update these packages individually, the command reports that limitation rather than
-  updating all extensions.
+- **Pi:** update only `@chorus-aidlc/chorus-pi` and `pi-mcp-adapter`. Version pins, ranges,
+  and non-latest tags are preserved and always reported as incomplete; remove the constraint
+  to get the latest version. If Pi cannot update these packages individually, the command
+  reports that limitation rather than updating all extensions.
 
-Missing Chorus plugins can be installed when the host CLI already exists. The command
-preserves registrations and credentials and does not install or upgrade the host CLI.
-Before changing a config file, it saves a copy as `<file>.chorus-upgrade.bak`, replaced on
-the next upgrade.
+If a host CLI is installed but its Chorus plugin is missing, the command installs the
+plugin. It preserves registrations and credentials and does not install or upgrade the host
+CLI. Before changing a config file, it saves a copy as `<file>.chorus-upgrade.bak`
+(overwritten by the next upgrade).
+
 `offline` or unknown entries (including the default OpenCode, OpenClaw, and dsh records),
-and hosts missing from the entry's `PATH`, are skipped and reported as **INCOMPLETE**.
-Use [the platform's setup or upgrade procedure](/reference/agents/) for those hosts.
+and hosts missing from the entry's `PATH`, are skipped and reported as **INCOMPLETE**. For
+those hosts, follow the setup or upgrade steps in [Agent platforms](/reference/agents/).
 
 ### Completion and activation
 
 The command runs without prompts. Exit code **0** means all requested work completed;
-**1** means failure or an incomplete target. No daemon file or an empty agent list is a
-successful plugin no-op; an unreadable or malformed file is a failure. A CLI failure
-prevents plugin work. Individual plugin failures do not stop later targets, and completed
-updates are kept, with no automatic rollback.
+**1** means failure or an incomplete target. A missing daemon file or an empty agent list
+counts as success, with nothing to refresh; an unreadable or malformed file is a failure. If
+the CLI update fails, no plugins are refreshed. A failure on one plugin does not stop later
+targets, and completed updates are kept (there is no automatic rollback).
 
-npm installation streams progress and has no installation timeout. If it fails, inspect
+The npm install step streams its progress and has no timeout. If it fails, inspect
 the reported npm error; for `EACCES` or `EPERM`, use a user-owned Node installation or have
 the system npm prefix updated by its administrator. Chorus does not elevate privileges.
 After an update, start new agent sessions and run `chorus daemon restart` when convenient.
@@ -108,9 +106,10 @@ chorus agents add --agents claude,codex \
 ```
 
 It is idempotent — safe to re-run to add an agent, refresh a plugin, or rotate a key.
-Detected but not-yet-installed agents stay selectable. Supported agents are Claude Code,
-Codex, Kiro, Pi, opencode, OpenClaw, and the DeepSeek Harness. With `pi` on PATH, setup installs
-both `pi-mcp-adapter` and `chorus-pi`; otherwise it provides manual instructions.
+Detected agents that don't have the Chorus plugin yet stay selectable. Supported agents are
+Claude Code, Codex, Kiro, Pi, OpenCode, OpenClaw, and the DeepSeek Harness (dsh). With `pi`
+on `PATH`, setup installs both `pi-mcp-adapter` and `chorus-pi`; otherwise it prints manual
+install instructions.
 
 Useful flags (`chorus agents add --help` lists them all):
 
@@ -141,7 +140,7 @@ chorus agents remove <name|uuid>  # remove one (match by name or UUID)
 `chorus agents run` starts a configured agent in your terminal with its Chorus connection
 already wired in — the foreground counterpart to daemon waking. Because a child process
 cannot change its parent shell's environment, the command injects the connection into the
-launched agent process directly, so you never hand-export anything.
+launched agent process directly, so you never export anything by hand.
 
 ```sh
 chorus agents run --name work -- --model opus        # launch agent "work"; pass --model opus to it
@@ -149,14 +148,14 @@ chorus agents run                                    # launch the only configure
 chorus agents run --name work --type codex -- resume # override the backend, then pass `resume` through
 ```
 
-- **Which agent** — `--name <name|uuid>` picks from `agents[]` in `~/.chorus/daemon.json`. Optional when one
-  agent is configured; with several, pass `--name` (or set `CHORUS_AGENT_PROFILE`), or the
-  command errors rather than guess.
+- **Which agent** — `--name <name|uuid>` picks from `agents[]` in `~/.chorus/daemon.json`.
+  Optional when one agent is configured; with several, pass `--name` (or set `CHORUS_AGENT_PROFILE`), or the
+  command exits with an error rather than guessing.
 - **What's injected** (into the launched process only — never your shell, never printed):
   `CHORUS_URL`, `CHORUS_API_KEY`, and `CHORUS_AGENT_PROFILE`.
 - **Which binary** — defaults to the agent's stored backend; `--type` overrides it. Types map to
   `claude`, `codex`, `kiro-cli`, `pi`, `opencode`, `openclaw`, and `dsh`. Agents
-  added as opencode / OpenClaw / DeepSeek Harness are stored as `offline` (the daemon will not
+  added as OpenCode / OpenClaw / DeepSeek Harness are stored as `offline` (the daemon will not
   auto-wake them), so pass `--type` explicitly to launch those.
 - **Passthrough** — everything after `--` goes to the agent verbatim, so its full flag surface is
   available. The agent inherits your terminal, and `chorus agents run` exits with its exit code.
@@ -165,23 +164,26 @@ chorus agents run --name work --type codex -- resume # override the backend, the
 
 Each selected `agents[]` entry can hold `args` (string array, default `[]`) and `env`
 (string-to-string object, default `{}`). Both daemon wakes and foreground launches use them.
-There is no top-level inheritance with nonempty `agents[]`; misplaced fields cause an error.
-See the [daemon guide](/guides/daemon-operations/) for a copyable model/thinking/env example,
-flat-file migration, validation, and secret-handling precautions. Values are literal, with no
-shell expansion, dotenv loading, or secret lookup. Env affects only the child; `CHORUS_*`
-and the nested-Claude context names `CLAUDECODE` / `CLAUDE_CODE_ENTRYPOINT` are reserved
-case-insensitively. Configuring them causes an error instead of silently discarding them.
-Persistent args cannot override known managed
-session, prompt, protocol, cwd, MCP, or permission controls, or contain `--` / `-` sentinels
-or help/inspection exits. Explicit foreground tokens remain unchanged, including native
-resume commands. This guards known conflicts; it is not a sandbox.
+When `agents[]` is non-empty, entries do not inherit top-level `args` / `env`, and setting
+them at the top level is an error. See the [daemon guide](/guides/daemon-operations/) for a
+copyable model/thinking/env example, flat-file migration, validation, and secret-handling
+precautions.
 
-Every new `chorus agents run` rereads the file. Daemon changes require
-`chorus daemon restart`; neither path updates already-running children. `--type` selects
+Values are literal, with no shell expansion, dotenv loading, or secret lookup. `env` affects
+only the launched agent. `CHORUS_*` and the Claude Code nesting variables `CLAUDECODE` /
+`CLAUDE_CODE_ENTRYPOINT` are reserved (case-insensitively): configuring one is an error
+rather than being silently dropped. Persistent args cannot override options Chorus manages (session, prompt, protocol, cwd, MCP,
+or permission controls), and cannot include `--` / `-` separators or flags that only print
+help or version information and exit. Arguments you pass explicitly at launch are forwarded
+unchanged, including native resume commands. These checks guard against known conflicts;
+they are not a sandbox.
+
+Each `chorus agents run` rereads the file; the daemon picks up changes only after
+`chorus daemon restart`. Neither affects agents that are already running. `--type` selects
 the backend used for validation and override matching; it does not translate backend flags.
 
-For these options only, an explicit occurrence in the selected command scope removes the
-configured equivalent and its value:
+For the options below only, passing one explicitly in the selected command scope replaces
+the configured option and its value:
 
 | Effective backend | Recognized overrides |
 | --- | --- |
@@ -197,7 +199,8 @@ Matching recognizes `--option value`, `--option=value`, and, where listed, `-mVA
 `-m=VALUE`. Codex supports `-c key=value`, `-ckey=value`, `-c=key=value`,
 `--config key=value`, and `--config=key=value`; only the two listed keys participate in
 precedence, leaving unrelated config entries intact. The backend must support the spelling:
-for Pi 0.85.1, use separated `--model`, `--thinking`, and `--provider` values, not equals forms.
+for Pi 0.85.1, use separated `--model`, `--thinking`, and `--provider` values, not the equals
+forms.
 
 ```sh
 chorus agents run --name pi-worker -- --model anthropic/claude-sonnet-4-6 --thinking medium
@@ -206,29 +209,37 @@ chorus agents run --name codex-worker -- exec --model gpt-5.4 -c model_reasoning
 
 **Subcommands:** persistent args go after the deepest recognized command: Codex `exec`,
 `exec resume`, or `resume`; Kiro `chat`; OpenClaw `agent`. Put the explicit override in that
-same scope: `exec --model chosen`, not `--model chosen exec`. Root/parent model options do
-not remove the child's configured model; Codex `-c`/`--config` keys apply across scopes.
-Without a recognized command, configured args are prefixed. Other command paths are not
+same scope: `exec --model chosen`, not `--model chosen exec`. A model option placed before
+the subcommand does not replace the subcommand's configured model; Codex `-c`/`--config`
+keys apply across scopes. Without a recognized command, configured args are placed first. Other command paths are not
 inferred; omit incompatible persistent args and use native passthrough for those paths.
 
-**Unknown options:** persistent `args` accepts ordinary unknown flags, but cannot guess
-whether the next token is a value or a prompt. Use `["--future=value"]` if the backend
-supports it, not `["--future", "value"]`. Known options require their expected values.
-Unknown/repeatable options keep configured-then-explicit order within the selected scope,
-with no general last-wins guarantee. After an ambiguous explicit option (unknown without an
-inline value), Chorus stops inferring overrides; put known overrides before it or use a
-supported inline value. Analysis also stops at the first bare `--` inside agent arguments
-(after removing the outer Chorus delimiter). Command discovery stops at a positional
-prompt, unknown command, or ambiguous option, and skips known option values. All explicit
-tokens are still forwarded unchanged; backend flag and version compatibility remain yours
-to check. For Windows `.cmd`/`.bat` limits, see the daemon guide.
+**Unknown options:**
 
-The Codex daemon further limits persistent args to model options and permitted `-c` / `--config` overrides. Other flags fail before a daemon wake, even if usable in a foreground session. See [Codex daemon configuration](/reference/agents/codex/#model-options-and-session-continuity).
+- Persistent `args` accepts ordinary unknown flags, but cannot guess whether the next token
+  is a value or a prompt. Use `["--future=value"]` if the backend supports it, not
+  `["--future", "value"]`. Known options require their expected values.
+- Unknown or repeatable options keep their order (configured first, then explicit) within
+  the selected scope; there is no general last-wins guarantee.
+- After an ambiguous explicit option (an unknown option without an inline value), Chorus
+  stops looking for overrides; put known overrides before it or use a supported inline
+  value. Analysis also stops at the first bare `--` inside agent arguments (after removing
+  the outer Chorus delimiter).
+- Command discovery stops at a positional prompt, an unknown command, or an ambiguous
+  option, and skips known option values.
+- All explicit tokens are still forwarded unchanged; checking backend flag and version
+  compatibility is up to you. For Windows `.cmd`/`.bat` limits, see the daemon guide.
+
+The Codex daemon further limits persistent args to model options and permitted `-c` /
+`--config` overrides. Other flags fail before the daemon wakes the agent, even if they work
+in a foreground session. See
+[Codex daemon configuration](/reference/agents/codex/#model-options-and-session-continuity).
 
 ## Call MCP tools from the shell — `chorus mcp`
 
-`chorus mcp` is a native MCP client — a token-free path to call any Chorus tool from a
-script or terminal. It replaces the earlier `chorus-api.sh` / `chorus-mcp-call.sh` wrappers.
+`chorus mcp` is a native MCP client — a way to call any Chorus tool from a script or
+terminal without spending model tokens. It replaces the earlier `chorus-api.sh` /
+`chorus-mcp-call.sh` wrappers.
 
 ```sh
 chorus mcp call <tool> '<json>'                  # call a tool with a JSON argument object
@@ -264,13 +275,13 @@ for an interactive shell that should act as a specific configured agent.
 (mode `0600`; the key is never echoed). For three agents it also seeds the agent's own
 configuration so interactive sessions authenticate without any manual export:
 
-| Agent | Extra credential sink |
+| Agent | Also written to |
 | --- | --- |
 | Claude Code | The `env` block of `~/.claude/settings.json` (honors `CLAUDE_CONFIG_DIR`). |
 | Codex | `~/.codex/.env` (honors `CODEX_HOME`); Codex reads its key from the environment through a keyless `config.toml` entry. |
 | DeepSeek Harness | `$DSH_HOME/.env`. |
 
-Kiro, opencode, and OpenClaw read their credential from their own installed configuration
+Kiro, OpenCode, and OpenClaw read their credential from their own installed configuration
 or, for a daemon-woken Kiro, from the per-wake environment the daemon exports.
 
 ## For agents
@@ -288,4 +299,4 @@ or, for a daemon-woken Kiro, from the per-wake environment the daemon exports.
 
 - [Connect an agent runtime](/guides/operator-onboarding/) — the step-by-step setup walkthrough.
 - [Operate the Chorus daemon](/guides/daemon-operations/) — keep a runtime online.
-- [MCP tools](/reference/mcp-tools/) — the tool catalog `chorus mcp` calls.
+- [MCP tools catalog](/reference/mcp-tools/) — every tool `chorus mcp` can call.

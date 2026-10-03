@@ -1,79 +1,79 @@
 ---
 title: 自动化行为
-description: 插件的审查子智能体、会话生命周期钩子，以及无人值守时的交互限制是如何工作的。
+description: 插件的评审子智能体、会话生命周期钩子，以及无人值守时的交互限制是如何工作的。
 docsLocale: zh
 route: /zh/guides/plugin-automation/
 ---
 
-接入 Chorus 插件后，它会在你已经熟悉的工作流（见 [AI-DLC 工作流](/zh/guides/ai-dlc-workflow/)）之上叠加一些行为：在合适的节点提示进行独立审查、无需手工记账即可跟踪智能体会话，并对无人值守的智能体施加限制。本页说明这些行为。它不重复讲解生命周期各阶段，也不重复讲解如何安装、运行和恢复运行后端，这些请分别参阅 [AI-DLC 工作流](/zh/guides/ai-dlc-workflow/)、[管理后台服务](/zh/guides/daemon-operations/)、[中断与恢复会话](/zh/guides/session-recovery/)，以及[智能体平台参考](/zh/reference/agents/)。
+接入 Chorus 插件后，它会在你已经熟悉的工作流（见 [AI-DLC 工作流](/zh/guides/ai-dlc-workflow/)）之上叠加一些行为：在合适的节点提示进行独立评审、无需手工记账即可跟踪智能体会话，并对无人值守的智能体施加限制。本页说明这些行为。它不重复讲解生命周期各阶段，也不重复讲解如何安装、运行和恢复运行环境，这些请分别参阅 [AI-DLC 工作流](/zh/guides/ai-dlc-workflow/)、[管理后台服务](/zh/guides/daemon-operations/)、[中断与恢复会话](/zh/guides/session-recovery/)，以及[智能体平台](/zh/reference/agents/)参考页。
 
-## 审查子智能体
+## 评审子智能体
 
-插件在流水线的三个节点上加入了独立的质量关口。在每个节点，一个 `PostToolUse` 钩子会触发，并注入一条提醒，提示**主智能体**去派生一个专门的**只读审查子智能体**。审查子智能体**不会自动启动**，由主智能体派生它，按运行时提供的方式等待完成，再读取本轮裁定评论。完成的审查会发布 `PASS`、`PASS WITH NOTES` 或 `FAIL` 的裁定：
+插件在流水线的三个节点上加入了独立的质量关口。在每个节点，一个 `PostToolUse` 钩子会触发，并注入一条提醒，提示**主智能体**去派生一个专门的**只读评审子智能体**。评审子智能体**不会自动启动**，由主智能体派生它，按运行时提供的方式等待完成，再读取本轮裁定评论。完成的评审会发布 `PASS`、`PASS WITH NOTES` 或 `FAIL` 的裁定：
 
 - `PASS` / `PASS WITH NOTES`：工作继续进行；备注仅供参考。
 - `FAIL`：必须先修复列出的阻塞项并重新提交，工作才能继续。
 
-审查子智能体负责检查，而不是修改工作成果。Proposal reviewer 可以运行 `ls`、`rg`、`find`、`git log/show/diff` 等只读 shell 命令，报告路径缺失前必须先确认。它不能修改文件、执行 Git 写操作、安装依赖或运行测试/构建。Task reviewer 与 code reviewer 还可以运行项目自身的测试、构建和 lint 命令，这适用于包括 Kiro 在内的所有平台；在 Kiro 上，一份禁用命令列表会阻止修改文件、Git 写操作和安装依赖。
+评审子智能体负责检查，而不是修改工作成果。提案评审子智能体可以运行 `ls`、`rg`、`find`、`git log/show/diff` 等只读 shell 命令，报告路径缺失前必须先确认。它不能修改文件、执行 Git 写操作、安装依赖或运行测试/构建。任务评审子智能体与代码评审子智能体还可以运行项目自身的测试、构建和 lint 命令，这适用于包括 Kiro 在内的所有平台；在 Kiro 上，一份禁用命令列表会阻止修改文件、Git 写操作和安装依赖。
 
-| 审查子智能体 | 触发时机 | 审查内容 | 裁定发布在 |
+| 评审子智能体 | 触发时机 | 评审内容 | 裁定发布在 |
 | --- | --- | --- | --- |
-| Proposal reviewer | `chorus_pm_submit_proposal` 之后 | 文档完整性、任务粒度、验收标准的对应关系，以及依赖图 | 提案上 |
-| Task reviewer | `chorus_submit_for_verify` 之后 | 该任务的实现是否满足其验收标准与提案文档，外加即使没有任何验收标准涉及也始终适用的默认质量检查：正确性、重新实现已有功能、任务自身代码中的安全漏洞、不可能失败的测试，以及必需操作失败却被静默吞掉 | 任务上 |
-| Code reviewer | 以想法为根的提案的最后一个任务被验证时（`chorus_admin_verify_task`） | 该想法跨全部任务的**聚合**改动（跨任务集成、架构漂移、安全、回归、特性级覆盖） | 想法上 |
+| 提案评审子智能体 | `chorus_pm_submit_proposal` 之后 | 文档完整性、任务粒度、验收标准的对应关系，以及依赖图 | 提案上 |
+| 任务评审子智能体 | `chorus_submit_for_verify` 之后 | 该任务的实现是否满足其验收标准与提案文档，外加即使没有任何验收标准涉及也始终适用的默认质量检查：正确性、重新实现已有功能、任务自身代码中的安全漏洞、不可能失败的测试，以及必需操作失败却被静默吞掉 | 任务上 |
+| 代码评审子智能体 | 以想法为根的提案的最后一个任务被验证时（`chorus_admin_verify_task`） | 该想法跨全部任务的**聚合**改动（跨任务集成、架构漂移、安全、回归、特性级覆盖） | 想法上 |
 
-Code reviewer 是交付前的最终关口：只有当以想法为根的提案的*最后一个*任务被验证时它才运行，并且一次性审查整个特性，而不是单个任务。触发这些提示的三个匹配器定义在 `public/chorus-plugin/hooks/hooks.json` 中。
+代码评审子智能体是交付前的最终关口：只有当以想法为根的提案的*最后一个*任务被验证时它才运行，并且一次性评审整个特性，而不是单个任务。
 
 ### 跨轮次跟踪发现项
 
-每个发现项都有一个稳定的 ID：阻塞项为 `B<round>-<slug>`，备注为 `N<round>-<slug>`，其中轮次是首次报告它的那一轮，例如 `B1-ac3-not-implemented`。这个 ID 永不改变，因此第 3 轮裁定里出现一行 `B1-…`，就说明这个问题已经扛过了两次修复尝试。从第 2 轮起，审查子智能体会在 **Prior findings** 下列出此前的每个发现项，并标注三种状态之一：`fixed`、`still-open` 或 `not-verifiable`，同时说明它为作出判断重新运行了什么。只有 `fixed` 才会关闭一个发现项。仍未解决*或*无法重新验证的阻塞项会让裁定保持为 `FAIL`；未解决的备注最多只会让裁定变为 `PASS WITH NOTES`，不会更差。
+每个发现项都有一个稳定的 ID：阻塞项为 `B<round>-<slug>`，备注为 `N<round>-<slug>`，其中轮次是首次报告它的那一轮，例如 `B1-ac3-not-implemented`。这个 ID 永不改变，因此第 3 轮裁定里出现一行 `B1-…`，就说明这个问题经过两次修复仍未解决。从第 2 轮起，评审子智能体会在 **Prior findings** 下列出此前的每个发现项，并标注三种状态之一：`fixed`、`still-open` 或 `not-verifiable`，同时说明它为作出判断重新运行了什么。只有 `fixed` 才会关闭一个发现项。仍未解决*或*无法重新验证的阻塞项会让裁定保持为 `FAIL`；未解决的备注最多只会让裁定变为 `PASS WITH NOTES`，不会更差。
 
-裁定没有篇幅上限：阻塞项的证据会完整写出。取而代之的是，第一轮最多报告五条备注，之后的轮次不再新增备注，这样每条评论都聚焦于需要处理的事项。
+裁定没有篇幅上限：阻塞项的证据会完整写出。不过，第一轮最多报告五条备注，之后的轮次不再新增备注，这样每条评论都聚焦于需要处理的事项。
 
 ### 等待本轮裁定
 
-Claude Code 需要等待审查子智能体的完成通知：即使请求前台启动，启动返回值也不是裁定。Codex 使用原生派生与等待机制。Pi 内置的 `subagent` 工具则会阻塞到审查子智能体返回。无论哪种运行时，都要读取**本次派生之后**发布的 `VERDICT:` 评论，不能使用旧轮次的评论。
+Claude Code 需要等待评审子智能体的完成通知：即使请求前台启动，启动返回值也不是裁定。Codex 使用原生派生与等待机制。Pi 内置的 `subagent` 工具则会阻塞到评审子智能体返回。无论哪种运行时，都要读取**本次派生之后**发布的 `VERDICT:` 评论，不能使用旧轮次的评论。
 
 没有新裁定时，要区分沉默与明确交接：
 
-- **明确拒绝审查或报告轮次上限**：停止并交给人类决定。不得重新派生，也不得用自审裁定替代这次交接。
+- **明确拒绝评审或报告轮次上限**：停止并交给人类决定。不得重新派生，也不得用自审裁定替代这次交接。
 - **完全没有回应**：只重试一次。重试后也要先检查是否明确拒绝；只有第二次仍完全沉默，主智能体才可执行只读自审并发布裁定。没有回应绝不等于通过。
 
 ### 检查是否符合原始意图
 
-三个审查子智能体还会对照来源想法的正文、人工回答的需求细化，以及人工评论来检查工作是否偏离原始意图。Agent 的评论和自行回答的需求细化只是审计上下文，不能授权范围变更。
+三个评审子智能体还会对照来源想法的正文、人工回答的需求细化，以及人工评论来检查工作是否偏离原始意图。智能体的评论和自行回答的需求细化只是审计上下文，不能授权范围变更。
 
-增加范围、遗漏需求，或验收标准虽通过却未满足原始需求，都属于阻塞项，除非能引用人工评论、回答或明确的人工覆盖决定来证明变更已获授权。Proposal reviewer 检查计划，task reviewer 检查实现，code reviewer 检查整个特性。这是通过现有想法、需求细化和评论读取工具执行的技能规则，不是新增的 MCP 工具。
+增加范围、遗漏需求，或验收标准虽通过却未满足原始需求，都属于阻塞项，除非能引用人工评论、回答或明确的人工覆盖决定来证明变更已获授权。提案评审子智能体检查计划，任务评审子智能体检查实现，代码评审子智能体检查整个特性。
 
-### 开启或关闭审查子智能体
+### 开启或关闭评审子智能体
 
-这些审查子智能体由 `userConfig` 设置控制，你可以在安装或配置插件时调整。每个审查子智能体都有一个开关（默认全部**开启**），以及一个最大轮次上限，用来限定在升级交给人类之前最多运行多少轮"审查-修复"循环，避免无限循环：
+这些评审子智能体由 `userConfig` 设置控制，你可以在安装或配置插件时调整。每个评审子智能体都有一个开关（默认全部**开启**），以及一个最大轮次上限，用来限定在升级交给人类之前最多运行多少轮“评审-修复”循环，避免无限循环：
 
 | 设置项 | 类型 | 默认值 | 作用 |
 | --- | --- | --- | --- |
-| `enableProposalReviewer` | boolean | `true` | 提交提案后提示派生 proposal reviewer |
-| `enableTaskReviewer` | boolean | `true` | 提交任务待验证后提示派生 task reviewer |
-| `enableCodeReviewer` | boolean | `true` | 想法的最后一个任务被验证后提示派生 code reviewer |
-| `maxProposalReviewRounds` | number | `3` | 升级交给人类前的最大提案审查-修复轮次（`0` = 不限） |
-| `maxTaskReviewRounds` | number | `3` | 升级前的最大任务审查轮次（`0` = 不限） |
-| `maxCodeReviewRounds` | number | `3` | 升级前的最大代码审查轮次（`0` = 不限） |
+| `enableProposalReviewer` | boolean | `true` | 提交提案后提示派生提案评审子智能体 |
+| `enableTaskReviewer` | boolean | `true` | 提交任务待验证后提示派生任务评审子智能体 |
+| `enableCodeReviewer` | boolean | `true` | 想法的最后一个任务被验证后提示派生代码评审子智能体 |
+| `maxProposalReviewRounds` | number | `3` | 升级交给人类前的最大提案评审-修复轮次（`0` = 不限） |
+| `maxTaskReviewRounds` | number | `3` | 升级前的最大任务评审轮次（`0` = 不限） |
+| `maxCodeReviewRounds` | number | `3` | 升级前的最大代码评审轮次（`0` = 不限） |
 
-关闭某个审查子智能体会取消它这道独立质量关口，但能降低 token 消耗。另有一个独立的 `enableOpenSpec` 开关用于控制 OpenSpec 模式，将在单独的页面中说明。
+关闭某个评审子智能体会取消它这道独立质量关口，但能降低 token 消耗。另有一个独立的 `enableOpenSpec` 开关用于控制 OpenSpec 模式，将在单独的页面中说明。
 
-:::caution[仅"开关面板"限于 Claude Code]
-Claude Code 与 Codex 都提供全部三个审查子智能体，并触发同样的三处审查提示。仅限 Claude Code 的是 `userConfig` **开关面板**，即上表中的 `enable*` 开关与轮次上限设置。Codex 没有 `userConfig`，因此在 Codex 上这些审查子智能体由它的技能和钩子直接驱动，而不是由安装时的开关控制。见下文[Codex 的差异](#codex-的差异)。不要把开关上的差异误读为"存在哪些审查子智能体"的差异。
+:::caution[评审开关仅在 Claude Code 上提供]
+Claude Code 与 Codex 都提供全部三个评审子智能体，并触发同样的三处评审提示。仅限 Claude Code 的是 `userConfig` **开关面板**，即上表中的 `enable*` 开关与轮次上限设置。Codex 没有 `userConfig`，因此在 Codex 上这些评审子智能体由它的技能和钩子直接驱动，而不是由安装时的开关控制。见下文[Codex 的差异](#codex-的差异)。不要把开关上的差异误读为“存在哪些评审子智能体”的差异。
 :::
 
 ## 会话生命周期钩子
 
 第二组钩子会自动管理智能体的 Chorus **会话**，因此无论是你还是智能体，都不必手工开启、发送心跳或关闭会话。它们自行运行，不涉及任何判断或提示：
 
-- **`SessionStart`**：检查连通性，将智能体签入，并发现插件为它预创建的任何会话。
-- **`SubagentStart`**：在工作者启动前，按 Agent 类型创建或复用 Chorus 会话；同类型工作者可以共享。
+- **`SessionStart`**：检查连通性，让智能体签到，并发现插件为它预创建的任何会话。
+- **`SubagentStart`**：在工作者启动前，按智能体类型创建或复用 Chorus 会话；同类型工作者可以共享。
 - **`SubagentStop`**：释放退出工作者的占用；共享该会话的最后一个工作者退出后，才自动签出任务、关闭会话并执行适用的自动验证。
-- **心跳与提醒**：空闲的工作者会发送心跳，避免长时间运行期间会话被标记为不活跃；`PostToolUse` 提醒则在上文所述的审查节点上提示主智能体。
+- **心跳与提醒**：空闲的工作者会发送心跳，避免长时间运行期间会话被标记为不活跃；`PostToolUse` 提醒则在上文所述的评审节点上提示主智能体。
 
-由于这些钩子掌管会话生命周期，智能体绝不应自行创建或关闭会话。至于这些会话所运行其中的运行后端本身（如何启动、选择工作目录、中断和恢复），请参阅[管理后台服务](/zh/guides/daemon-operations/)与[中断与恢复会话](/zh/guides/session-recovery/)。
+由于这些钩子掌管会话生命周期，智能体绝不应自行创建或关闭会话。至于运行这些会话的运行环境本身（如何启动、选择工作目录、中断和恢复），请参阅[管理后台服务](/zh/guides/daemon-operations/)与[中断与恢复会话](/zh/guides/session-recovery/)。
 
 ## 无人值守的后台服务会话：禁止交互式提问
 
@@ -81,36 +81,29 @@ Claude Code 与 Codex 都提供全部三个审查子智能体，并触发同样�
 
 正确做法是，智能体把每一个决定都**通过 Chorus** 转交出去，让相应的人类可以异步回应：
 
-- 在任务或提案上发布一条证据充分的**评论**，并 **@mention** 相应的人类，写清你需要的确切动作（例如管理员验证）。
+- 在任务或提案上发布一条证据充分的**评论**，并 **@mention** 相应的人类，写清智能体需要对方执行的确切操作（例如管理员验证）。
 - 用**需求细化**把想法上尚未解决的问题记录下来，而不是阻塞等待一个实时答复。
 
-这样既保留了完整的审计轨迹，又能让人类在下次进入 Chorus 时再回应，而会话不必卡在一个它无法弹出的提问上。无论会话是交互式还是无人值守，这套转交方式都适用；只是在无人值守的情形下，交互式提问根本无从进行。
+这样既保留了完整的审计轨迹，又能让人类在下次进入 Chorus 时再回应，而会话不必卡在一个无人能回答的提问上。无论会话是交互式还是无人值守，这套转交方式都适用；只是在无人值守的情形下，交互式提问根本无从进行。
 
 ## Codex 的差异
 
-Codex 插件是一个移植版，而非完全镜像。它运行**与 Claude Code 相同的三个审查子智能体**（proposal、task、code），每一个都由同样的 `PostToolUse` / 钩子提示触发：分别在提交提案后、提交任务待验证后，以及以想法为根的提案的最后一个任务被验证后。差异在于配置与派生的机制，而不在于审查子智能体的集合：
+Codex 插件是一个移植版，而非完全镜像。它运行**与 Claude Code 相同的三个评审子智能体**（提案、任务、代码），每一个都由同样的 `PostToolUse` / 钩子提示触发：分别在提交提案后、提交任务待验证后，以及以想法为根的提案的最后一个任务被验证后。差异在于配置与派生的机制，而不在于评审子智能体的集合：
 
-- **没有 `userConfig` 开关面板。** Codex 不提供 `enable*` 审查开关，也不提供轮次上限设置。审查提示由 Codex 的技能和钩子直接驱动，因此无法像在 Claude Code 上那样在安装时关闭，例如那道代码审查关口默认开启，且没有可用来禁用它的开关。
-- **原生派生方式。** 主智能体通过 Codex 自带的 `spawn_agent` / `wait_agent` 调用审查子智能体，而不是 Claude Code 的 Agent Teams；Codex 也没有与 `TeammateIdle`、`TaskCompleted` 钩子对应的事件。
+- **没有 `userConfig` 开关面板。** Codex 不提供 `enable*` 评审开关，也不提供轮次上限设置。评审提示由 Codex 的技能和钩子直接驱动，因此无法像在 Claude Code 上那样在安装时关闭，例如代码评审提示默认开启，且没有用于禁用它的开关。
+- **原生派生方式。** 主智能体通过 Codex 自带的 `spawn_agent` / `wait_agent` 调用评审子智能体，而不是 Claude Code 的 Agent Teams；Codex 也没有与 `TeammateIdle`、`TaskCompleted` 钩子对应的事件。
 
-对于 OpenClaw、Kiro 和 Pi 运行后端，请把自动化当作"差异加指引"来对待：在[智能体平台参考](/zh/reference/agents/)下各运行后端的页面里查看它支持什么，而不要假定它就是 Claude Code 的行为。
+OpenClaw、Kiro 和 Pi 运行环境上的自动化行为有所不同。不要假定它们与 Claude Code 一致，请查看[智能体平台](/zh/reference/agents/)参考页中各运行环境的页面，了解它们各自支持什么。
 
-## 面向 Agent
+## 面向智能体
 
 - **触发时机：**
   - `chorus_pm_submit_proposal` 之后，一个 `PostToolUse` 钩子会提示你派生 `chorus:proposal-reviewer`；等待完成后读取它在提案上发布的本轮 `VERDICT:` 评论。
   - `chorus_submit_for_verify` 之后，派生 `chorus:task-reviewer`；读取它在任务上的 `VERDICT:` 评论。
-  - 在以想法为根的提案的**最后一个**任务上执行 `chorus_admin_verify_task` 之后，派生 code reviewer；读取它在想法上的 `VERDICT:` 评论。Claude Code（`chorus:code-reviewer`）与 Codex（`chorus-code-reviewer`）都会运行它。
-  - 审查子智能体**不会**自动启动，由你自己派生并等待裁定。`PASS` / `PASS WITH NOTES` 继续；`FAIL` 意味着修复阻塞项并重新提交。
+  - 在以想法为根的提案的**最后一个**任务上执行 `chorus_admin_verify_task` 之后，派生代码评审子智能体；读取它在想法上的 `VERDICT:` 评论。Claude Code（`chorus:code-reviewer`）与 Codex（`chorus-code-reviewer`）都会运行它。
+  - 评审子智能体**不会**自动启动，由你自己派生并等待裁定。`PASS` / `PASS WITH NOTES` 继续；`FAIL` 意味着修复阻塞项并重新提交。
 - **限制：**
-  - 遵循上面的只读限制与本轮裁定等待规则。方案审查允许 shell 检查，不允许运行测试/构建。绝不能通过重新派生或自审绕过明确的人类升级处理。
-  - 全部三个审查子智能体（proposal、task、code）在 Claude Code 与 Codex 上**都**提供。仅限 Claude Code 的是 `userConfig` 开关面板，即 `enable*` 开关（`enableProposalReviewer`、`enableTaskReviewer`、`enableCodeReviewer`）与轮次上限（`maxProposalReviewRounds`、`maxTaskReviewRounds`、`maxCodeReviewRounds`，默认 3，`0` = 不限）。Codex 没有 `userConfig`，因此在 Codex 上这些审查子智能体由它的技能和钩子直接驱动，无法在安装时关闭。
+  - 遵循上面的只读限制与本轮裁定等待规则。提案评审允许 shell 检查，不允许运行测试/构建。绝不能通过重新派生或自审绕过明确的人类升级处理。
+  - 全部三个评审子智能体（提案、任务、代码）在 Claude Code 与 Codex 上**都**提供。仅限 Claude Code 的是 `userConfig` 开关面板，即 `enable*` 开关（`enableProposalReviewer`、`enableTaskReviewer`、`enableCodeReviewer`）与轮次上限（`maxProposalReviewRounds`、`maxTaskReviewRounds`、`maxCodeReviewRounds`，默认 3，`0` = 不限）。Codex 没有 `userConfig`，因此在 Codex 上这些评审子智能体由它的技能和钩子直接驱动，无法在安装时关闭。
   - **不要**调用 `chorus_create_session` 或 `chorus_close_session`，会话生命周期钩子（`SessionStart`、`SubagentStart`、`SubagentStop`）会管理它。
   - **无人值守的**后台服务会话**绝不能**使用交互式提问（`AskUserQuestion` 之类）。请把决定通过 Chorus 评论加 `@mention` 以及需求细化转交出去。
-- **引用出处：**
-  - 钩子事件与 `PostToolUse` 匹配器：`public/chorus-plugin/hooks/hooks.json`。
-  - 审查子智能体角色：`public/chorus-plugin/agents/proposal-reviewer.md`、`public/chorus-plugin/agents/task-reviewer.md`、`public/chorus-plugin/agents/code-reviewer.md`。
-  - `userConfig` 开关与轮次上限（仅 Claude Code）：`public/chorus-plugin/.claude-plugin/plugin.json`。
-  - Codex 提供相同的三个审查子智能体，但没有 `userConfig` 面板：`plugins/chorus/skills/chorus-code-reviewer/SKILL.md`、`plugins/chorus/hooks/on-post-verify-task.sh`（代码审查关口提示），以及 `plugins/chorus/.codex-plugin/plugin.json`。
-  - 钩子与技能的分工：`docs/chorus-plugin.md`。
-  - 无人值守交互守卫：`docs/DAEMON.md` 以及 `develop` / `quick-dev` 技能。

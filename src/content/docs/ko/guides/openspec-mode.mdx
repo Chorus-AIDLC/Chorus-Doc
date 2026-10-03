@@ -1,59 +1,59 @@
 ---
 title: OpenSpec 모드
-description: 플러그인이 사양 모드를 어떻게 고르는지, 그리고 OpenSpec 작성이 디스크의 파일을 Chorus 제안 초안으로 어떻게 미러하는지.
+description: 플러그인이 명세 모드를 어떻게 고르는지, 그리고 OpenSpec 작성이 디스크의 파일을 Chorus 제안 초안으로 어떻게 미러하는지.
 docsLocale: ko
 route: /ko/guides/openspec-mode/
 ---
 
-사양 모드를 지원하는 Chorus 플러그인은 제안 작성이 취할 모양, 즉 **사양 모드**를 결정합니다. OpenSpec 모드는 그
-세 가지 중 하나이며, 작업 중인 리포지토리에서 OpenSpec을 쓸 수 있는 한 기본값입니다. 활성화된 동안에도
+명세 모드를 지원하는 Chorus 플러그인은 제안을 작성하는 방식, 즉 **명세 모드**를 결정합니다. OpenSpec 모드는
+세 가지 명세 모드 중 하나이며, 작업 중인 저장소에서 OpenSpec을 쓸 수 있는 한 기본값입니다. 활성화된 동안에도
 [AI-DLC 워크플로](/ko/guides/ai-dlc-workflow/)는 평소와 똑같이 실행되지만, 자유 형식 Markdown을 Chorus에
 곧장 입력하는 대신 에이전트가 [`openspec`](https://github.com/Fission-AI/OpenSpec) CLI로 디스크에
 구조화된 파일을 작성하고, 그것들을 제안의 문서 초안으로 미러합니다. 디스크의 파일이 작업 사본이고,
-Chorus 초안은 검토자가 제안 페이지에서 읽는 충실한 미러입니다.
+Chorus 초안은 검토자가 제안 페이지에서 읽는, 내용이 똑같은 사본입니다.
 
-## 세 가지 사양 모드
+## 세 가지 명세 모드
 
 | 모드 | 에이전트가 쓰는 것 | 언제 선택되는가 |
 | --- | --- | --- |
 | `openspec` | `openspec/changes/<slug>/` 아래 구조화된 파일, 초안으로 미러됨 | OpenSpec을 쓸 수 있을 때의 기본값 |
-| `lite` | `.chorus/specs/<slug>/` 아래 [Chorus 자체의 경량 사양](/ko/guides/spec-lite-mode/) | OpenSpec을 쓸 수 없을 때의 기본값 |
-| `off` | 자유 형식 초안, 로컬 사양 파일을 전혀 쓰지 않음 | 명시적으로 요청할 때만 |
+| `lite` | `.chorus/specs/<slug>/` 아래 [Chorus 자체의 경량 명세](/ko/guides/spec-lite-mode/) | OpenSpec을 쓸 수 없을 때의 기본값 |
+| `off` | 자유 형식 초안, 로컬 명세 파일을 전혀 쓰지 않음 | 명시적으로 요청할 때만 |
 
-사양 모드를 지원하는 여섯 플러그인은 같은 결정 규칙을 사용하지만, 결정 시점과 확인 방법은 다릅니다.
+명세 모드를 지원하는 여섯 플러그인은 같은 결정 규칙을 사용하지만, 결정 시점과 확인 방법은 다릅니다.
 
 | 런타임 | 결정 시점과 확인 방법 |
 | --- | --- |
 | Claude Code, Codex, Kiro, Pi | 세션 시작 시(Kiro는 에이전트 생성 시) 결정하며, 주입된 `## Spec Mode` 컨텍스트에 결과를 표시합니다. |
 | dsh | 플러그인 로드 시 결정하고 첫 에이전트 단계에서 `## Spec Mode` 컨텍스트를 주입합니다. |
-| OpenClaw | 단계 스킬이 사양 모드 단계에 도달하면 포함된 리졸버를 실행합니다. SessionStart 주입은 없습니다. `/chorus spec` 또는 `/chorus status`로 모드를 확인하세요. |
+| OpenClaw | 단계 스킬이 명세 모드 단계에 도달하면 포함된 리졸버를 실행합니다. 세션 시작 시 명세 모드 컨텍스트를 추가하지 않습니다. `/chorus spec` 또는 `/chorus status`로 모드를 확인하세요. |
 
 예를 들어 OpenSpec으로 결정되면 `CHORUS_SPEC_MODE=openspec`으로 표시됩니다.
-연결 알림이 없다는 이유로 모드를 추측하지 마세요.
+연결 알림이 표시되었는지 여부로 모드를 짐작하지 마세요.
 
 ## 모드가 정해지는 방식
 
-우선순위 순으로.
+우선순위가 높은 순서대로 적용됩니다.
 
 1. **명시적인 `CHORUS_SPEC_MODE`가 최우선.** `openspec`, `lite`, `off` 중 하나로 설정하면 셸 단위,
-   리포지토리 단위, CI 잡 단위로 모드를 고정할 수 있습니다.
+   저장소 단위, CI 잡 단위로 모드를 고정할 수 있습니다.
 2. **설정이 없으면, OpenSpec을 쓸 수 있는 한 그것이 기본값.** 쓸 수 있다는 것은 다음 세 가지가 모두
-   성립한다는 뜻입니다. 리포지토리 루트에 `openspec/` 디렉터리가 있고(`openspec init`이 만듭니다),
-   `openspec` CLI가 `PATH`에 있고, OpenSpec이 꺼져 있지 않다([다른 모드 고르기](#다른-모드-고르기) 참고).
+   성립한다는 뜻입니다. 저장소 루트에 `openspec/` 디렉터리가 있고(`openspec init`이 만듭니다),
+   `openspec` CLI가 `PATH`에 있으며, OpenSpec이 꺼져 있지 않아야 합니다([다른 모드 고르기](#다른-모드-고르기) 참고).
 3. **그 밖에는 `lite`.** 아무것도 설치하지 않아도 되는 Chorus 자체의 대체 경로입니다.
 
-OpenSpec을 쓸 수 없는 곳에서 `CHORUS_SPEC_MODE=openspec`을 고정했다면, 세션이 그 사실을 알리고
-워크플로는 다른 모양으로 작성하는 대신 **멈춥니다**.
+OpenSpec을 쓸 수 없는 곳에서 `CHORUS_SPEC_MODE=openspec`을 고정했다면, 세션은 요청한 모드를 따를 수 없다고
+알리고, 워크플로는 조용히 다른 방식으로 작성하는 대신 **멈춥니다**.
 
 원인을 해결하거나(CLI 설치, `openspec init` 실행, OpenSpec 재활성화) 쓸 수 있는 모드를 고르세요.
 요청한 모드가 조용히 강등되는 일은 없습니다.
 
 알 수 없는 `CHORUS_SPEC_MODE` 값은 미설정으로 처리하고 이유를 표시합니다. 위 세 가지 정확한 값을 사용하세요.
-독립 스킬 배포판은 사양 모드 라우팅을 포함하지 않으며 계속 자유 형식으로 작성합니다.
+독립 스킬 배포판은 명세 모드 라우팅을 포함하지 않으며 계속 자유 형식으로 작성합니다.
 
 ## 설치와 초기화
 
-OpenSpec은 Fission AI의 Node CLI입니다. 먼저 전역으로 설치한 뒤, 에이전트가 제안을 작성하는 리포지토리에서
+OpenSpec은 Fission AI의 Node CLI입니다. 먼저 전역으로 설치한 뒤, 에이전트가 제안을 작성하는 저장소에서
 초기화합니다.
 
 ```bash
@@ -62,10 +62,10 @@ openspec init
 ```
 
 `openspec init`은 `openspec/` 작업 디렉터리(`changes/`, `specs/`, 설정과 안내 파일)를 만듭니다. 시작 시
-모드를 결정하는 런타임은 세션을 재시작하고, dsh는 플러그인을 다시 로드하세요. OpenClaw는 다음 사양 모드 단계에서
+모드를 결정하는 런타임은 세션을 재시작하고, dsh는 플러그인을 다시 로드하세요. OpenClaw는 다음 명세 모드 단계에서
 다시 결정합니다. 결정하는 프로세스가 `openspec/` 디렉터리와 CLI를 모두 찾을 수 있어야 합니다.
 
-플러그인 설치는 [에이전트 플랫폼 레퍼런스](/ko/reference/agents/)를 참고하세요.
+플러그인 설치는 [에이전트 플랫폼 참고 문서](/ko/reference/agents/)를 참고하세요.
 
 ## proposal, develop, yolo에서의 변화
 
@@ -76,22 +76,20 @@ openspec init
 - **기술 설계**: `openspec/changes/<slug>/design.md`
 - **명세(역량마다 하나씩)**: `openspec/changes/<slug>/specs/<capability>/spec.md`
 
-`openspec/changes/<slug>/tasks.md`는 **미러되지 않습니다**. Chorus 작업 초안이 작업의 유일한 진실
-원천이므로, OpenSpec 작업 목록은 디스크에 남겨 둡니다.
+`openspec/changes/<slug>/tasks.md`는 **미러되지 않습니다**. 작업에 관해서는 Chorus 작업 초안이
+기준이므로, OpenSpec 작업 목록은 디스크에 남겨 둡니다.
 
-이후 실행이 변경을 복구할 수 있도록, 제안 설명에는 정확한 한 줄이 실립니다.
+이후 실행이 변경을 복구할 수 있도록, 제안 설명에 다음 한 줄이 정확히 들어갑니다.
 
 ```text
 OpenSpec change slug: <slug>
 ```
 
-미러는 바이트 단위로 충실합니다. 플러그인은 각 파일의 바이트를 초안으로 흘려보내지, 모델이 내용을 다시
-입력하게 하지 않으므로, 로컬 파일과 Chorus 초안이 동일하게 유지됩니다. 이것을 직접 실행하지는 않습니다.
+미러는 바이트 단위로 동일합니다. 플러그인은 모델이 내용을 다시 입력하게 하지 않고 각 파일의 바이트를
+그대로 초안에 옮기므로, 로컬 파일과 Chorus 초안이 동일하게 유지됩니다. 사용자가 직접 실행할 필요는 없습니다.
 플러그인의 스킬이 네이티브 MCP 클라이언트 `chorus mcp call <tool> --arg-file content=<file>`로 처리하며,
 `chorus` CLI가 `PATH`에 없을 때만 레거시 `chorus-api.sh` / `chorus-mcp-call.sh` 래퍼로 대체합니다.
-정확한 계약(그 오류 시 중단 규칙과 승인 후 재동기화)은 여기서 재현하지 않고 권위 있는 출처에 있습니다.
-`docs/OPENSPEC_MODE.md`와 플러그인 스킬 `public/chorus-plugin/skills/openspec-aware/SKILL.md`를
-참고하세요.
+오류 시 중단 규칙과 승인 후 재동기화를 포함한 정확한 규칙은 플러그인의 OpenSpec 스킬이 정의합니다.
 
 ## `openspec archive`는 언제 실행되는가
 
@@ -109,10 +107,10 @@ openspec archive <slug>
 
 ## 다른 모드 고르기
 
-세 스위치, 우선순위 순으로.
+스위치는 세 가지이며, 우선순위가 높은 순서대로 나열합니다.
 
-1. **`CHORUS_SPEC_MODE`**(모든 런타임). 피하고 싶은 것을 서술하는 대신 원하는 모드를 직접 지목하는 가장
-   단순한 방법입니다.
+1. **`CHORUS_SPEC_MODE`**(모든 런타임). 피하고 싶은 것을 서술하는 대신 원하는 모드를 직접 지정하는 가장
+   직접적인 방법입니다.
 
    ```bash
    export CHORUS_SPEC_MODE=lite   # Chorus 자체의 로컬 사양
@@ -120,24 +118,24 @@ openspec archive <slug>
    ```
 
 2. **`enableOpenSpec` userConfig 토글**(Claude Code 플러그인 전용, 기본 켜짐). 플러그인의 설치 구성에서
-   이를 끄면, 아카이브 리마인더를 포함해 플러그인 전역에서 OpenSpec을 쓸 수 없게 만듭니다.
-3. **`CHORUS_OPENSPEC_MODE=off` 환경 변수**(모든 런타임). 셸 단위로 적용되는 예전부터의 OpenSpec
-   옵트아웃이며, 지금도 유효합니다.
+   이를 끄면 아카이브 리마인더를 포함해 플러그인 전체에서 OpenSpec을 쓸 수 없게 됩니다.
+3. **`CHORUS_OPENSPEC_MODE=off` 환경 변수**(모든 런타임). 셸 단위로 적용되는 기존 OpenSpec
+   끄기 방법이며, 지금도 유효합니다.
 
    ```bash
    export CHORUS_OPENSPEC_MODE=off
    ```
 
-뒤의 두 가지가 지금 무엇을 뜻하는지 유의하세요. 이들은 OpenSpec을 *쓸 수 없게* 만들므로, 세션은 자유
-형식이 아니라 `lite`에 안착합니다. 로컬 사양 파일을 전혀 원하지 않으면 `off`를 명시적으로 지정하세요.
+뒤의 두 가지는 OpenSpec을 *쓸 수 없게* 만들 뿐이므로, 세션은 자유 형식이 아니라 `lite`로 결정된다는
+점에 유의하세요. 로컬 명세 파일을 전혀 원하지 않으면 `off`를 명시적으로 지정하세요.
 어느 쪽이든 디스크의 기존 `openspec/` 디렉터리는 그대로 남고, 새 제안에 OpenSpec 슬러그 줄이 붙지도
 않습니다.
 
 ## 에이전트용
 
 - **트리거.** proposal, develop, yolo는 런타임이 결정한 `CHORUS_SPEC_MODE`를 사용합니다. 주입된
-  `## Spec Mode`가 있으면 읽고, OpenClaw에서는 사양 모드 단계마다 포함된 리졸버를 실행하세요. 다른 런타임에서
-  주입 컨텍스트가 없다면 해당 스킬의 대체 절차를 따르세요. 설명문에서 결정 규칙을 직접 재구현하지 마세요.
+  `## Spec Mode`가 있으면 읽고, OpenClaw에서는 명세 모드 단계마다 포함된 리졸버를 실행하세요. 다른 런타임에서
+  주입 컨텍스트가 없다면 해당 스킬의 대체 절차를 따르세요. 문서 설명을 근거로 결정 규칙을 직접 재구현하지 마세요.
   `CHORUS_OPENSPEC_ACTIVE=1`은 사용 가능한 `openspec`을 뜻합니다. `lite`는 spec-lite, `off`는 인라인
   작성입니다. 명시적 `openspec`을 충족할 수 없으면 **중단**하고 대체하지 마세요. 마지막 작업 검증 후에는
   런타임의 훅 또는 스킬에 따라 `openspec archive <slug>`를 실행하세요. 모든 런타임에 PostToolUse가 있다고
@@ -147,9 +145,5 @@ openspec archive <slug>
   없을 때만 레거시 `chorus-api.sh mcp-tool` / `chorus-mcp-call.sh` 래퍼로 대체합니다. 문서 내용을
   인라인으로 다시 입력해서는 절대 안 되며, 어떤 오류가 있으면 중단합니다. `tasks.md`는 미러하지 마세요.
   제안 설명에는 정확한 `OpenSpec change slug: <slug>` 한 줄을 실어야 합니다. 모드가 `openspec`이 아닐
-  때는 `openspec/changes/`를 스캐폴딩하지 말고 슬러그 줄도 추가하지 마세요. 독립 `public/skill/`
-  배포판은 사양 모드를 지원하지 않습니다.
-- **출처.** `public/chorus-plugin/bin/resolve-spec-mode.sh`(모드 결정의 단일 진실 원천),
-  `docs/OPENSPEC_MODE.md`(사용자 대상 개요), 그리고 권위 있는 스킬
-  `public/chorus-plugin/skills/openspec-aware/SKILL.md`(Claude Code)와
-  `plugins/chorus/skills/openspec-aware/SKILL.md`(Codex).
+  때는 `openspec/changes/`를 스캐폴딩하지 말고 슬러그 줄도 추가하지 마세요. 독립 스킬
+  배포판은 명세 모드를 지원하지 않습니다.

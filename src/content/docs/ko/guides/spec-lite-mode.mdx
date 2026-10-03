@@ -1,32 +1,32 @@
 ---
 title: Spec-lite 모드
-description: Chorus 자체의 경량 사양 모드 — 역량마다 하나의 지속되는 로컬 사양과, 변경마다 하나의 날짜 폴더에 담긴 동기화 문서.
+description: Chorus 자체의 경량 명세 모드 — 역량마다 하나의 지속되는 로컬 명세와, 변경마다 하나의 날짜 폴더에 담긴 동기화 문서.
 docsLocale: ko
 route: /ko/guides/spec-lite-mode/
 ---
 
-Spec-lite는 Chorus 자체의 경량 사양 모드입니다. git으로 추적되는 작은 사양 기록이며, 아무것도 설치할
-필요가 없습니다. 리포지토리에서 [OpenSpec](/ko/guides/openspec-mode/)을 쓸 수 없을 때 세션이 쓰는 모드이고,
+Spec-lite는 Chorus 자체의 경량 명세 모드입니다. git으로 추적되는 작은 명세 기록이며, 아무것도 설치할
+필요가 없습니다. 저장소에서 [OpenSpec](/ko/guides/openspec-mode/)을 쓸 수 없을 때 세션이 쓰는 모드이고,
 `CHORUS_SPEC_MODE=lite`로 직접 요청할 때도 선택됩니다. OpenSpec 경로에 비해 의도적으로 더 작아서 CLI도,
 검증 단계도, 아카이브 단계도, 델타 문법도 없습니다. 그래서 시간과 토큰을 덜 쓰면서도 `git log`로 읽을 수
 있는 기록을 남깁니다.
 
-[AI-DLC 워크플로](/ko/guides/ai-dlc-workflow/)는 그대로입니다. 달라지는 것은 로컬 사양 파일의 모양뿐입니다.
+[AI-DLC 워크플로](/ko/guides/ai-dlc-workflow/)는 그대로입니다. 달라지는 것은 로컬 명세 파일의 모양뿐입니다.
 
 ## 언제 선택되는가
 
-런타임의 사양 모드 결과에서 `CHORUS_SPEC_MODE=lite`를 확인하세요. Claude Code, Codex, Kiro, Pi는 시작
-컨텍스트에, dsh는 플러그인 로드 후 첫 에이전트 단계에 표시합니다. OpenClaw는 시작 컨텍스트를 주입하지 않고
+런타임의 명세 모드 결과에서 `CHORUS_SPEC_MODE=lite`를 확인하세요. Claude Code, Codex, Kiro, Pi는 시작
+컨텍스트에, DeepSeek Harness(`dsh`)는 플러그인 로드 후 첫 에이전트 단계에 표시합니다. OpenClaw는 시작 컨텍스트를 주입하지 않고
 단계 스킬 실행 중 결정합니다. `/chorus spec` 또는 `/chorus status`로 확인하세요.
 
-`lite`가 되는 이유는 두 가지입니다. 이 리포지토리에서 OpenSpec을 쓸 수 없거나(`openspec/` 디렉터리와
+`lite`가 되는 이유는 두 가지입니다. 이 저장소에서 OpenSpec을 쓸 수 없거나(`openspec/` 디렉터리와
 `openspec` CLI가 필요하므로 이쪽이 흔합니다), 직접 요청했기 때문입니다.
 
 ```bash
 export CHORUS_SPEC_MODE=lite
 ```
 
-이렇게 고정하면 OpenSpec이 동작하는 리포지토리에서도 spec-lite를 쓰게 됩니다. 전체 우선순위는
+이렇게 고정하면 OpenSpec이 동작하는 저장소에서도 spec-lite를 쓰게 됩니다. 전체 우선순위는
 [모드가 정해지는 방식](/ko/guides/openspec-mode/#모드가-정해지는-방식)을 참고하세요.
 
 ## 디스크에 남는 것
@@ -41,23 +41,23 @@ export CHORUS_SPEC_MODE=lite
     └── tech_design.md                   # → Chorus 기술 설계 문서
 ```
 
-**지속되는 사양 `<capability-slug>/spec.md`.** 역량이나 기능마다 하나이며, 변경마다 하나가 *아닙니다*.
-의도, 수용 지점이 담긴 요구사항, 비목표를 모은 누적적인 "현재의 진실"입니다. 모든 변경이 이 파일을 제자리에서
+**지속되는 명세 `<capability-slug>/spec.md`.** 역량이나 기능마다 하나이며, 변경마다 하나가 *아닙니다*.
+의도, 수락 기준이 담긴 요구사항, 비목표를 모아 계속 갱신되는 "현재 기준"입니다. 모든 변경이 이 파일을 제자리에서
 고치고, git 이력이 그대로 기록이 됩니다. 변경 이력 절을 따로 관리할 필요가 없습니다. Chorus로 복사되지
 **않으며** Chorus 식별자도 갖지 않습니다. `status`(`draft`, `active`, `done`)는 역량 자체를 나타냅니다.
-변경이 진행 중이면 `active`, 인도 후 미완료 변경이 없으면 `done`이 되고, 새 변경이 다시 엽니다.
+변경이 진행 중이면 `active`, 제공이 끝나고 남은 변경이 없으면 `done`이 되며, 새 변경이 시작되면 다시 열립니다.
 
 **변경마다 하나의 날짜 폴더 `<capability-slug>/<YYYY-MM-DD>-<change-slug>/`.** 날짜로 시간순 정렬을
 하며, 같은 날의 서로 다른 변경에는 서로 다른 change slug를 사용하세요. 안의 각 파일이 Chorus 문서 유형 하나에 대응하며, `prd.md`는
 필수이고 `tech_design.md`, `adr.md`, `guide.md` 또는 변경 범위의 `spec.md`는 필요할 때만 추가합니다.
 이 파일들은 Chorus로 **미러됩니다**. 한 파일이 하나의 지속 문서에 대응하고, 모델이 다시 입력하는 대신
 바이트 단위로 기록되므로 로컬 파일과 Chorus 문서가 동일하게 유지됩니다. 승인 후 편집을 미러할 때마다 그 문서의
-버전이 올라가고, 그것이 git과 나란한 Chorus 쪽 기록이 됩니다.
+버전이 올라가고, 이 버전이 git과 함께 Chorus 안에 남는 변경 기록이 됩니다.
 
-`tasks.md`는 없습니다. 작업은 작업 초안으로 Chorus에 존재하고, `spec.md`의 수용 지점은 의도의 표현이지
+`tasks.md`는 없습니다. 작업은 작업 초안으로 Chorus에 존재하고, `spec.md`의 수락 기준은 의도의 표현이지
 진행 추적기가 아닙니다.
 
-이후 세션이 변경을 찾을 수 있도록, 제안 설명에는 정확한 한 줄이 실립니다.
+이후 세션이 변경을 찾을 수 있도록, 제안 설명에 다음 한 줄이 정확히 들어갑니다.
 
 ```text
 Spec-lite: .chorus/specs/<capability-slug>/<YYYY-MM-DD>-<change-slug>/
@@ -81,37 +81,35 @@ Spec-lite: .chorus/specs/<capability-slug>/<YYYY-MM-DD>-<change-slug>/
 ## `spec.md`라는 이름의 두 파일
 
 `<capability-slug>/spec.md`는 지속되는 쪽이며 로컬 전용이고 Chorus 식별자가 없습니다.
-`<capability-slug>/<날짜 폴더>/spec.md`에 있는 것은 별개로, Chorus로 *동기화되는* 변경 범위의 사양
+`<capability-slug>/<날짜 폴더>/spec.md`에 있는 것은 별개로, Chorus로 *동기화되는* 변경 범위의 명세
 문서입니다. 변경의 주 문서로 `prd.md`를 쓰면 이 모호함을 만나지 않습니다.
 
 ## 변경이 진행되는 동안
 
 진행 중인 변경의 날짜 폴더는 계속 편집됩니다. 작업이 반영될 때마다 에이전트는 그 폴더와 지속되는
-`spec.md`를 함께 갱신하고, 변경 문서를 다시 미러하며 수용 지점에 표시를 남깁니다. **이미 인도된** 변경의
-폴더는 건드리지 않습니다. 새 변경은 새 날짜 폴더이며, 과거의 것을 고쳐 쓰지 않습니다.
+`spec.md`를 함께 갱신하고, 변경 문서를 다시 미러하며 수락 기준에 표시를 남깁니다. **이미 완료된** 변경의
+폴더는 건드리지 않습니다. 새 변경은 새 날짜 폴더로 만들며, 과거 폴더를 고쳐 쓰지 않습니다.
 
 여러 작업이 병렬로 진행될 때는 메인 에이전트만 이 파일들에 쓰고, 워커는 Chorus를 통해 진행 상황을
-보고합니다. 그래야 공유 폴더가 두 세션에 의해 동시에 덮이지 않습니다.
+보고합니다. 그래야 공유 폴더가 두 세션에 의해 동시에 덮어써지지 않습니다.
 
 ## 어디에 제공되는가
 
 Spec-lite는 Chorus 플러그인과 함께 Claude Code, Codex, Kiro, Pi, OpenClaw, dsh에서 제공됩니다. 모드
 규칙은 같지만 시작 방식은 다릅니다. 런타임 차이는 [OpenSpec 가이드](/ko/guides/openspec-mode/)를 참고하세요.
-독립 스킬 배포판은 사양 모드 라우팅을 포함하지 않으며 계속 자유 형식으로 작성합니다.
+독립 스킬 배포판은 명세 모드 라우팅을 포함하지 않으며 계속 자유 형식으로 작성합니다.
 
 ## 에이전트용
 
 - **트리거.** 런타임이 `CHORUS_SPEC_MODE=lite`로 결정한 경우에만 spec-lite를 사용하세요. 주입된
-  `## Spec Mode`가 있으면 읽고, OpenClaw는 단계 스킬의 사양 모드 단계에서 포함된 리졸버를 실행합니다.
+  `## Spec Mode`가 있으면 읽고, OpenClaw는 단계 스킬의 명세 모드 단계에서 포함된 리졸버를 실행합니다.
   다른 런타임에서 컨텍스트가 없다면 해당 스킬의 대체 절차를 따르고 감지 규칙을 직접 만들지 마세요.
   다른 모드에서는 이 스킬이 아무 동작도 하지 않습니다.
 - **제약.** 지속되는 `<slug>/spec.md`는 절대 미러하지 마세요. 날짜 폴더의 문서는
   `chorus mcp call <tool> '<json>' --arg-file content=<file>`로 미러해 본문을 다시 입력하는 대신 파일에서
   흘려보내고, `chorus`가 `PATH`에 없을 때만 `chorus-api.sh` / `chorus-mcp-call.sh` 래퍼로 대체합니다.
-  문서 신원은 `documentUuid` 또는 `(proposalUuid, type)`으로만 해석하고, 조회 결과가 0건이거나 2건 이상이면
+  문서는 `documentUuid` 또는 `(proposalUuid, type)`으로만 식별하고, 조회 결과가 0건이거나 2건 이상이면
   **중단**해야 하며 제목만으로 맞춰서는 안 됩니다. 미러에서 오류가 나면 중단합니다. `tasks.md`를 만들지
-  말고 `openspec/changes/`도 스캐폴딩하지 마세요. 제안 설명에는 정확한
-  `Spec-lite: .chorus/specs/<slug>/<YYYY-MM-DD>-<change-slug>/` 위치 지정 줄을 한 줄로 두고 끝에 문장
-  부호 없이 실어야 합니다.
-- **출처.** `public/chorus-plugin/skills/spec-lite/SKILL.md`(권위 있는 스킬, 두 시작 템플릿이 파일 안에 있습니다)와
-  `public/chorus-plugin/bin/resolve-spec-mode.sh`(모드 결정의 단일 진실 원천).
+  말고 `openspec/changes/`도 스캐폴딩하지 마세요. 제안 설명에는
+  `Spec-lite: .chorus/specs/<slug>/<YYYY-MM-DD>-<change-slug>/` 위치 줄을 정확히, 독립된 한 줄로, 끝에
+  문장 부호 없이 넣어야 합니다.

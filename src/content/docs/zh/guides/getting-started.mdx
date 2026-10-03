@@ -7,16 +7,19 @@ sidebar:
   order: 1
 ---
 
+本指南带你从一台新电脑开始，完成一个可用的本地 Chorus 安装。你需要
+[Node.js 22 或更高版本](https://nodejs.org/)以及 npm。
+
 ## 安装并启动 Chorus
 
-请先安装 Node.js 22 或更高版本，然后安装 Chorus：
+全局安装 Chorus 命令：
 
 ```sh
 npm install --global \
   @chorus-aidlc/chorus
 ```
 
-首次启动时设置自己的管理员账号和密码：
+设置管理员账号并启动 Chorus：
 
 ```sh
 DEFAULT_USER=you@example.com \
@@ -24,11 +27,21 @@ DEFAULT_PASSWORD='choose-a-strong-password' \
 chorus
 ```
 
-启动完成后，打开 `http://localhost:8637`，使用刚才设置的邮箱和密码登录。共享电脑上不要让密码进入命令历史。若 Chorus 由团队统一部署，请使用管理员提供的网址和账号，不要在自己的电脑上重复安装。
+Chorus 会创建本地数据库、执行所需的数据库迁移，并启动 Web 应用。使用 Chorus 期间请保持这个终端开启。
 
-## 连接第一个智能体
+## 登录
 
-打开设置（Settings），进入设置指南（Setup Guide）。向导会根据你使用的智能体平台给出安装步骤，并帮助你创建访问密钥。
+打开 `http://localhost:8637`，使用上面设置的邮箱和密码登录。在共享电脑上，不要让这些值进入命令历史。内置数据库仅适用于本地单人使用。如需多人共享的安装，请使用外部 PostgreSQL 数据库或受支持的 Docker 部署，并通过部署环境管理凭据。
+
+## 连接智能体
+
+1. 打开**设置**。
+2. 找到**设置向导**（Setup Guide），选择**打开设置向导**。
+3. 选择你的智能体平台。
+4. 按页面显示的步骤完成安装和连接。
+5. 完成向导中的连接检查。
+
+设置向导会创建所需的智能体凭据，并给出适用于所选平台的命令。不要复用其他平台的命令。
 
 更喜欢用终端？安装命令行工具并运行一条命令即可：
 
@@ -39,22 +52,22 @@ chorus agents add
 
 `chorus agents add` 会检测你已安装的智能体，为每个智能体安装其 Chorus 插件，并写入凭据，参见 [chorus 命令行工具](/zh/reference/cli/) 和[连接智能体运行环境](/zh/guides/operator-onboarding/)。
 
-要全面了解智能体配置（如何对比各平台、Chorus 插件打包了什么、以及如何升级或卸载），请参见[智能体平台](/zh/reference/agents/)，并阅读[配置智能体](/zh/guides/administrator-setup/)下关于访问密钥、远程启动与保持运行时在线的其余指南。
+要全面了解智能体配置（如何对比各平台、Chorus 插件包含哪些内容，以及如何升级或卸载），请参见[智能体平台](/zh/reference/agents/)；关于访问密钥、远程启动和让运行环境保持在线，请从[为智能体创建访问权限](/zh/guides/administrator-setup/)开始阅读其他智能体设置指南。
 
-根据使用方式完成后续步骤：
+根据你的使用方式选择下一步：
 
-- **只在智能体终端中使用 Chorus**：安装对应平台的插件或 MCP 集成，再按照平台页面调用 `chorus_checkin`。OpenCode、Pi 和通用 MCP 客户端到这里就完成了，它们不会显示为可远程运行的在线智能体。
-- **从 Chorus 页面远程发起工作**：选择 Claude Code、Codex、Kiro 或 OpenClaw。Claude Code、Codex 和 Kiro 用户应依次[连接智能体运行环境](/zh/guides/operator-onboarding/)、[让后台服务保持在线](/zh/guides/daemon-operations/)，再[发起第一次远程会话](/zh/guides/remote-control/)；OpenClaw 通过自己的网关保持在线。
+- **只在智能体终端中使用 Chorus**：完成平台页面中的签到步骤。OpenCode、Pi 和通用 MCP 客户端到这里就完成了，它们不会显示为可远程使用的运行环境。
+- **从 Chorus 远程发起工作**：选择 Claude Code、Codex、Kiro 或 OpenClaw。Claude Code、Codex 和 Kiro 需要依次[连接智能体运行环境](/zh/guides/operator-onboarding/)、[让它保持在线](/zh/guides/daemon-operations/)，再[启动第一个会话](/zh/guides/remote-control/)。OpenClaw 通过自己的网关保持在线。
 
-完成远程运行配置后，设置页面右下角会显示在线智能体。展开连接，确认运行后端、主机和工作目录都符合预期。连接没有上线时，请前往[排查智能体连接故障](/zh/guides/troubleshooting/)。
+如果机器或凭据由其他人管理，请先阅读[为智能体创建访问权限](/zh/guides/administrator-setup/)。
 
 ## 跑通你的第一个想法
 
-Chorus 跑起来、智能体也连上之后，就让它干活。看清整个闭环最快的方式，是把一个小想法端到端跑一遍：
+Chorus 运行起来、智能体也连接好之后，就可以让它开始工作了。看清整个闭环最快的方式，是把一个小想法端到端跑一遍：
 
 1. [创建一个项目](/zh/guides/create-a-project/)来承载这项工作。
 2. [记录一个想法](/zh/guides/capture-an-idea/)，挑个小而真实的，比如“给这个仓库加一个 README”，然后回答智能体的需求细化问题。
-3. [审核](/zh/guides/review-a-proposal/)智能体起草的提案，并批准它。
+3. [审核智能体起草的提案](/zh/guides/review-a-proposal/)，并批准它。
 4. 让智能体[执行任务](/zh/guides/run-tasks/)，再[验证与完成](/zh/guides/verify-and-complete/)结果。
 
 想全面了解一项请求如何从想法走到完成、以及你在哪些环节做决定，请阅读 [AI-DLC 工作流](/zh/guides/ai-dlc-workflow/)，那一页会把你引导到每个阶段的分步指南。

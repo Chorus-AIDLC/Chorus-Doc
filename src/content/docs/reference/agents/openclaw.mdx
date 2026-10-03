@@ -5,12 +5,11 @@ docsLocale: en
 route: /reference/agents/openclaw/
 ---
 
-# OpenClaw
-
 OpenClaw has a first-party Chorus plugin. It stays available through the OpenClaw gateway
 and its native background service; it does not use the Chorus daemon.
 
-Before installation, use OpenClaw `2026.4.27` or newer and create an agent key by following
+Before you begin, make sure you have OpenClaw `2026.4.27` or newer, and create an agent key by
+following
 [Prepare agent access](/guides/administrator-setup/).
 
 ## Install the plugin
@@ -50,8 +49,8 @@ If OpenClaw runs agents in sandbox mode, allow `chorus__*` tools in the sandbox 
 - OpenClaw is not accepted by `chorus daemon --agent`; keep the gateway running instead.
 - OpenClaw does not expose the same workflow lifecycle hooks as Claude Code.
 
-Use [Remote control](/guides/remote-control/) and
-[Session recovery](/guides/session-recovery/) for shared operating procedures.
+Use [Start work on a remote agent](/guides/remote-control/) and
+[Interrupt and resume a session](/guides/session-recovery/) for shared operating procedures.
 
 ## Common issues
 
@@ -60,4 +59,4 @@ Use [Remote control](/guides/remote-control/) and
 - **Check-in is unauthorized:** rotate the agent key, update `openclaw.json`, and restart
   the gateway.
 - **Remote start fails:** confirm that the gateway has a main session and model configured,
-  then see [Troubleshooting](/guides/troubleshooting/).
+  then see [Troubleshoot agent connections](/guides/troubleshooting/).

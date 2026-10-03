@@ -5,12 +5,10 @@ docsLocale: en
 route: /reference/agents/codex/
 ---
 
-# Codex
-
 Codex has a first-party Chorus integration with tools, workflow skills, and hooks. It is
 also a supported Chorus daemon backend.
 
-Before installation, create an agent key by following
+Before you install, create an agent key by following
 [Prepare agent access](/guides/administrator-setup/).
 
 ## Install the integration
@@ -29,24 +27,24 @@ chorus agents add --agents codex
 ```
 
 Enter the Chorus URL and agent key when prompted. `chorus agents add` installs the Codex
-plugin and configures Codex keyless: it writes `CHORUS_URL`, `CHORUS_API_KEY`, and
-`CHORUS_AGENT_PROFILE` into `~/.codex/.env` and sets `bearer_token_env_var = "CHORUS_API_KEY"`
-in `~/.codex/config.toml`, so Codex reads its key from the environment rather than a baked
-literal. Restart Codex afterward.
+plugin, writes `CHORUS_URL`, `CHORUS_API_KEY`, and `CHORUS_AGENT_PROFILE` into
+`~/.codex/.env`, and sets `bearer_token_env_var = "CHORUS_API_KEY"` in
+`~/.codex/config.toml`, so Codex reads its key from the environment and the config file
+never contains it. Restart Codex afterward.
 
 ## Enable remote start
 
 Skip this section if you only use Chorus from an interactive Codex session. Otherwise,
 follow [Connect an agent runtime](/guides/operator-onboarding/) and select `codex` as the
 backend. Verify the connection in the foreground before using
-[Daemon operations](/guides/daemon-operations/) to keep it online.
+[Operate the Chorus daemon](/guides/daemon-operations/) to keep it online.
 
 ## Daemon behavior in 0.20.0
 
 Daemon wakes now use one isolated `codex app-server --listen stdio://` process per turn.
 The minimum verified baseline is **codex-cli 0.157.1**; older versions are unverified, and
 missing protocol support fails the wake. There is no `codex exec` fallback or backend
-switch. Install the Chorus integration in each custom `CODEX_HOME` too. Updating Chorus
+switch. If you use a custom `CODEX_HOME`, install the Chorus integration there too. Updating Chorus
 plugins does not upgrade the Codex CLI itself.
 
 ### Model options and session continuity
@@ -59,19 +57,24 @@ through [the CLI](/reference/cli/); `chorus agents run --type codex -- exec ...`
 `... -- resume ...` retain their existing behavior.
 
 The daemon resumes stored threads, including threads from the earlier `exec` backend,
-with the current working directory and permission policy. Only a definitive “no rollout
-found” response starts a replacement thread, once, with a continuity notice in the
-conversation. Other resume errors stop the wake and preserve the stored mapping. A
-session-map read failure starts fresh with a warning; a write failure warns that future
-continuity may be reduced. New messages queue for later turns; they do not steer a running
-turn. Token usage is computed from cumulative counters for this turn; if a resumed thread
-has no trustworthy baseline, that turn's usage is omitted rather than counting its history.
+with the current working directory and permission policy.
+
+- **Replacement threads:** only a definitive “no rollout found” response starts a
+  replacement thread, once, with a continuity notice in the conversation. Other resume
+  errors stop the wake and keep the stored link between the Chorus session and the Codex
+  thread.
+- **Stored session records:** if the daemon cannot read its stored session record, it starts
+  fresh with a warning; if it cannot save one, it warns that future continuity may be
+  reduced.
+- **New messages** queue for later turns; they do not steer a running turn.
+- **Token usage** is reported for the current turn only. If a resumed thread has no reliable
+  starting count, that turn's usage is left out rather than counting the thread's history.
 
 ### Restricted mode and tool approvals
 
-`--chorus-only` keeps Codex read-only, with interactive approvals disabled and network
-access disabled for the turn. Native requests for approval or user input are denied;
-requests that cannot be safely rejected fail the wake. Questions should go through Chorus
+`--chorus-only` keeps Codex read-only, with interactive approvals and network access
+disabled for the turn. Native requests for approval or user input are denied; requests that
+cannot be safely rejected fail the wake. Questions should go through Chorus
 comments or elaboration. On the verified Codex version, Chorus MCP tools that require
 approval can also be rejected, including `chorus_checkin`. A completed turn does not prove
 that its MCP calls succeeded.
@@ -93,15 +96,14 @@ Codex configuration, not daemon `args`. The daemon does not approve requests on 
 
 An authorized interrupt sends `turn/interrupt`; cancellation during startup closes the
 transport. The daemon then performs bounded process-tree cleanup. On Windows this needs
-Windows PowerShell (`Get-CimInstance`) and `taskkill`; Windows behavior is covered by
-platform tests, while Linux has live verification.
+Windows PowerShell (`Get-CimInstance`) and `taskkill`.
 
 For startup or protocol failures, check `codex --version`, login, model/config settings,
 and local session storage permissions. Initialization has a 30-second limit, setup RPC
 responses 60 seconds, and cleanup 10 seconds. A running turn has no inactivity or total
-runtime timeout: use **Interrupt** if it is stuck. `CLOSED` is an informational diagnostic;
-a failed, interrupted, or missing terminal outcome is not success just because the process
-exits zero. See [Session recovery](/guides/session-recovery/) for the recovery flow.
+runtime timeout: use **Interrupt** if it is stuck. `CLOSED` is informational only. A turn
+that failed, was interrupted, or never reported an outcome is not a success, even if the
+process exits with code 0. See [Interrupt and resume a session](/guides/session-recovery/) for the recovery flow.
 
 ## Verify the connection
 
@@ -120,12 +122,12 @@ and working directory are online.
   sub-agent sessions.
 - Remote work inherits the local user's access. Register only trusted working directories.
 
-Use [Remote control](/guides/remote-control/) and
-[Session recovery](/guides/session-recovery/) for shared operating procedures.
+Use [Start work on a remote agent](/guides/remote-control/) and
+[Interrupt and resume a session](/guides/session-recovery/) for shared operating procedures.
 
 ## Resume from the terminal
 
-To take over a live conversation from your own terminal, copy its session id from the chat
+To take over a live conversation from your own terminal, copy its session ID from the chat
 UI (**Copy session ID** in the transcript header) and run, from the conversation's working
 directory:
 
@@ -133,8 +135,8 @@ directory:
 codex exec resume <thread_id>
 ```
 
-Codex generates its own thread id, so the copied value is that thread id — not a
-Chorus-supplied session id. It is exactly what Chorus passes back to Codex when it resumes a
+Codex generates its own thread ID, so the copied value is that thread ID — not a
+Chorus-supplied session ID. It is exactly what Chorus passes back to Codex when it resumes a
 run. See [Interrupt and resume a session](/guides/session-recovery/#take-over-from-a-terminal)
 for the full flow.
 
@@ -146,4 +148,4 @@ for the full flow.
 - **Plugin or hooks are disabled:** enable them in `/plugins` and `/hooks`, then restart
   Codex.
 - **Daemon is offline:** run `chorus daemon status`, then see
-  [Troubleshooting](/guides/troubleshooting/).
+  [Troubleshoot agent connections](/guides/troubleshooting/).

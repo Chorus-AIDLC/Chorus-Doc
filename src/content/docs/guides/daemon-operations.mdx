@@ -8,13 +8,13 @@ sidebar:
 ---
 
 Use this guide after you have verified a foreground daemon connection. The commands apply
-to the supported resident backends: Claude Code, Codex, Kiro, and Pi.
+to the supported always-on backends: Claude Code, Codex, Kiro, and Pi.
 
 ## Upgrade daemon backends to 0.20.0
 
 Update the Chorus CLI using [the upgrade command](/reference/cli/#upgrade-the-cli-and-plugins),
 then restart the daemon when ongoing work allows. Host CLIs are updated separately.
-Check these backend-specific requirements before your first wake:
+Check these backend-specific requirements before the daemon first starts work:
 
 - [Codex App Server](/reference/agents/codex/#daemon-behavior-in-0200): verified with
   codex-cli 0.157.1; daemon `args` accept only model options and permitted config overrides.
@@ -22,8 +22,8 @@ Check these backend-specific requirements before your first wake:
 - [Claude Code stream-json](/reference/agents/claude-code/#daemon-behavior-in-0200): verified
   with Claude Code 2.1.283 and 2.1.284; interruption first uses the protocol, and background
   questions must use Chorus comments or elaboration.
-- [Pi RPC](/reference/agents/pi/#daemon-behavior-in-0200): requires pi 0.85.0 or newer
-  (verified with 0.85.1); `--plugins` refreshes the Chorus packages but not pi itself.
+- [Pi RPC](/reference/agents/pi/#daemon-behavior-in-0200): requires Pi 0.85.0 or newer
+  (verified with 0.85.1); `--plugins` refreshes the Chorus packages but not Pi itself.
 
 ## Choose what the daemon can access
 
@@ -57,11 +57,10 @@ The daemon reads its settings from `~/.chorus/daemon.json`. In the common single
 it is one flat JSON object holding the agent credential and the runtime options; to serve
 several agents from one daemon you instead list them under an `agents` array — see
 [Run several agents in one daemon](#run-several-agents-in-one-daemon). Either way it is
-written with `0600` (owner read/write only) using an atomic temp-file-plus-rename, so a crash
-mid-write never leaves a truncated file. The default path is `~/.chorus/daemon.json`
-(resolved from your home directory). `CHORUS_DAEMON_CONFIG_PATH` can select a different file.
-When using an override, set it consistently for the CLI and daemon service; an export in
-your shell does not change an already-running service.
+written atomically with `0600` (owner read/write only), so a crash mid-write never leaves a
+truncated file. Set `CHORUS_DAEMON_CONFIG_PATH` to use a different file. If you use this
+override, set it consistently for both the CLI and the daemon service; an export in your
+shell does not change an already-running service.
 
 ### Fields
 
@@ -73,8 +72,8 @@ your shell does not change an already-running service.
 | `agentName` | string | Authenticated agent name (informational). |
 | `cwds` | string[] | Working directories this daemon serves. Each path is one independent online connection. |
 | `browseRoots` | string[] | Roots exposed to remote working-directory discovery. A browse root does not create a connection. |
-| `agent` | string | Local backend to wake: `"claude-code"`, `"codex"`, `"kiro"`, or `"pi"`. |
-| `sigintTimeoutMs` | number | Interrupt-escalation grace (ms); Claude Code, Codex, and Pi send a protocol interrupt first. Default `10000`. |
+| `agent` | string | Local backend to wake: `"claude-code"`, `"codex"`, `"kiro"`, `"pi"`, or `"dsh"`. |
+| `sigintTimeoutMs` | number | How long (ms) to wait after an interrupt before forcing the process to stop; Claude Code, Codex, and Pi send a protocol interrupt first. Default `10000`. |
 | `agents` | object[] | *Optional.* Serve several independent agents from one daemon; each entry can override shared runtime defaults, but `args` and `env` are never inherited. See [Run several agents in one daemon](#run-several-agents-in-one-daemon). |
 
 A minimal file after `chorus login` plus `chorus daemon install`:
@@ -115,8 +114,9 @@ valid file rather than failing.
 
 ### Field, flag, and environment variable
 
-The runtime options below can be supplied three ways. Precedence is flag, then environment variable,
-then `daemon.json`, so a one-off flag or env override never has to be written to the file:
+The runtime options below can be supplied in three ways. Precedence is flag, then environment
+variable, then `daemon.json`, so a one-off flag or environment override never has to be
+written to the file:
 
 | Concern | `daemon.json` field | CLI flag | Environment variable |
 | --- | --- | --- | --- |
@@ -149,10 +149,12 @@ daemon per agent. List them under an `agents` array; each entry is one agent:
 }
 ```
 
-Shared runtime settings such as `url` and `sigintTimeoutMs` provide defaults; an agent's
-own value overrides that default. `args` and `env` are per-agent only, not shared defaults. Each agent gets its own identity (from its key), its own connections (one per its
-`cwds`), its own wake queue, and its own backend — so they are woken and run independently, and
-one agent's failure never disrupts the others. On the server each appears as its own connection
+Shared runtime settings such as `url` and `sigintTimeoutMs` provide defaults, and an agent's
+own value overrides them. `args` and `env` are per-agent only, never shared defaults.
+
+Each agent gets its own identity (from its key), its own connections (one for each of its
+`cwds`), its own wake queue, and its own backend. Agents are therefore woken and run
+independently, and one agent's failure never disrupts the others. On the server each appears as its own connection
 in **Settings → Agents**, keyed on agent, host, and directory. Agents may even share a working
 directory; the daemon does not serialize them, so avoid concurrent conflicting work in one git
 tree (use separate branches or worktrees).
@@ -167,12 +169,12 @@ agent — existing single-agent installs run unchanged.
 | Field | Meaning |
 | --- | --- |
 | `apiKey` *(required)* | The agent's `cho_` key — determines its identity. |
-| `url` | Chorus server (may differ per agent — a different server or company). |
+| `url` | Chorus server (may differ per agent — a different server or workspace). |
 | `agentType` | `claude-code`, `codex`, `kiro`, or `pi` (backends may be mixed). |
 | `cwds` | Working directories this agent serves (one connection each). |
 | `permissionMode` | `yolo` or `chorus`. |
 | `maxConcurrency` | This agent's own wake-concurrency cap (default `4`). |
-| `sigintTimeoutMs` | Interrupt-escalation grace window (ms). |
+| `sigintTimeoutMs` | How long (ms) to wait after an interrupt before forcing the process to stop. |
 | `browseRoots` | Directory-discovery allowlist. |
 | `args` | Optional string array of extra backend CLI arguments; default `[]`. See [Set an agent's model, thinking level, and environment](#set-an-agents-model-thinking-level-and-environment). |
 | `env` | Optional object mapping environment names to string values; default `{}`. |
@@ -181,7 +183,8 @@ agent — existing single-agent installs run unchanged.
 
 Add the fields to the intended entry in `~/.chorus/daemon.json`. This Pi example uses
 illustrative credentials and a non-secret environment value; replace the URL, key, and
-model with values valid for your setup. Merge it into your existing file, not over other agents:
+model with values valid for your setup. Merge it into your existing file rather than
+overwriting other agents:
 
 ```json
 {
@@ -203,7 +206,8 @@ backend; there are no separate `model` or `thinking` fields. Both daemon wakes a
 `chorus agents run --name pi-worker` use this entry. `offline` agents stay non-wakeable.
 
 - **No global inheritance:** with a nonempty `agents` array, top-level `args` or `env`
-  cause an error. Move them into each intended entry. Other agents and your shell are unaffected.
+  cause an error. Move them into each intended entry. Other agents and your shell are
+  unaffected.
 - **Literal values:** each `args` element is one token, without extra shell quoting.
   `$HOME`, `${TOKEN}`, and shell commands are not expanded. Chorus adds no dotenv loading,
   interpolation, secret lookup, or special handling for env values. `env` overrides the
@@ -212,20 +216,23 @@ backend; there are no separate `model` or `thinking` fields. Both daemon wakes a
 - **Validation:** `null`, non-string tokens/values, NUL characters, and env names outside
   `[A-Za-z_][A-Za-z0-9_]*` are rejected before launch. Empty string values are valid.
   Use options, not positional prompts or subcommands. For an unknown option, use
-  `"--future=value"` if the backend supports it; `"--future", "value"` is ambiguous and rejected.
+  `"--future=value"` if the backend supports it; `"--future", "value"` is ambiguous and
+  rejected.
 - **Protected controls:** persistent args cannot change known session/resume, prompt,
-  transport/output, cwd, managed MCP, or permission controls. Help/version, inspection exits,
-  bare `--`, and stdin marker `-` are also forbidden. All `CHORUS_*` env names and the
-  nested-Claude context names `CLAUDECODE` / `CLAUDE_CODE_ENTRYPOINT` are reserved,
-  regardless of case. Configuring them causes an error instead of silently discarding them.
-  Use dedicated Chorus settings or explicit foreground passthrough instead.
+  transport/output, cwd, managed MCP, or permission controls. Help, version, and other options
+  that only print information and exit are also forbidden, as are a bare `--` and the stdin
+  marker `-`. All `CHORUS_*` env names and the nested-Claude context names `CLAUDECODE` /
+  `CLAUDE_CODE_ENTRYPOINT` are reserved, regardless of case. Configuring any of them causes an
+  error rather than being silently discarded. Use dedicated Chorus settings or explicit
+  foreground passthrough instead.
 - **Windows command shims:** `.cmd`/`.bat` launches reject configured empty tokens and tokens
   containing whitespace, quotes, or command metacharacters. Use a native executable for those
   values; explicit foreground passthrough is not guaranteed shell-safe through a shim.
 
-Env can contain plaintext provider credentials. Protect the file (`chmod 600 ~/.chorus/daemon.json`
-on POSIX) and never commit secrets. Chorus omits configured values from validation/launch
-messages, but the child program or OS inspection may expose them; there is no encryption or vault.
+`env` can contain plaintext provider credentials. Protect the file
+(`chmod 600 ~/.chorus/daemon.json` on POSIX) and never commit secrets. Chorus omits configured
+values from validation and launch messages, but the child program or OS inspection may expose
+them; there is no encryption or vault.
 If you set a custom home such as `CODEX_HOME` or `PI_CODING_AGENT_DIR`, configure the Chorus
 integration there too.
 
@@ -265,14 +272,15 @@ depends on the backend:
 - **Kiro** — automatic, via the environment. The installed `mcp.json` references `${CHORUS_URL}`
   and `${env:CHORUS_API_KEY}`, which the daemon exports per wake, so each Kiro agent
   authenticates with its own key.
-- **Codex** — automatic, via the environment. `chorus agents add` configures Codex keyless: it
-  writes `CHORUS_URL` / `CHORUS_API_KEY` / `CHORUS_AGENT_PROFILE` into `~/.codex/.env` (which
-  Codex loads at startup) and sets `bearer_token_env_var = "CHORUS_API_KEY"` in `config.toml`, so
-  Codex reads its key from the environment rather than a baked literal. The daemon injects each
-  agent's own key per wake, so several Codex agents in one daemon each authenticate as themselves.
+- **Codex** — automatic, via the environment. `chorus agents add` configures Codex without
+  storing the key in its config: it writes `CHORUS_URL` / `CHORUS_API_KEY` /
+  `CHORUS_AGENT_PROFILE` into `~/.codex/.env` (which Codex loads at startup) and sets
+  `bearer_token_env_var = "CHORUS_API_KEY"` in `config.toml`, so Codex reads its key from the
+  environment rather than from the file. The daemon injects each agent's own key per wake, so
+  several Codex agents in one daemon each authenticate as themselves.
 - **Pi** — automatic, via the environment. The daemon exports each agent's `CHORUS_URL` /
-  `CHORUS_API_KEY` / `CHORUS_AGENT_PROFILE` into the woken pi session, which the `chorus-pi`
-  extension reads, so each pi agent authenticates with its own key.
+  `CHORUS_API_KEY` / `CHORUS_AGENT_PROFILE` into the woken Pi session, which the `chorus-pi`
+  extension reads, so each Pi agent authenticates with its own key.
 
 ## Install the Linux service
 
@@ -287,7 +295,7 @@ chorus daemon install \
 
 The installer starts the service immediately and configures it to start when the user
 logs in. Run `chorus agents add` (or `chorus login`) first so the service can read the
-saved credential — or pass `--daemon-autostart` to `chorus agents add` to install this boot
+saved credential — or pass `--daemon-autostart` to `chorus agents add` to install this
 service in the same step.
 
 :::note[Why credentials live in the file]
@@ -303,10 +311,10 @@ unit.
 ### Provide credentials a woken agent needs
 
 The daemon supplies the Chorus connection (`CHORUS_URL`, `CHORUS_API_KEY`, and
-`CHORUS_AGENT_PROFILE`), not model-provider credentials automatically. If your backend reads
-provider credentials from env, supply them in the agent's `env` or in the daemon's inherited
-environment. A `systemd --user` service does not inherit exports
-from your login shell. To supply them through the service, use a drop-in and restart:
+`CHORUS_AGENT_PROFILE`), but not model-provider credentials. If your backend reads provider
+credentials from environment variables, supply them in the agent's `env` or in the daemon's
+inherited environment. A `systemd --user` service does not inherit exports from your login
+shell; to supply them through the service, add a drop-in and restart:
 
 ```sh
 # ~/.config/systemd/user/chorus-daemon.service.d/provider-env.conf

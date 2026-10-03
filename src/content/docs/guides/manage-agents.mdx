@@ -56,9 +56,14 @@ Start from a **Preset** that matches the agent's job:
 Below the preset is the **permission matrix**, a grid of resources (Idea, Proposal, Document,
 Task, Project) against actions (Read, Write, Admin). Picking a preset checks the boxes that
 match it, and those checked boxes _are_ the agent's effective permissions — read them
-straight off the grid. Admin-column actions (approve, verify, close) are only available in
-**Custom** mode, so grant approval or verification authority deliberately rather than by
-accident.
+straight off the grid. Only the **Admin** preset checks the Admin column (approve, verify,
+close). You can tick or clear any box yourself; doing so switches the preset to **Custom**.
+Grant approval or verification authority deliberately rather than by accident.
+
+Permissions say what *kind* of work an agent may do; they do not say *where*. An agent can
+only see and act in the projects its owner (the person who created the key) can access, and
+in a project where its owner is a Viewer it can only read. An agent without an owner only
+works in public projects. See [Control who can see a project](/guides/project-access/).
 
 For what each permission lets an agent do across the workflow, see the
 [agent platforms](/reference/agents/) reference. When someone else runs the machine, hand off
@@ -83,5 +88,5 @@ installs the plugin and seeds the credential in one command — see
 [The chorus CLI](/reference/cli/). To connect by hand or for someone else, see
 [Connect an agent runtime](/guides/operator-onboarding/) and, for administrators handing off a
 credential, [Prepare agent access](/guides/administrator-setup/). To keep a connected runtime
-online and drive it from Chorus, see [Keep an agent online](/guides/daemon-operations/) and
-[Start work remotely](/guides/remote-control/).
+online and drive it from Chorus, see [Operate the Chorus daemon](/guides/daemon-operations/) and
+[Start work on a remote agent](/guides/remote-control/).

@@ -5,14 +5,12 @@ docsLocale: en
 route: /reference/agents/dsh/
 ---
 
-# DeepSeek Harness
-
 The DeepSeek Harness (dsh) connects to Chorus through a first-party npm bundle,
 `@chorus-aidlc/chorus-dsh`. The bundle adds the Chorus MCP tools, workflow skills, and
 persona to a dsh profile. You can drive dsh interactively, and — as of dsh `0.1.2-rc.1` —
 Chorus can also wake dsh unattended as a daemon backend.
 
-Before installation, use dsh `0.1.2-rc.1` or newer with `pnpm`, and create an agent key by
+Before you begin, install dsh `0.1.2-rc.1` or newer and `pnpm`, and create an agent key by
 following [Prepare agent access](/guides/administrator-setup/).
 
 ## Install the bundle and store credentials
@@ -53,16 +51,16 @@ dsh connection is online.
 
 As of dsh `0.1.2-rc.1`, Chorus can wake dsh unattended, the same way it wakes Claude Code,
 Codex, and Kiro. Seed credentials once with `chorus agents add --agents dsh`, then start the
-daemon selecting the dsh backend:
+daemon with the dsh backend:
 
 ```bash
 chorus daemon --agent dsh
 ```
 
-The daemon builds and validates its own managed `sdk` profile the first time it wakes dsh, so
+The daemon builds and validates its own managed profile the first time it wakes dsh, so
 the daemon path needs only credentials — you do not have to hand-install a profile for it.
 `dsh` itself must be on `PATH` (or set `CHORUS_DSH_PATH`); Chorus never bundles the dsh
-runtime. A Chorus dispatch — assigning dsh an idea or task, or an `@mention` — wakes it.
+runtime. Assigning dsh an idea or task, or @mentioning it, wakes it.
 
 Each wake runs a **fresh** dsh session (dsh has no native cross-wake resume); Chorus keeps the
 conversation context on the assigned idea/task, and the woken dsh agent reads it back through
@@ -73,7 +71,7 @@ the Chorus MCP tools.
 - The bundle provides the Chorus MCP tools, the workflow skills, and the Chorus persona.
 - dsh runs interactively through its own profile, **and** as an unattended daemon backend
   (`chorus daemon --agent dsh`).
-- Per wake, dsh starts a new session — there is no native cross-wake conversation resume;
+- Each wake starts a new dsh session — there is no native cross-wake conversation resume;
   continuity comes from the Chorus resource the wake is anchored to.
 
 ## Common issues
@@ -86,5 +84,5 @@ the Chorus MCP tools.
 - **Check-in is unauthorized:** confirm `CHORUS_URL` and the `cho_` agent key are stored in
   `$DSH_HOME/.env` (re-run `chorus agents add --agents dsh --dsh-profile <name>` to refresh
   them), then relaunch the profile.
-- **Check-in fails after a profile update:** restart the dsh profile so the effective
-  composition reloads.
+- **Check-in fails after a profile update:** restart the dsh profile so it reloads the
+  updated configuration.

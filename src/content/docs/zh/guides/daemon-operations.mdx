@@ -7,27 +7,19 @@ sidebar:
   order: 10
 ---
 
-## 将 daemon 后端升级到 0.20.0
+请先确认后台服务在前台能够正常连接，再使用本指南。这些命令适用于受支持的常驻运行后端：Claude Code、Codex、Kiro 和 Pi。
 
-通过[升级命令](/zh/reference/cli/#升级-cli-与插件)更新 Chorus CLI，待当前工作允许时重启 daemon。宿主 CLI 需要单独更新。首次唤醒前请核对对应后端的要求：
+## 将后台服务的运行后端升级到 0.20.0
 
-- [Codex App Server](/zh/reference/agents/codex/#0200-的-daemon-行为)：已验证 codex-cli 0.157.1；daemon `args` 只接受模型参数和允许的配置覆盖。使用 `--chorus-only` 时，请在 Codex 配置中验证所需 MCP 工具的授权。
-- [Claude Code stream-json](/zh/reference/agents/claude-code/#0200-的-daemon-行为)：已验证 Claude Code 2.1.283 和 2.1.284；中断优先使用协议，后台提问应通过 Chorus 评论或澄清流程。
-- [Pi RPC](/zh/reference/agents/pi/#0200-的-daemon-行为)：需要 pi 0.85.0 或更新版本（已验证 0.85.1）；`--plugins` 会更新 Chorus 相关包，但不会升级 pi 本身。
+通过[升级命令](/zh/reference/cli/#升级-cli-与插件)更新 Chorus CLI，并在不影响进行中工作的时机重启后台服务。宿主 CLI 需要单独更新。后台服务首次开始工作前，请核对对应后端的要求：
 
-## 选择运行方式
+- [Codex App Server](/zh/reference/agents/codex/#0200-的-daemon-行为)：已在 codex-cli 0.157.1 上验证；后台服务的 `args` 只接受模型参数和允许的配置覆盖。使用 `--chorus-only` 时，请在 Codex 配置中确认所需 MCP 工具已获授权。
+- [Claude Code stream-json](/zh/reference/agents/claude-code/#0200-的-daemon-行为)：已在 Claude Code 2.1.283 和 2.1.284 上验证；中断会优先通过协议发送，后台运行时的提问必须通过 Chorus 评论或澄清流程进行。
+- [Pi RPC](/zh/reference/agents/pi/#0200-的-daemon-行为)：需要 Pi 0.85.0 或更新版本（已在 0.85.1 上验证）；`--plugins` 会更新 Chorus 相关包，但不会升级 Pi 本身。
 
-`chorus daemon` 会把本机的 Claude Code、Codex、Kiro 或 Pi 连接到 Chorus。首次接入时，建议先在前台运行，确认登录、运行后端和工作目录都正确：
+## 选择后台服务可访问的目录
 
-```sh
-chorus daemon --agent claude-code --cwd /home/demo/workspace --chorus-only
-```
-
-前台运行便于直接查看错误，也可以随时按 `Ctrl+C` 停止。确认正常后，再安装为 Linux 用户服务。
-
-## 配置工作目录
-
-每个 `--cwd` 参数都会注册一个可供 Chorus 选择的工作目录：
+每个 `--cwd` 参数都会把一个工作目录注册为 Chorus 中的一个独立目标：
 
 ```sh
 chorus daemon \
@@ -37,23 +29,23 @@ chorus daemon \
   --chorus-only
 ```
 
-只添加智能体确实需要访问的目录。若希望用户能在某个目录树中选择尚未注册的子目录，可另外设置浏览根目录：
+不指定 `--cwd` 时，Chorus 使用你启动命令时所在的目录。只有当用户需要在某个更大的根目录下选择子目录时，才使用 `--browse-root`（可重复指定）：
 
 ```sh
 chorus daemon --browse-root /home/demo/workspace
 ```
 
-浏览根目录不会自动把所有子目录注册为连接。项目中已经固定的主机和工作目录会继续用于后续任务与会话，除非用户明确更改。
+浏览根目录只用于发现目录，不会把其中每个目录都注册为在线连接。
 
-为项目的智能体[固定工作目录](/zh/guides/create-a-project/)时，该路径必须是本 daemon 所服务的目录之一，请把它加入本 daemon 的 `cwds` 集合，固定的目录才能解析为在线连接。
+为项目的智能体[固定工作目录](/zh/guides/create-a-project/)时，该路径必须是本后台服务所服务的目录之一；请把它加入本后台服务的 `cwds` 集合，固定的目录才能解析为在线连接。
 
-:::caution[工作目录决定智能体能访问什么]
-远程工作会在选定目录中运行，可能读取和修改其中的文件。不要为了方便把主目录或包含敏感资料的上级目录设为浏览根目录。
+:::caution[限制文件系统访问]
+只注册允许智能体读取和修改的目录。远程启动的智能体拥有运行后台服务的用户所具有的文件系统和工具权限。
 :::
 
 ## 配置 `daemon.json`
 
-daemon 的设置都读自 `~/.chorus/daemon.json`。常见的单智能体场景下，它是一个扁平的 JSON 对象，同时保存智能体凭据和运行选项；若要用一个 daemon 同时服务多个智能体，则改为在 `agents` 数组中逐一列出（见下文「在一个 daemon 中运行多个智能体」一节）。无论哪种形式，该文件都以 `0600` 权限（仅所有者可读写）写入，采用先写临时文件再原子重命名的方式，因此写入过程中崩溃也不会留下被截断的文件。默认路径为 `~/.chorus/daemon.json`（从主目录解析而来），可用 `CHORUS_DAEMON_CONFIG_PATH` 指定其他文件。使用覆盖路径时，请为 CLI 与 daemon 服务一致地设置该变量；在 shell 中导出它不会改变已运行的服务。
+后台服务的设置都读自 `~/.chorus/daemon.json`。常见的单智能体场景下，它是一个扁平的 JSON 对象，同时保存智能体凭据和运行选项；若要用一个后台服务同时服务多个智能体，则改为在 `agents` 数组中逐一列出，参见[在一个后台服务中运行多个智能体](#在一个后台服务中运行多个智能体)。无论哪种形式，该文件都以 `0600` 权限（仅所有者可读写）原子写入，因此写入过程中崩溃也不会留下被截断的文件。可用 `CHORUS_DAEMON_CONFIG_PATH` 指定其他文件。使用覆盖路径时，请为 CLI 与后台服务一致地设置该变量；在 shell 中导出它不会改变已运行的服务。
 
 ### 字段
 
@@ -63,11 +55,11 @@ daemon 的设置都读自 `~/.chorus/daemon.json`。常见的单智能体场景�
 | `apiKey` | string | 智能体 API 密钥（`cho_…`）。 |
 | `agentUuid` | string | 已认证的智能体 UUID（仅供参考）。 |
 | `agentName` | string | 已认证的智能体名称（仅供参考）。 |
-| `cwds` | string[] | 本 daemon 服务的工作目录。每个路径都是一个独立的在线连接。 |
+| `cwds` | string[] | 本后台服务所服务的工作目录。每个路径都是一个独立的在线连接。 |
 | `browseRoots` | string[] | 向远程工作目录发现开放的根目录。浏览根目录不会创建连接。 |
-| `agent` | string | 要唤起的本地运行后端：`"claude-code"`、`"codex"`、`"kiro"` 或 `"pi"`。 |
+| `agent` | string | 要唤醒的本地运行后端：`"claude-code"`、`"codex"`、`"kiro"`、`"pi"` 或 `"dsh"`。 |
 | `sigintTimeoutMs` | number | 中断后强制终止前的宽限时间（毫秒）；Claude Code、Codex 和 Pi 会先发送协议中断。默认 `10000`。 |
-| `agents` | object[] | *可选。* 用一个 daemon 服务多个独立智能体；每个条目可覆盖共享运行默认值，但不会继承 `args` 和 `env`。见下文「在一个 daemon 中运行多个智能体」。 |
+| `agents` | object[] | *可选。* 用一个后台服务服务多个独立智能体；每个条目可覆盖共享运行默认值，但不会继承 `args` 和 `env`。参见[在一个后台服务中运行多个智能体](#在一个后台服务中运行多个智能体)。 |
 
 执行 `chorus login` 加 `chorus daemon install` 后的最简文件：
 
@@ -111,9 +103,9 @@ daemon 的设置都读自 `~/.chorus/daemon.json`。常见的单智能体场景�
 
 权限模式特意不保存到 `daemon.json`。请在启动时传入 `--chorus-only`（或设置 `CHORUS_CHORUS_ONLY=1`）；安装为服务时，`--chorus-only` 会被写入服务单元，而不是文件。
 
-## 在一个 daemon 中运行多个智能体
+## 在一个后台服务中运行多个智能体
 
-一个 `chorus daemon` 进程可以**同时服务多个完全独立的智能体**（不同的人设、权限、账户，甚至不同的运行后端），而无需为每个智能体单独跑一个 daemon。把它们逐一列在 `agents` 数组中，每个条目就是一个智能体：
+一个 `chorus daemon` 进程可以**同时服务多个完全独立的智能体**（不同的人设、权限、账户，甚至不同的运行后端），而无需为每个智能体单独运行一个后台服务。把它们逐一列在 `agents` 数组中，每个条目就是一个智能体：
 
 ```json
 {
@@ -126,10 +118,12 @@ daemon 的设置都读自 `~/.chorus/daemon.json`。常见的单智能体场景�
 }
 ```
 
-`url`、`sigintTimeoutMs` 等共享运行设置提供默认值，智能体自己的设置可覆盖这些默认值。`args` 和 `env` 只属于单个智能体，不是共享默认值。每个智能体都有自己的身份（由其密钥决定）、自己的连接（每个 `cwds` 一个）、自己的唤起队列和自己的运行后端，因此它们各自独立地被唤起和运行，一个智能体出错不会影响其他智能体。在服务器端，每个智能体都以 agent、主机、目录为键，作为独立连接显示在**设置 → 智能体**（Settings → Agents）中。多个智能体甚至可以共享同一个工作目录；daemon 不会对它们串行化，因此请避免在同一个 git 工作树中并发地做互相冲突的工作（改用不同的分支或 worktree）。
+`url`、`sigintTimeoutMs` 等共享运行设置提供默认值，智能体自己的设置可覆盖这些默认值。`args` 和 `env` 只属于单个智能体，不是共享默认值。
+
+每个智能体都有自己的身份（由其密钥决定）、自己的连接（每个 `cwds` 一个）、自己的唤醒队列和自己的运行后端，因此它们各自独立地被唤醒和运行，一个智能体出错不会影响其他智能体。在服务器端，每个智能体都以智能体、主机、目录为键，作为独立连接显示在**设置 → 智能体**中。多个智能体甚至可以共享同一个工作目录；后台服务不会让它们串行执行，因此请避免在同一个 git 工作树中并发地做互相冲突的工作（改用不同的分支或 worktree）。
 
 :::note[向后兼容]
-若没有 `agents` 数组，扁平的顶层 `url` / `apiKey` / `cwds` 会被当作恰好一个智能体，现有的单智能体安装照旧运行，无需改动。
+若没有 `agents` 数组，扁平的顶层 `url` / `apiKey` / `cwds` 会被视为唯一的一个智能体，现有的单智能体安装照旧运行，无需改动。
 :::
 
 ### 每个智能体的字段
@@ -137,19 +131,19 @@ daemon 的设置都读自 `~/.chorus/daemon.json`。常见的单智能体场景�
 | 字段 | 含义 |
 | --- | --- |
 | `apiKey`（必填） | 该智能体的 `cho_` 密钥，决定其身份。 |
-| `url` | Chorus 服务器（可按智能体不同，如不同的服务器或公司）。 |
+| `url` | Chorus 服务器（可按智能体不同，例如不同的服务器或工作区）。 |
 | `agentType` | `claude-code`、`codex`、`kiro` 或 `pi`（后端可以混用）。 |
 | `cwds` | 该智能体服务的工作目录（每个一个连接）。 |
 | `permissionMode` | `yolo` 或 `chorus`。 |
-| `maxConcurrency` | 该智能体自己的唤起并发上限（默认 `4`）。 |
-| `sigintTimeoutMs` | 中断升级的宽限时间（毫秒）。 |
+| `maxConcurrency` | 该智能体自己的唤醒并发上限（默认 `4`）。 |
+| `sigintTimeoutMs` | 中断后强制终止进程前的等待时间（毫秒）。 |
 | `browseRoots` | 目录发现的允许列表。 |
-| `args` | 可选的字符串数组，作为后端 CLI 的额外参数，默认 `[]`。见下文「设置智能体的模型、思考级别和环境变量」。 |
+| `args` | 可选的字符串数组，作为后端 CLI 的额外参数，默认 `[]`。参见[设置智能体的模型、思考级别和环境变量](#设置智能体的模型思考级别和环境变量)。 |
 | `env` | 可选的对象，将环境变量名映射到字符串值，默认 `{}`。 |
 
 ### 设置智能体的模型、思考级别和环境变量
 
-在 `~/.chorus/daemon.json` 中为目标智能体添加字段。下面的 Pi 示例使用占位凭据和非敏感环境变量值；请替换为适合你的 URL、密钥和模型，并合并到现有文件中，不要覆盖其他智能体：
+在 `~/.chorus/daemon.json` 中为目标智能体添加字段。下面的 Pi 示例使用示例凭据和非敏感的环境变量值；请将 URL、密钥和模型替换为适合你环境的值，并合并到现有文件中，不要覆盖其他智能体：
 
 ```json
 {
@@ -166,21 +160,21 @@ daemon 的设置都读自 `~/.chorus/daemon.json`。常见的单智能体场景�
 }
 ```
 
-模型仅为示例，不是 Chorus 默认值。请使用后端支持的参数和值；没有独立的 `model` 或 `thinking` 字段。daemon 唤起和 `chorus agents run --name pi-worker` 都会使用这个条目。`offline` 智能体仍不会被 daemon 唤起。
+模型仅为示例，不是 Chorus 默认值。请使用后端支持的参数和值；没有独立的 `model` 或 `thinking` 字段。后台服务的唤醒和 `chorus agents run --name pi-worker` 都会使用这个条目。`offline` 智能体仍然不会被唤醒。
 
-- **不继承全局设置**：存在非空 `agents` 数组时，顶层 `args` 或 `env` 会报错。请移入每个需要它们的条目，不会影响其他智能体或你的 shell。
+- **不继承全局设置**：存在非空 `agents` 数组时，顶层 `args` 或 `env` 会报错。请把它们移入每个需要的条目。其他智能体和你的 shell 不受影响。
 - **按字面传递**：`args` 的每个元素是一个参数，不要额外加 shell 引号。`$HOME`、`${TOKEN}` 和 shell 命令不会展开。Chorus 不额外加载 dotenv、不插值、不查询密钥服务，也不对 env 值做特殊处理。`env` 覆盖子进程继承的环境，但 Chorus 管理的控制项仍优先。Windows 环境变量名不区分大小写，POSIX 区分。
 - **校验**：`null`、非字符串参数或值、NUL 字符，以及不符合 `[A-Za-z_][A-Za-z0-9_]*` 的变量名会在启动前被拒绝。允许空字符串值。请填写选项，而非位置提示词或子命令。未知选项在后端支持时用 `"--future=value"`；`"--future", "value"` 存在歧义，会被拒绝。
-- **受保护的控制项**：持久化参数不能更改已知的会话/恢复、提示词、传输/输出、工作目录、托管 MCP 或权限控制。帮助/版本、会导致程序直接退出的检查选项、单独的 `--` 和标准输入标记 `-` 也被禁止。所有 `CHORUS_*` 环境变量名以及嵌套 Claude 上下文变量 `CLAUDECODE` / `CLAUDE_CODE_ENTRYPOINT` 均保留，不区分大小写；配置这些名称会报错，而不是被静默删除。请改用专用的 Chorus 设置或显式前台透传。
+- **受保护的控制项**：持久化参数不能更改已知的会话/恢复、提示词、传输/输出、工作目录、托管 MCP 或权限控制。帮助、版本以及其他只输出信息就退出的选项也被禁止，单独的 `--` 和标准输入标记 `-` 同样不允许。所有 `CHORUS_*` 环境变量名以及嵌套 Claude 上下文变量 `CLAUDECODE` / `CLAUDE_CODE_ENTRYPOINT` 均保留，不区分大小写；配置这些名称会报错，而不是被静默删除。请改用专用的 Chorus 设置或显式前台透传。
 - **Windows 命令包装器**：通过 `.cmd`/`.bat` 启动时，配置中的空参数，以及含空白、引号或命令元字符的参数会被拒绝。需要这些值时请用原生可执行文件；通过包装器的显式前台透传不保证 shell 安全。
 
-Env 可包含明文提供方凭据。请保护文件（POSIX 上用 `chmod 600 ~/.chorus/daemon.json`），切勿提交密钥。Chorus 的校验和启动消息不显示配置值，但子程序或操作系统检查仍可能暴露它们；没有加密或密钥库支持。若设置 `CODEX_HOME` 或 `PI_CODING_AGENT_DIR` 等自定义目录，也需在其中配置 Chorus 集成。
+`env` 中可能包含明文的模型提供方凭据。请保护文件（POSIX 上用 `chmod 600 ~/.chorus/daemon.json`），切勿提交密钥。Chorus 的校验和启动消息不会显示配置值，但子程序或操作系统层面的检查仍可能暴露它们；Chorus 不提供加密或密钥库。若设置 `CODEX_HOME` 或 `PI_CODING_AGENT_DIR` 等自定义目录，也需在其中配置 Chorus 集成。
 
-**应用更改**：运行 `chorus daemon restart`。daemon 在启动时读取这些设置，而非每次唤起时；编辑文件不会改变运行中的子进程，重启前的后续唤起也仍使用旧设置。每次新的 `chorus agents run` 都会重读配置，但不影响已运行的子进程。删除 `args`/`env` 即可恢复未自定义的行为。
+**应用更改**：运行 `chorus daemon restart`。后台服务在启动时读取这些设置，而非每次唤醒时；编辑文件既不会改变运行中的子进程，也不会影响重启前的后续唤醒。每次新的 `chorus agents run` 都会重读配置，但不影响已运行的子进程。删除 `args`/`env` 即可恢复未自定义的行为。
 
-**旧式扁平文件**：没有非空 `agents` 数组时，顶层 `args`/`env` 用于唯一的 daemon 智能体。前台选择要求使用 `agents[]`。要共用设置，请将扁平的 URL、密钥、身份信息、`args` 和 `env` 移入一个条目，并将 `agent` 改名为 `agentType`。通过 `chorus agents add` 或 `chorus login --add` 添加智能体，也会将已有扁平凭据配置及其 args/env 移入 `agents[0]`，删除对应顶层键。缺少密钥的不完整扁平配置需要先补全或手动转换。
+**旧式扁平文件**：没有非空 `agents` 数组时，顶层 `args`/`env` 用于后台服务中唯一的智能体。要在前台按名称选择智能体，必须使用 `agents[]`。若要共用设置，请将扁平的 URL、密钥、身份信息、`args` 和 `env` 移入一个条目，并将 `agent` 改名为 `agentType`。通过 `chorus agents add` 或 `chorus login --add` 添加智能体，也会将已有的扁平凭据配置及其 `args`/`env` 移入 `agents[0]`，并删除对应的顶层键。缺少密钥的不完整扁平配置需要先补全或手动转换。
 
-一次性覆盖和子命令的具体规则见 [CLI 参考](/zh/reference/cli/)。
+一次性覆盖和子命令的具体规则见 [chorus 命令行工具](/zh/reference/cli/)。
 
 ### 添加另一个智能体
 
@@ -188,45 +182,35 @@ Env 可包含明文提供方凭据。请保护文件（POSIX 上用 `chmod 600 ~
 - **`chorus daemon install --add`** 会循环运行安装向导，让你在一次运行中添加多个智能体（仅限终端）。
 - 始终支持**手动编辑** `~/.chorus/daemon.json`。
 
-编辑文件后请重启 daemon（`chorus daemon restart`），然后在**设置 → 智能体**（Settings → Agents）中确认每个智能体都已出现。
+编辑文件后请重启后台服务（`chorus daemon restart`），然后在**设置 → 智能体**中确认每个智能体都已出现。
 
 ### 各后端如何拿到自己的密钥
 
-每个智能体都用自己的密钥认证，但这个密钥*如何*到达被唤起的子进程，取决于后端：
+每个智能体都用自己的密钥认证，但这个密钥*如何*传给被唤醒的子进程，取决于后端：
 
-- **Claude Code**：自动。daemon 会为每次唤起写入一份携带该智能体 URL 和密钥的 MCP 配置。无需额外配置。
-- **Kiro**：自动，通过环境变量。已安装的 `mcp.json` 引用 `${CHORUS_URL}` 和 `${env:CHORUS_API_KEY}`，daemon 会在每次唤起时导出它们，因此每个 Kiro 智能体都用自己的密钥认证。
-- **Codex**：自动，通过环境变量。`chorus agents add` 会把 Codex 配置为不内置密钥：它把 `CHORUS_URL` / `CHORUS_API_KEY` / `CHORUS_AGENT_PROFILE` 写入 `~/.codex/.env`（Codex 在启动时加载它），并在 `config.toml` 中设置 `bearer_token_env_var = "CHORUS_API_KEY"`，因此 Codex 从环境变量读取密钥，而不是从写死的字面量读取。daemon 会在每次唤起时注入各智能体自己的密钥，因此一个 daemon 中的多个 Codex 智能体各自以自己的身份认证。
-- **Pi**：自动，通过环境变量。daemon 会在每次唤起时把各智能体自己的 `CHORUS_URL` / `CHORUS_API_KEY` / `CHORUS_AGENT_PROFILE` 导出到被唤醒的 pi 会话中，由 `chorus-pi` 扩展读取，因此每个 pi 智能体都用自己的密钥认证。
+- **Claude Code**：自动。后台服务会为每次唤醒写入一份携带该智能体 URL 和密钥的 MCP 配置。无需额外配置。
+- **Kiro**：自动，通过环境变量。已安装的 `mcp.json` 引用 `${CHORUS_URL}` 和 `${env:CHORUS_API_KEY}`，后台服务会在每次唤醒时导出它们，因此每个 Kiro 智能体都用自己的密钥认证。
+- **Codex**：自动，通过环境变量。`chorus agents add` 会把 Codex 配置为不内置密钥：它把 `CHORUS_URL` / `CHORUS_API_KEY` / `CHORUS_AGENT_PROFILE` 写入 `~/.codex/.env`（Codex 在启动时加载它），并在 `config.toml` 中设置 `bearer_token_env_var = "CHORUS_API_KEY"`，因此 Codex 从环境变量读取密钥，而不是从配置文件中读取。后台服务会在每次唤醒时注入各智能体自己的密钥，因此一个后台服务中的多个 Codex 智能体各自以自己的身份认证。
+- **Pi**：自动，通过环境变量。后台服务会在每次唤醒时把各智能体自己的 `CHORUS_URL` / `CHORUS_API_KEY` / `CHORUS_AGENT_PROFILE` 导出到被唤醒的 Pi 会话中，由 `chorus-pi` 扩展读取，因此每个 Pi 智能体都用自己的密钥认证。
 
-## 安装 Linux 用户服务
+## 安装 Linux 服务
 
-在 Linux 上，可让 Chorus 自动创建并启动用户级 systemd 服务：
+在 Linux 上，可将验证过的配置安装为用户服务：
 
 ```sh
 chorus daemon install --agent claude-code --cwd /home/demo/workspace --chorus-only
 chorus daemon status
 ```
 
-安装脚本会立即启动该服务，并将其配置为在用户登录时自动启动。请先运行 `chorus agents add`（或 `chorus login`），服务才能读取已保存的凭据；也可以给 `chorus agents add` 传入 `--daemon-autostart`，在同一步中安装这个开机服务。
-
-常用管理命令：
-
-```sh
-chorus daemon logs
-chorus daemon restart
-chorus daemon uninstall
-```
-
-更改登录信息、运行后端或工作目录后，请重启服务。需要让服务在用户退出登录后继续运行时，请先确认系统策略允许，再由系统管理员配置用户驻留。
+安装程序会立即启动该服务，并将其配置为在用户登录时自动启动。请先运行 `chorus agents add`（或 `chorus login`），服务才能读取已保存的凭据；也可以给 `chorus agents add` 传入 `--daemon-autostart`，在同一步中安装这个服务。
 
 :::note[为什么凭据要存进文件]
-`systemd --user` 单元在干净的启动环境中运行，**不会**继承你在 shell 中导出的 `CHORUS_URL` / `CHORUS_API_KEY`。因此 `chorus daemon install` 会在写入服务单元之前，先解析、校验凭据并将其持久化到 `~/.chorus/daemon.json`（`0600`）。服务单元既不引用文件路径，也不引用凭据，它只设置 `HOME`，让 daemon 在启动时能定位到 `~/.chorus/daemon.json`。所服务的 `cwds` 和所选的 `agent` 也存在同一个文件中；只有 `--chorus-only` 会写入服务单元。
+`systemd --user` 单元在干净的启动环境中运行，**不会**继承你在 shell 中导出的 `CHORUS_URL` / `CHORUS_API_KEY`。因此 `chorus daemon install` 会在写入服务单元之前，先解析、校验凭据并将其持久化到 `~/.chorus/daemon.json`（`0600`）。服务单元既不引用文件路径，也不引用凭据，它只设置 `HOME`，让后台服务在启动时能定位到 `~/.chorus/daemon.json`。所服务的 `cwds` 和所选的 `agent` 也存在同一个文件中；只有 `--chorus-only` 会写入服务单元。
 :::
 
 ### 为被唤醒的智能体提供所需凭据
 
-daemon 自动提供 Chorus 连接（`CHORUS_URL`、`CHORUS_API_KEY` 和 `CHORUS_AGENT_PROFILE`），不会自动提供模型提供方凭据。若后端从环境变量读取提供方凭据，可通过该智能体的 `env` 提供，也可通过 daemon 继承的环境提供。`systemd --user` 服务不会继承登录 shell 中导出的变量。如需通过服务提供，请用 drop-in 设置后重启：
+后台服务自动提供 Chorus 连接（`CHORUS_URL`、`CHORUS_API_KEY` 和 `CHORUS_AGENT_PROFILE`），但不提供模型提供方凭据。若后端从环境变量读取提供方凭据，可通过该智能体的 `env` 提供，也可通过后台服务继承的环境提供。`systemd --user` 服务不会继承登录 shell 中导出的变量；如需通过服务提供，请添加 drop-in 配置后重启：
 
 ```sh
 # ~/.config/systemd/user/chorus-daemon.service.d/provider-env.conf
@@ -241,12 +225,39 @@ systemctl --user daemon-reload && systemctl --user restart chorus-daemon
 从文件读取提供方认证的后端（例如 Claude Code 和 Codex，位于 `~/.claude` / `~/.codex`）只需正确设置
 后台服务的 `HOME`，已安装的服务单元已经做到了这一点。
 
-:::caution[确认运行权限]
-不使用 `--chorus-only` 时，后台智能体可以调用所选平台提供的完整工具，包括执行终端命令。仅在受控主机和可信代码目录中启用这种模式。
+日常运维使用以下命令：
+
+```sh
+chorus daemon status
+chorus daemon logs
+chorus daemon restart
+chorus daemon stop
+chorus daemon uninstall
+```
+
+更改凭据、工作目录、运行后端或权限模式后，请重新安装或重启服务，并在**设置 → 智能体**中确认连接正常。
+
+:::note[macOS 与 Windows]
+在 macOS 上，`chorus daemon install` 会像在 Linux 上一样安装真正的 launchd 开机服务。在 Windows 上，它会输出服务模板和手动配置步骤；测试连接时，请以前台运行的 `chorus daemon` 作为基准。
 :::
 
-## macOS 与 Windows
+## 不安装服务直接运行
 
-在 macOS 上，`chorus daemon install` 会像在 Linux 上一样安装真正的 launchd 开机服务。在 Windows 上，它会输出服务模板和手动配置步骤；测试连接时，请以前台方式运行 `chorus daemon` 作为基准。
+短期使用的连接可以让 `chorus daemon` 保持在前台运行。也可以使用分离（后台）模式：
 
-服务在线后，可继续阅读[从 Chorus 发起远程工作](/zh/guides/remote-control/)；运行异常时，请查看[排查智能体连接故障](/zh/guides/troubleshooting/)。
+```sh
+chorus daemon -d --agent codex --cwd /home/demo/workspace --chorus-only
+```
+
+使用同样的 `status`、`logs`、`restart` 和 `stop` 命令管理它。不要把分离模式与另外编写的进程守护程序组合使用。
+
+## 检查运行状况
+
+同时查看命令行和网页中的状态：
+
+1. 运行 `chorus daemon status`。
+2. 用 `chorus daemon logs` 查看最近的输出。
+3. 在**设置 → 智能体**中，确认每个预期的工作目录都处于**在线**状态。
+4. 发起一个小型测试会话，确认它指向预期的目录。
+
+日志可能包含路径、提示词和命令输出，分享前请删除敏感值。遇到故障时，请继续阅读[排查智能体连接故障](/zh/guides/troubleshooting/)。

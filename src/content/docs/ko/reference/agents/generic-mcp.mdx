@@ -1,11 +1,9 @@
 ---
-title: Generic MCP clients
+title: 범용 MCP 클라이언트
 description: 호환되는 MCP 클라이언트를 Chorus 도구에 연결합니다.
 docsLocale: ko
 route: /ko/reference/agents/generic-mcp/
 ---
-
-# Generic MCP clients
 
 이 옵션은 클라이언트가 Streamable HTTP MCP를 지원하지만 전용 Chorus 통합은 없을 때 사용합니다.
 이 연결은 Chorus 도구만 노출하며, Chorus 워크플로를 설치하거나 클라이언트를 원격으로 사용할 수
@@ -28,7 +26,7 @@ URL: https://chorus.example.com/api/mcp
 Authorization: Bearer cho_REDACTED
 ```
 
-가능하면 클라이언트의 보호된 자격 증명 저장소를 사용하세요. 구성 문법은 클라이언트마다 다르므로,
+가능하면 클라이언트의 보호된 인증 정보 저장소를 사용하세요. 구성 문법은 클라이언트마다 다르므로,
 URL과 사용자 지정 Authorization 헤더 추가는 클라이언트 문서를 따르세요.
 
 ## 연결 확인
@@ -46,10 +44,10 @@ URL과 사용자 지정 Authorization 헤더 추가는 클라이언트 문서를
 
 ## 자주 발생하는 문제
 
-- **`401 Unauthorized`:** 에이전트 키를 교체하고 클라이언트 자격 증명을 업데이트합니다.
+- **`401 Unauthorized`:** 에이전트 키를 교체하고 클라이언트 인증 정보를 업데이트합니다.
 - **`404 Not Found`:** 정확한 `/api/mcp` 엔드포인트를 사용합니다.
 - **도구는 작동하지만 워크플로가 멈춤:** 클라이언트가 각 워크플로 단계와 검토 게이트를 스스로
   실행해야 합니다.
-- **클라이언트가 HTTP 헤더를 설정할 수 없음:** 이 MCP 엔드포인트에 인증할 수 없습니다.
+- **클라이언트가 HTTP 헤더를 설정할 수 없음:** 이 클라이언트로는 이 MCP 엔드포인트에 인증할 수 없습니다.
 
-일반적인 키와 연결 확인은 [문제 해결](/ko/guides/troubleshooting/)을 참고하세요.
+일반적인 키와 연결 확인은 [에이전트 연결 문제 해결](/ko/guides/troubleshooting/)을 참고하세요.

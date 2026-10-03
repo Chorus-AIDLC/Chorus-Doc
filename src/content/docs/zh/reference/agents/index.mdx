@@ -5,34 +5,31 @@ docsLocale: zh
 route: /zh/reference/agents/
 ---
 
-# 智能体平台
+先选择你已经在用的智能体，再决定是否还需要让 Chorus 远程启动该智能体上的工作。
 
-不同平台的安装方式和运行能力并不相同。先根据你的使用场景选择平台，再进入对应章节完成安装。
-
-| 平台 | 支持方式 | 适合谁 | 远程启动 | 持续运行 |
+| 平台 | 维护方 | 适合谁 | 远程启动 | 持续运行 |
 | --- | --- | --- | --- | --- |
-| [Claude Code](./claude-code/) | Chorus 第一方 | 使用 Claude Code，希望获得完整 Chorus 工作流和远程会话控制的用户 | 支持 | 支持，通过 Chorus 后台服务 |
-| [Codex](./codex/) | Chorus 第一方 | 使用 Codex，希望获得完整 Chorus 工作流和远程会话控制的用户 | 支持 | 支持，通过 Chorus 后台服务 |
-| [Kiro](./kiro/) | Chorus 第一方 | 使用 Kiro CLI，希望使用 Chorus 技能和远程会话控制的用户 | 支持 | 支持，通过 Chorus 后台服务 |
-| [OpenClaw](./openclaw/) | Chorus 第一方 | 已经运行 OpenClaw，希望在其原生服务中接入 Chorus 的用户 | 支持 | 支持，通过 OpenClaw 原生服务 |
-| [DeepSeek Harness](./dsh/) | Chorus 第一方 | 使用 DeepSeek Harness，希望获得 Chorus 工作流的用户 | 支持 | 支持，通过 Chorus 后台服务 |
-| [OpenCode](./opencode/) | 社区维护 | 接受社区集成支持范围的 OpenCode 用户 | 不支持 | 不支持 |
-| [Pi](./pi/) | Chorus 第一方 | 使用 Pi，希望获得完整 Chorus 工作流和远程会话控制的用户 | 支持 | 支持，通过 Chorus 后台服务 |
-| [通用 MCP 客户端](./generic-mcp/) | 协议级接入 | 只需要直接调用 Chorus MCP 工具的用户 | 不支持 | 不支持 |
+| [Claude Code](./claude-code/) | Chorus 团队 | 想获得完整 Chorus 工作流的 Claude Code 用户 | 支持，通过 Chorus 后台服务 | Chorus 后台服务 |
+| [Codex](./codex/) | Chorus 团队 | 想获得完整 Chorus 工作流的 Codex 用户 | 支持，通过 Chorus 后台服务 | Chorus 后台服务 |
+| [Kiro](./kiro/) | Chorus 团队 | 想获得完整 Chorus 工作流的 Kiro CLI 用户 | 支持，通过 Chorus 后台服务 | Chorus 后台服务 |
+| [OpenClaw](./openclaw/) | Chorus 团队 | 已在运行 OpenClaw 网关的用户 | 支持，通过 OpenClaw | OpenClaw 网关 |
+| [DeepSeek Harness](./dsh/) | Chorus 团队 | 想获得完整 Chorus 工作流的 DeepSeek Harness 用户 | 支持，通过 Chorus 后台服务 | Chorus 后台服务 |
+| [OpenCode](./opencode/) | 社区 | 能接受社区支持的 OpenCode 用户 | 不支持 | 不支持 |
+| [Pi](./pi/) | Chorus 团队 | 想获得完整 Chorus 工作流的 Pi 用户 | 支持，通过 Chorus 后台服务 | Chorus 后台服务 |
+| [通用 MCP 客户端](./generic-mcp/) | 仅 MCP 兼容 | 从其他 MCP 客户端调用 Chorus 工具 | 不支持 | 不支持 |
 
-如果你需要从 Chorus 页面启动智能体并持续管理会话，请选择 Claude Code、Codex、Kiro、Pi、DeepSeek Harness 或 OpenClaw。只需要在本地交互式使用 Chorus 工具时，可以选择 OpenCode 或通用 MCP 客户端。
+Claude Code、Codex、Kiro、Pi 和 DeepSeek Harness 是受支持的 Chorus 后台服务后端。OpenClaw 通过自己的网关和插件保持在线。OpenCode 和通用 MCP 客户端以交互方式连接，不能被选作 Chorus 后台服务后端。
 
-创建密钥前请阅读[为智能体创建访问权限](/zh/guides/administrator-setup/)。使用 Claude Code、Codex、Kiro、Pi 或 DeepSeek Harness 远程执行工作时，请在完成平台安装后继续[连接智能体运行环境](/zh/guides/operator-onboarding/)和[管理后台服务](/zh/guides/daemon-operations/)。
+API 密钥与权限请先阅读[为智能体创建访问权限](/zh/guides/administrator-setup/)。要让 Claude Code、Codex、Kiro、Pi 或 DeepSeek Harness 能接受远程工作，请完成平台安装，再继续阅读[管理后台服务](/zh/guides/daemon-operations/)。
 
 ## 插件打包了什么
 
 上面每个平台页都会带你完成首次安装与连接验证。本节说明 Chorus 插件在各运行时到底打包了什么，
-以及如何保持更新，不重复安装步骤。
+以及如何保持更新；本节不重复安装步骤。
 
 插件让 AI 编码运行时成为 Chorus 的协作方：它提供 Chorus MCP 工具、各阶段工作流技能、评审子智能体，
 以及会话生命周期自动化。插件按运行时各发布一次，统一命名为 `chorus`。下文完整介绍 Claude Code 与
-Codex；OpenClaw、Kiro 和 Pi 是能力更窄或形态不同的移植版本，因此以差异说明加指引的形式呈现，而非
-同等对待。
+Codex；OpenClaw、Kiro 和 Pi 的能力更窄或形态不同，因此只给出简短说明和链接。
 
 ### Claude Code
 
@@ -45,8 +42,8 @@ Claude Code 插件（`chorus@chorus-plugins`）打包了：
   `/chorus:develop`、`/chorus:review`、`/chorus:quick-dev`、`/chorus:yolo` 调用的各阶段技能。
 - **评审子智能体**：三个只读评审者：`chorus:proposal-reviewer`、`chorus:task-reviewer`、
   `chorus:code-reviewer`，各自发布一条 `VERDICT` 评论。
-- **会话生命周期 Hook**：自动完成签到、会话发现与创建、心跳、以及任务签出与关闭会话的
-  Hook，另有在提交后提醒主智能体派生评审者的 `PostToolUse` Hook。
+- **会话生命周期钩子**：自动完成签到、会话发现与创建、心跳、以及任务签出与关闭会话的
+  钩子，另有在提交后提醒主智能体派生评审者的 `PostToolUse` 钩子。
 - **配置开关**：插件的 `userConfig` 选项，用于启用或停用各评审者、限制评审轮次，以及开关
   OpenSpec 模式。
 
@@ -58,37 +55,35 @@ Codex 插件（Codex 版 `chorus@chorus-plugins`）打包了：
   `$review`、`$quick-dev`、`$yolo`。它们带命名空间，全限定名为 `chorus:<skill>`。
 - **评审子智能体**：与 Claude Code 相同的三个只读评审者：`chorus-proposal-reviewer`、
   `chorus-task-reviewer` 与 `chorus-code-reviewer`。
-- **会话感知 Hook**：会话启动签到、每轮提醒，以及在提交方案、提交任务或某个想法方案的最后
+- **会话感知钩子**：会话启动签到、每轮提醒，以及在提交提案、提交任务或某个想法提案的最后
   一个任务通过验证后触发的 `PostToolUse` 评审提示。Codex 没有与 Claude Code 的 `TeammateIdle`、
-  `TaskCompleted` 对应的 Hook。
+  `TaskCompleted` 对应的钩子。
 
 Codex 的 MCP 服务器**不**随插件打包。Codex 不会在插件 MCP 配置中展开 `${VAR}`，因此
 `chorus agents add` 改为把 Codex 配置为不内置密钥：它把
 `CHORUS_URL` / `CHORUS_API_KEY` / `CHORUS_AGENT_PROFILE` 写入 `~/.codex/.env`（Codex 在启动时
 加载它），并在 `~/.codex/config.toml` 中设置 `bearer_token_env_var = "CHORUS_API_KEY"`，因此
-磁盘上不会存储任何字面量密钥。Codex 也没有 `userConfig` 界面，所以评审与 OpenSpec 行为由
-技能逻辑控制，而非插件开关。
+磁盘上不会存储任何字面量密钥。Codex 也没有插件设置（`userConfig`），所以评审与 OpenSpec 行为由
+技能控制，而非插件开关。
 
-### 移植版本：OpenClaw、Kiro 与 Pi
+### 其他官方集成：OpenClaw、Kiro 与 Pi
 
-这些运行时都有第一方集成，但能力与 Claude Code、Codex 不同。请把下面的说明当作指引，而非同等
-能力的保证。
+这些运行时都有官方集成，但能力与 Claude Code、Codex 不同。请把下面的说明当作指引，而非能力
+对等的承诺。
 
 - **OpenClaw**：一个提供 Chorus MCP 工具与工作流技能的插件。它通过 OpenClaw 网关而非
-  Chorus 后台服务保持在线，也不提供相同的工作流生命周期 Hook。参见
+  Chorus 后台服务保持在线，也不提供相同的工作流生命周期钩子。参见
   [OpenClaw](/zh/reference/agents/openclaw/)。
-- **Kiro**：一个提供工具、工作流技能、评审智能体与 Hook 的集成，可按工作区或用户级安装。
+- **Kiro**：一个提供工具、工作流技能、评审智能体与钩子的集成，可按工作区或用户级安装。
   参见 [Kiro](/zh/reference/agents/kiro/)。
 - **Pi**：已发布的 `@chorus-aidlc/chorus-pi` npm 包（`pi install npm:@chorus-aidlc/chorus-pi`），
-  提供 Chorus MCP 工具（通过 `pi-mcp-adapter`）、工作流技能、包相对的评审智能体、官方 pi `subagent`
+  提供 Chorus MCP 工具（通过 `pi-mcp-adapter`）、工作流技能、随包发现的评审智能体、Pi 官方的 `subagent`
   工具，以及 Pi 原生事件钩子。Pi 是**可唤醒的 Chorus 后台服务后端**（`chorus daemon --agent pi`），
   尽管它自身没有原生 MCP 或权限系统。参见 [Pi](/zh/reference/agents/pi/)。
 
 ## 升级插件
 
-对于已配置的 Claude Code、Codex、Kiro 和 Pi，可用 `chorus upgrade --plugins` 升级 CLI 与 Chorus 插件，无需重新注册智能体或轮换凭据。参见 [CLI 升级范围与完成状态](/zh/reference/cli/#升级-cli-与插件)。下面的配置流程仍适用于选择智能体或更改凭据。
-
-原地升级；你的智能体密钥与 Chorus URL 不受影响。
+升级在原地进行，你的智能体密钥与 Chorus URL 不受影响。对于已配置的 Claude Code、Codex、Kiro 和 Pi，`chorus upgrade --plugins` 会升级 CLI 与 Chorus 插件，无需重新注册智能体或轮换凭据。参见 [CLI 升级范围与完成状态](/zh/reference/cli/#升级-cli-与插件)。如需选择智能体或更改凭据，下面的配置流程仍然适用。
 
 - **任意智能体**：加上 `--update-installed` 运行安装向导，并选择需要更新的智能体。不加该参数时，完整的现有安装可能会被跳过：
 
@@ -112,7 +107,7 @@ OpenClaw、Kiro 与 Pi 请重新运行 `chorus agents add --update-installed`，
 ## 卸载插件
 
 - **Claude Code**：打开 `/plugin` 菜单，停用或移除 `chorus@chorus-plugins`。移除插件会
-  同时移除它的 Hook 与评审子智能体。环境中的智能体密钥不是插件产物，如不再需要请单独删除。
+  同时移除它的钩子与评审子智能体。环境中的智能体密钥不是插件产物，如不再需要请单独删除。
 - **Codex**：在 `/plugins` 菜单中停用或移除插件。由于 MCP 服务器是单独配置的，还需从
   `~/.codex/config.toml` 中删除 `[mcp_servers.chorus]` 段，并从 `~/.codex/.env` 中删除 Chorus
   相关密钥，才能彻底断开。系统会保留一次性备份 `config.toml.chorus-bak`。
@@ -125,31 +120,27 @@ OpenClaw、Kiro 与 Pi 请通过运行时自带的插件或包管理器移除集
 运行中的 Chorus 版本一致，技能 frontmatter 的 `version` 也随之变动，因此一次插件发布对应它所
 面向的应用版本。升级 Chorus 时，请把插件升级到匹配版本；插件报告的版本，也就是其技能版本。
 
-你无需单独管理技能：在 Claude Code 上技能随插件打包、随插件更新一同下发，在 Codex 上技能就在
-插件包内。不存在需要单独保持同步的技能安装。
+在 Claude Code 和 Codex 上，技能都打包在插件内并随插件一同更新，无需单独安装或保持同步。
 
 ## 后续阅读
 
-- [命令与技能路由](/zh/guides/plugin-commands/) ， 哪个命令驱动哪个工作流阶段，以及它产出什么。
-- [自动化行为](/zh/guides/plugin-automation/) ， 评审子智能体、会话 Hook 与无头约束如何运作。
-- [OpenSpec 模式](/zh/guides/openspec-mode/) ， 会话如何选定规格模式，以及 OpenSpec 写作路径。
-- [Spec-lite 模式](/zh/guides/spec-lite-mode/) ， 不走 OpenSpec 时使用的 Chorus 原生轻量规格留痕。
+- [命令与技能路由](/zh/guides/plugin-commands/)：哪个命令驱动哪个工作流阶段，以及它产出什么。
+- [自动化行为](/zh/guides/plugin-automation/)：评审子智能体、会话钩子与无头约束如何运作。
+- [OpenSpec 模式](/zh/guides/openspec-mode/)：会话如何选定规格模式，以及 OpenSpec 写作路径。
+- [Spec-lite 模式](/zh/guides/spec-lite-mode/)：不走 OpenSpec 时使用的 Chorus 原生轻量规格留痕。
 
 关于这些命令驱动的工作流，参见 [AI-DLC 工作流](/zh/guides/ai-dlc-workflow/)；关于把运行时
-作为后台服务运行，参见[后台服务运维](/zh/guides/daemon-operations/)。
+作为后台服务运行，参见[管理后台服务](/zh/guides/daemon-operations/)。
 
-## 面向 Agent
+## 面向智能体
 
-- **触发场景：** 读者（或智能体）来到本页，是为了选择平台，或了解插件在某个运行时提供了什么，
+- **触发条件：** 读者（或智能体）来到本页，是为了选择平台，或了解插件在某个运行时提供了什么，
   以及如何升级、卸载、核对版本对齐。首次连接在上表链接的各运行时平台页。
 - **约束：**
   - 不要重复首次安装步骤；链接到对应平台页。
-  - 准确陈述 Claude Code 与 Codex 的能力：两者都附带全部三个评审者（方案、任务、代码）；只有
-    Claude Code 暴露 `userConfig` 开关界面，因此在 Codex 上这些行为由技能与 Hook 直接控制。切勿把
+  - 准确陈述 Claude Code 与 Codex 的能力：两者都附带全部三个评审者（提案、任务、代码）；只有
+    Claude Code 暴露 `userConfig` 开关界面，因此在 Codex 上这些行为由技能与钩子直接控制。切勿把
     OpenClaw、Kiro、Pi 说成与主运行时能力对等。
   - 插件与技能是同一个版本号，跟随 Chorus 应用版本；不要描述独立的技能安装。
-- **可引用来源：** Claude Code 清单与开关 ，
-  `public/chorus-plugin/.claude-plugin/plugin.json`；Codex 清单 ，
-  `plugins/chorus/.codex-plugin/plugin.json` 与 `plugins/chorus/README.md`；Hook 与技能分工
-  ， `docs/chorus-plugin.md`。上述路径均位于
+- **引用来源：** Claude Code 与 Codex 的插件清单及 README，位于
   [Chorus 仓库](https://github.com/Chorus-AIDLC/Chorus)。

@@ -5,14 +5,12 @@ docsLocale: ja
 route: /ja/reference/agents/claude-code/
 ---
 
-# Claude Code
-
-Claude Code には第一者の Chorus プラグインがあります。対話的な Claude Code セッションで Chorus
+Claude Code には公式の Chorus プラグインがあります。対話的な Claude Code セッションで Chorus
 ツールとワークフロースキルをサポートし、サポートされる Chorus デーモンのバックエンドとしても
 動作します。
 
 インストール前に、[エージェントのアクセスを準備する](/ja/guides/administrator-setup/)に従って
-エージェントキーを作成します。
+API キーを作成します。
 
 ## プラグインをインストールする
 
@@ -23,7 +21,7 @@ npm install --global @chorus-aidlc/chorus
 chorus agents add --agents claude
 ```
 
-プロンプトが出たら、Chorus URL とエージェントキーを入力します。`chorus agents add` は
+プロンプトが出たら、Chorus URL と API キーを入力します。`chorus agents add` は
 `claude plugin marketplace add` / `claude plugin install` を代わりに実行し、`CHORUS_URL`、
 `CHORUS_API_KEY`、`CHORUS_AGENT_PROFILE` をユーザー全体の `~/.claude/settings.json` の `env`
 ブロックに書き込むため、対話的な Claude Code セッションは手動の環境設定なしで認証されます。
@@ -48,19 +46,19 @@ export CHORUS_API_KEY="cho_REDACTED"
 ## リモート起動を有効にする
 
 対話的な Claude Code セッションからのみ Chorus を使う場合は、このセクションを飛ばしてください。
-それ以外の場合は、[ランタイムを接続する](/ja/guides/operator-onboarding/)に従い、バックエンドとして
-`claude-code` を選びます。[デーモンの運用](/ja/guides/daemon-operations/)でオンラインを維持する前に、
+それ以外の場合は、[エージェントランタイムを接続する](/ja/guides/operator-onboarding/)に従い、バックエンドとして
+`claude-code` を選びます。[Chorus デーモンを運用する](/ja/guides/daemon-operations/)に従ってオンラインを維持する前に、
 フォアグラウンドで接続を確認してください。
 
 ## 0.20.0 のデーモン動作
 
 起動ごとに一つの `claude -p` プロセスを作り、ターン終了後に終了する点は従来どおりです。Chorus は双方向の **stream-json** 入出力を使い、制御応答のために接続を開いたままにします。既存セッションと `claude --resume` は引き続き利用できます。プレーンテキストへのフォールバックや通信方式の切り替えはありません。Linux 上の Claude Code **2.1.283 と 2.1.284** で実行検証済みです。これは検証済みバージョンであり、すべての Claude リリースに対する最低互換バージョンの保証ではありません。
 
-- **中断**：最初にプロトコルで中断します。`sigintTimeoutMs` 以内に停止しなければプロセスツリーを強制終了します。既定値は従来どおり 10 秒です。Windows の終了処理はプラットフォームテストで検証しており、実機検証ではありません。
-- **制限対象ツール**：`--chorus-only` では Chorus 以外のツールを明示的に拒否し、Chorus ツールの使用かコメントでの質問を案内します。ログには拒否したツール名だけを記録し、入力内容は記録しません。YOLO の動作は変わりません。
-- **質問**：デーモン起動では YOLO を含め `AskUserQuestion` を無効にします。端末で回答する人がいないため、Chorus のコメントか要件の明確化を使います。対話的な Claude Code セッションの質問フローは変わりません。
+- **中断**：デーモンはまずプロトコル経由で中断を送ります。`sigintTimeoutMs` 以内にプロセスが停止しなければ、プロセスツリーを強制終了します。既定値は従来どおり 10 秒です。
+- **制限対象ツール**：`--chorus-only` モードでは Chorus 以外のツールを明示的に拒否し、Chorus ツールを使うか Chorus のコメントで質問するようエージェントに伝えます。ログには拒否したツール名だけを記録し、入力内容は記録しません。YOLO の動作は変わりません。
+- **質問**：デーモンによる起動では、YOLO を含めて常に `AskUserQuestion` が無効になります。端末で回答する人がいないため、エージェントは Chorus のコメントか要件詳細化を通じて質問します。対話的な Claude Code セッションの質問フローは変わりません。
 
-更新後は実際に導入されている Claude Code で、チェックイン、追加ターン、中断と再開を確認してください。プロトコルエラーは[デーモンのログ](/ja/guides/daemon-operations/)、続行手順は[セッションの復旧](/ja/guides/session-recovery/)を参照してください。
+更新後は、ホストに実際にインストールされている Claude Code のバージョンで、チェックイン、追加ターン、中断と再開を確認してください。プロトコルエラーの診断には[デーモンのログ](/ja/guides/daemon-operations/)を、作業の続け方は[セッションを中断して再開する](/ja/guides/session-recovery/)を参照してください。
 
 ## 接続を確認する
 
@@ -78,35 +76,35 @@ Claude Code で `/plugin list` を実行し、`chorus@chorus-plugins` が有効�
 - リモート作業は、登録された作業ディレクトリ内で、ローカルの OS ユーザーが利用できるすべてに
   アクセスできます。信頼できるディレクトリのみを登録してください。
 
-共通の運用手順については、[リモート制御](/ja/guides/remote-control/)と
-[セッションの復旧](/ja/guides/session-recovery/)を使ってください。
+共通の運用手順については、[リモートのエージェントで作業を始める](/ja/guides/remote-control/)と
+[セッションを中断して再開する](/ja/guides/session-recovery/)を参照してください。
 
 ## ターミナルから再開する
 
 自分のターミナルから進行中の会話を引き継ぐには、チャット UI からそのセッション ID をコピーし
-（トランスクリプトのヘッダーにある**Copy session ID**）、その会話の作業ディレクトリで実行します。
+（トランスクリプトのヘッダーにある **セッション ID をコピー**）、その会話の作業ディレクトリで実行します。
 
 ```bash
 claude --resume <sessionId>
 ```
 
 コピーした ID は、Chorus がセッションを再開するときに Claude Code へ渡すのと同じ ID です。
-Claude Code バックエンドの場合、それは直接の着想の UUID です。完全な流れは
-[セッションの中断と再開](/ja/guides/session-recovery/#ターミナルから引き継ぐ)を参照してください。
+Claude Code バックエンドの場合、それはそのセッションがひもづく着想の UUID です。完全な流れは
+[セッションを中断して再開する](/ja/guides/session-recovery/#ターミナルから引き継ぐ)を参照してください。
 
 ## よくある問題
 
 - **プラグインが表示されない：** Claude Code を再起動し、`/plugin list` を確認します。
-- **チェックインが認可されない：** エージェントキーを作成またはローテーションし、次に
+- **チェックインが認可されない：** API キーを作成またはローテーションし、次に
   `chorus agents add` を再実行して（または `~/.claude/settings.json` の `env` ブロックを更新して）、
   Claude Code を再起動します。
 - **デーモンがオフライン：** `chorus daemon status` を実行し、次に
-  [トラブルシューティング](/ja/guides/troubleshooting/)を参照します。
-- **想定と異なるプロジェクトが表示される：** 意図した絶対パスの `--cwd` 値でデーモンを
+  [エージェント接続のトラブルシューティング](/ja/guides/troubleshooting/)を参照します。
+- **想定と異なる作業ディレクトリがオンラインになっている：** 意図した絶対パスの `--cwd` 値でデーモンを
   再インストールします。
 
 ## サブエージェントのセッション
 
-プラグインが管理するサブエージェントのセッション名には Agent の種類を使います。
+プラグインが管理するサブエージェントのセッション名にはエージェントの種類を使います。
 同じ種類の並列サブエージェントは Chorus セッションを共有でき、最後の一つが終了するまで開いたままです。
-一つの終了で、まだ動いている別のサブエージェントの追跡が終了することを防ぎます。
+これにより、一つが終了しても、まだ動いている他のサブエージェントの追跡は途切れません。

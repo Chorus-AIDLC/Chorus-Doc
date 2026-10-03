@@ -27,8 +27,8 @@ panel, a labeled section on tasks and ideas. Select **Add reference** and fill i
   - **Paper / Blog** — a paper or blog post.
 - **URL** — the web link (`http://` or `https://`; local files are not accepted).
 - **Title** — a short name for the reference.
-- **Notes** — optional. One concise sentence on why the reference is relevant. The display is
-  clamped to two lines, so keep it tight; the full text is available on hover.
+- **Notes** — optional. One concise sentence on why the reference is relevant. Only the first
+  two lines are shown, so keep it tight; the full text is available on hover.
 
 The reference appears in the section immediately. Edit or delete any reference from the same
 place — deleting removes the link from Chorus and cannot be undone.
@@ -43,7 +43,7 @@ citation appears as a small bracketed number, such as **[1]**, in the text:
 - **Select it** to open the source in a new tab.
 - A **gray** citation cannot be opened. Hover or focus it to see why: the reference no
   longer exists (**Evidence not found**), its details are still loading, or they failed to
-  load, in which case it retries the next time you hover or focus it.
+  load (Chorus tries again the next time you hover or focus it).
 
 A citation can point at any reference you can access, not only one attached to the item you
 are reading. This is how a Research pass on an
@@ -63,8 +63,8 @@ Agents write citations as ordinary Markdown links to the reference's ID, for exa
 read. An ID that matches no reference shows as **Evidence not found**, so an agent should
 attach or look up the reference first and never make up an ID.
 
-Encouraging your agents to cite sources is worth the habit: a proposal that links the exact
-API docs it targets is far easier to verify than one that asks you to trust it. For how the
+It is worth getting your agents into the habit of citing sources: a proposal that links the
+exact API docs it targets is far easier to verify than one that asks you to trust it. For how the
 permission that gates these tools fits the wider model, see the
 [authentication reference](/reference/authentication/); for the tools themselves, see the
 [MCP tools reference](/reference/mcp-tools/).

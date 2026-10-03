@@ -27,7 +27,7 @@ SUPER_ADMIN_PASSWORD_HASH='$2b$10$...' \
 chorus
 ```
 
-启动时，Chorus 会自动应用所有待执行的数据库迁移（`prisma migrate deploy`，对应 `db:migrate` 脚本），随后在 `8637` 端口提供 Web 应用。数据库必须已经存在且可访问；在这条路径上，Chorus 不会为你创建数据库服务器。
+启动时，Chorus 会自动应用所有待执行的数据库迁移（`prisma migrate deploy`），随后在 `8637` 端口提供 Web 应用。数据库必须已经存在且可访问；在这条路径上，Chorus 不会为你创建数据库。
 
 Chorus 在生产运行中读取的环境变量：
 
@@ -61,15 +61,15 @@ REDIS_URL='redis://default:password@redis.internal:6379'
 
 **跨实例的事件传播必须依赖 Redis。** 未设置 `REDIS_URL` 时，Chorus 会退回到进程内的内存事件总线，其作用范围仅限单个进程，在一个实例上产生的更新不会到达其他实例。单实例部署可以不配置 Redis，依靠这种内存回退运行；但只要部署多于一个实例，就必须配置共享 Redis。
 
-所有实例还必须共享同一个安全的 `NEXTAUTH_SECRET`，确保请求落到任意实例时，Chorus 自签名会话都能通过校验。
+所有实例还必须共享同一个安全的 `NEXTAUTH_SECRET`，这样无论请求落到哪个实例，Chorus 签发的会话都保持有效。
 
 ## 部署 AWS CDK 栈
 
-Chorus 在 `packages/chorus-cdk` 下自带一个 AWS CDK 栈，并提供仓库根目录的 `install.sh` 以交互方式驱动它。该栈会搭建一套完整的、经 HTTPS 前置的部署，并附带托管的 PostgreSQL 与 Redis。
+Chorus 在 `packages/chorus-cdk` 下自带一个 AWS CDK 栈，并提供仓库根目录的 `install.sh` 以交互方式驱动它。该栈会搭建一套以 HTTPS 对外提供服务的完整部署，并附带托管的 PostgreSQL 与 Redis。
 
 ### 前置条件
 
-`install.sh` 会检查 `aws`、`node`、`pnpm` 和 AWS 凭据。请先通过 `aws configure` 或
+`install.sh` 会检查 `aws`、`node`、`pnpm` 以及有效的 AWS 凭据。请先通过 `aws configure` 或
 `AWS_PROFILE` 配置凭据。证书要求取决于下列模式。
 
 ### 选择部署模式
@@ -77,7 +77,7 @@ Chorus 在 `packages/chorus-cdk` 下自带一个 AWS CDK 栈，并提供仓库�
 - **`alb`（默认）**：公网 ALB 使用 HTTPS 443 端口，必须提供部署区域内的 ACM 证书，自定义域名可选。
 - **`cloudfront`**：CloudFront 提供公网 HTTPS，经 VPC origin 转发到私有 ALB 的 HTTP 80 端口。
   默认的 `*.cloudfront.net` 域名无需自备证书。使用自定义域名时，必须同时提供域名和 **`us-east-1`**
-  的 ACM 证书。已禁用缓存，不会缓存登录后的页面和 API 响应。
+  的 ACM 证书。登录后的页面和 API 响应均禁用缓存。
 
 在 `./install.sh` 中选择模式，或向 CDK 传入 `-c deployMode=cloudfront`。
 `default_deploy.sh` 会保留选择。非交互安装使用 `CHORUS_INSTALL_NONINTERACTIVE=1`、
@@ -112,17 +112,17 @@ CloudFront 地址、ECS 日志或目标组健康状态，并确认部署区域�
 | Super admin password | 是 | 至少 8 个字符。在 synth 阶段用 bcrypt 哈希，明文不会写入模板。 |
 | NextAuth secret | 否 | 留空时每次 synth 都会生成新值。提供同一个持久值，才能在重新部署后保留会话。 |
 
-栈通过 Secrets Manager 共享 `NEXTAUTH_SECRET`，但 synth 时不会读取已保存的值。
+</div>
+
+栈通过 Secrets Manager 共享 `NEXTAUTH_SECRET`，但 synth 时不会读回已保存的值。
 每次部署请在安装器或 CDK 的 `nextAuthSecret` context 中复用同一值。若此前留空，
 请在重新部署前保留 Secrets Manager 中的现有值，避免意外轮换。
-
-</div>
 
 收集完这些答案后，`install.sh` 会安装并构建 CDK 包，引导（bootstrap）CDK 环境，然后部署该栈。它还会把你的答案写入可重复执行的 `default_deploy.sh`，这样后续部署无需重新询问。
 
 ### 该栈会创建哪些组件
 
-该栈（`packages/chorus-cdk/lib/{chorus-stack,service,database,cache}.ts`）会创建：
+该栈会创建：
 
 <div class="table-scroll" role="region" aria-label="CDK 栈组件" tabindex="0">
 

@@ -5,18 +5,16 @@ docsLocale: en
 route: /reference/agents/
 ---
 
-# Agent platforms
-
 Choose the agent you already use, then decide whether you also need Chorus to start work
 on that agent remotely.
 
-| Platform | Support ownership | Best for | Remote start | Persistent runtime |
+| Platform | Supported by | Best for | Remote start | Persistent runtime |
 | --- | --- | --- | --- | --- |
 | [Claude Code](./claude-code/) | Chorus team | Claude Code users who want the complete Chorus workflow | Yes, with the Chorus daemon | Chorus daemon |
 | [Codex](./codex/) | Chorus team | Codex users who want the complete Chorus workflow | Yes, with the Chorus daemon | Chorus daemon |
 | [Kiro](./kiro/) | Chorus team | Kiro CLI users who want the complete Chorus workflow | Yes, with the Chorus daemon | Chorus daemon |
 | [OpenClaw](./openclaw/) | Chorus team | OpenClaw users who already run its gateway | Yes, through OpenClaw | OpenClaw gateway |
-| [DeepSeek Harness](./dsh/) | Chorus team | DeepSeek Harness users who want the Chorus workflow | Yes, with the Chorus daemon | Chorus daemon |
+| [DeepSeek Harness](./dsh/) | Chorus team | DeepSeek Harness users who want the complete Chorus workflow | Yes, with the Chorus daemon | Chorus daemon |
 | [OpenCode](./opencode/) | Community | OpenCode users comfortable with community support | No | No |
 | [Pi](./pi/) | Chorus team | Pi users who want the complete Chorus workflow | Yes, with the Chorus daemon | Chorus daemon |
 | [Generic MCP client](./generic-mcp/) | MCP compatibility only | Calling Chorus tools from another MCP client | No | No |
@@ -25,9 +23,9 @@ Claude Code, Codex, Kiro, Pi, and DeepSeek Harness are the supported Chorus daem
 OpenClaw stays online through its own gateway and plugin. OpenCode and generic MCP clients
 connect interactively and cannot be selected as a Chorus daemon backend.
 
-For access keys and permissions, start with [Prepare agent access](/guides/administrator-setup/).
-For a remotely available Claude Code, Codex, Kiro, Pi, or DeepSeek Harness installation, continue with
-[Daemon operations](/guides/daemon-operations/) after completing the platform setup.
+For API keys and permissions, start with [Prepare agent access](/guides/administrator-setup/).
+To make Claude Code, Codex, Kiro, Pi, or DeepSeek Harness available for remote work, complete
+the platform setup, then continue with [Operate the Chorus daemon](/guides/daemon-operations/).
 
 ## What the plugin packages
 
@@ -38,8 +36,8 @@ current — it does not repeat the install steps.
 The plugin turns an AI coding runtime into a Chorus collaborator: it exposes the Chorus MCP
 tools, the stage workflow skills, reviewer sub-agents, and session lifecycle automation. It
 is published once per runtime and named `chorus`. Claude Code and Codex are covered in full
-below; OpenClaw, Kiro, and Pi are ports with narrower or differently shaped capabilities, so
-they appear as difference-and-pointer notes rather than as equals.
+below; OpenClaw, Kiro, and Pi have narrower or differently shaped capabilities, so they get
+short notes with links instead.
 
 ### Claude Code
 
@@ -75,14 +73,14 @@ The Codex plugin (`chorus@chorus-plugins` for Codex) packages:
   and `TaskCompleted` hooks.
 
 The Codex MCP server is **not** bundled with the plugin. Codex does not expand `${VAR}` in
-plugin MCP config, so `chorus agents add` configures Codex keyless instead: it writes
-`CHORUS_URL` / `CHORUS_API_KEY` / `CHORUS_AGENT_PROFILE` into `~/.codex/.env` (which Codex
+plugin MCP config, so `chorus agents add` configures Codex without storing the key in its
+config: it writes `CHORUS_URL` / `CHORUS_API_KEY` / `CHORUS_AGENT_PROFILE` into `~/.codex/.env` (which Codex
 loads at startup) and sets `bearer_token_env_var = "CHORUS_API_KEY"` in
-`~/.codex/config.toml`, so no literal key is stored on disk. Codex also has no `userConfig`
-surface, so reviewer and OpenSpec behavior is controlled by skill logic rather than plugin
-toggles.
+`~/.codex/config.toml`, so no literal key is stored on disk. Codex also has no plugin
+settings (`userConfig`), so reviewer and OpenSpec behavior is controlled by the skills rather
+than plugin toggles.
 
-### Ports: OpenClaw, Kiro, and Pi
+### Other first-party integrations: OpenClaw, Kiro, and Pi
 
 These runtimes have first-party integrations, but their capabilities differ from Claude
 Code and Codex. Treat the notes below as pointers, not a parity claim.
@@ -92,17 +90,19 @@ Code and Codex. Treat the notes below as pointers, not a parity claim.
   workflow lifecycle hooks. See [OpenClaw](/reference/agents/openclaw/).
 - **Kiro** — an integration with tools, workflow skills, reviewer agents, and hooks,
   installable per workspace or user-wide. See [Kiro](/reference/agents/kiro/).
-- **Pi** — the published `@chorus-aidlc/chorus-pi` npm package (`pi install npm:@chorus-aidlc/chorus-pi`),
-  with Chorus MCP tools (via `pi-mcp-adapter`), workflow skills, package-relative reviewer agents,
-  the official pi `subagent` tool, and Pi-native event hooks. Pi is a **wakeable Chorus daemon
-  backend** (`chorus daemon --agent pi`), though it has no native MCP or permission system of its
-  own. See [Pi](/reference/agents/pi/).
+- **Pi** — the published `@chorus-aidlc/chorus-pi` npm package
+  (`pi install npm:@chorus-aidlc/chorus-pi`), with Chorus MCP tools (via `pi-mcp-adapter`),
+  workflow skills, package-relative reviewer agents, Pi's official `subagent` tool, and
+  Pi-native event hooks. Pi is a **wakeable Chorus daemon backend**
+  (`chorus daemon --agent pi`), though it has no native MCP or permission system of its own. See [Pi](/reference/agents/pi/).
 
 ## Upgrade the plugin
 
-For configured Claude Code, Codex, Kiro, and Pi profiles, `chorus upgrade --plugins` updates the CLI and Chorus plugins without re-registering agents or rotating credentials. See [CLI upgrade scope and completion](/reference/cli/#upgrade-the-cli-and-plugins). The setup flow below remains useful for selecting agents or changing credentials.
-
-Upgrade in place; your agent key and Chorus URL are unaffected.
+Upgrades happen in place; your agent key and Chorus URL are unaffected. For configured Claude
+Code, Codex, Kiro, and Pi profiles, `chorus upgrade --plugins` updates the CLI and Chorus
+plugins without re-registering agents or rotating credentials. See
+[CLI upgrade scope and completion](/reference/cli/#upgrade-the-cli-and-plugins). The setup
+flow below is still useful for selecting agents or changing credentials.
 
 - **Any agent** — run setup with `--update-installed` and select the agents to refresh.
   Without that flag, a complete existing installation may be skipped:
@@ -121,11 +121,11 @@ Upgrade in place; your agent key and Chorus URL are unaffected.
 
   Restart Claude Code, then run `/plugin list` and confirm the new version is enabled.
 
-- **Codex** — re-running `chorus agents add --update-installed` refreshes the plugin and the `~/.codex/.env`
-  credential, and is also how you rotate the agent key. Finish with `/plugins` inside Codex.
+- **Codex** — re-running `chorus agents add --update-installed` refreshes the plugin and the
+  `~/.codex/.env` credential, and is also how you rotate the agent key. Finish with `/plugins` inside Codex.
 
-For OpenClaw, Kiro, and Pi, re-run `chorus agents add --update-installed` or upgrade through the same mechanism
-you installed with, described on each platform page above.
+For OpenClaw, Kiro, and Pi, re-run `chorus agents add --update-installed` or upgrade through
+the same mechanism you installed with, as described on each platform page above.
 
 ## Uninstall the plugin
 
@@ -148,13 +148,12 @@ release, and the skill's frontmatter `version` moves with it, so a plugin releas
 with the application it targets. When you upgrade Chorus, upgrade the plugin to the matching
 version; when the plugin reports a version, that is also its skill version.
 
-You do not manage the skill separately: on Claude Code the skill is bundled with the plugin
-and delivered with plugin updates, and on Codex the skills ship inside the plugin package.
-There is no independent skill install to keep in sync.
+Skills ship inside the plugin on both Claude Code and Codex and update with it; there is
+nothing to install or keep in sync separately.
 
 ## Where to go next
 
-- [Commands & skill routing](/guides/plugin-commands/) — which command runs each workflow
+- [Commands and skill routing](/guides/plugin-commands/) — which command runs each workflow
   stage, and what it produces.
 - [Automation behaviors](/guides/plugin-automation/) — how reviewer sub-agents, session
   hooks, and headless constraints behave.
@@ -165,7 +164,7 @@ There is no independent skill install to keep in sync.
 
 For the workflow these commands drive, see [The AI-DLC workflow](/guides/ai-dlc-workflow/);
 for running a runtime as a background service, see
-[Daemon operations](/guides/daemon-operations/).
+[Operate the Chorus daemon](/guides/daemon-operations/).
 
 ## For agents
 
@@ -181,8 +180,5 @@ for running a runtime as a background service, see
     OpenClaw, Kiro, or Pi as having parity with the primary runtimes.
   - The plugin and skill versions are a single number tracking the Chorus application
     version; do not describe an independent skill install.
-- **Cite:** Claude Code manifest and toggles —
-  `public/chorus-plugin/.claude-plugin/plugin.json`; Codex manifest —
-  `plugins/chorus/.codex-plugin/plugin.json` and `plugins/chorus/README.md`; hook and skill
-  division — `docs/chorus-plugin.md`. All paths are in the
+- **Cite:** the Claude Code and Codex plugin manifests and documentation in the
   [Chorus repository](https://github.com/Chorus-AIDLC/Chorus).

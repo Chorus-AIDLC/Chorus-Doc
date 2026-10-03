@@ -29,10 +29,10 @@ at different points:
 | --- | --- |
 | Claude Code, Codex, Kiro, Pi | At session start (Kiro: agent spawn); the injected `## Spec Mode` context states the result. |
 | dsh | At plugin load; the first agent step receives the `## Spec Mode` context. |
-| OpenClaw | When a stage skill reaches its spec-mode step, using the shipped resolver. There is no SessionStart injection. Run `/chorus spec` or `/chorus status` to inspect the mode. |
+| OpenClaw | When a stage skill reaches its spec-mode step, using the shipped resolver. It does not add spec-mode context at session start. Run `/chorus spec` or `/chorus status` to inspect the mode. |
 
 For example, a resolved OpenSpec mode is reported as `CHORUS_SPEC_MODE=openspec`.
-Do not infer a mode from the absence of a connection toast.
+Do not infer a mode from whether a connection notice appeared.
 
 ## How the mode is chosen
 
@@ -53,9 +53,9 @@ quietly authoring something else.
 Fix the cause (install the CLI, run `openspec init`, or re-enable OpenSpec) or pick a mode
 that works. A mode you asked for is never silently downgraded.
 
-Unrecognized `CHORUS_SPEC_MODE` values are treated like unset, with an explanation; use one
+Unrecognized `CHORUS_SPEC_MODE` values are treated as if unset, with an explanation; use one
 of the three exact values above. The standalone skill distribution does not include spec-mode
-routing and continues to author free-form.
+routing and keeps writing free-form documents.
 
 ## Install and initialize
 
@@ -86,7 +86,7 @@ kebab-case slug and mirror three file types into your Chorus proposal's document
 `openspec/changes/<slug>/tasks.md` is **not** mirrored: Chorus task drafts are the source of
 truth for tasks, so the OpenSpec task list is left on disk.
 
-So a later run can recover the change, the proposal description carries one exact line:
+So that a later run can recover the change, the proposal description carries one exact line:
 
 ```text
 OpenSpec change slug: <slug>
@@ -97,9 +97,8 @@ re-typing the content through the model, which keeps the local file and the Chor
 identical. You do not run this yourself; the plugin's skill handles it with the native MCP
 client, `chorus mcp call <tool> --arg-file content=<file>`, and falls back to the legacy
 `chorus-api.sh` / `chorus-mcp-call.sh` wrappers only when the `chorus` CLI is not on `PATH`.
-The exact contract (its halt-on-error rules and post-approval re-sync) lives in the
-authoritative sources rather than being reproduced here — see `docs/OPENSPEC_MODE.md` and the
-plugin skill `public/chorus-plugin/skills/openspec-aware/SKILL.md`.
+The plugin's OpenSpec skill defines the exact contract, including its halt-on-error rules and
+post-approval re-sync.
 
 ## When `openspec archive` runs
 
@@ -138,7 +137,7 @@ Three switches, in precedence order:
    export CHORUS_OPENSPEC_MODE=off
    ```
 
-Note what the last two now mean: they make OpenSpec *unusable*, which lands the session on
+Note that the last two make OpenSpec *unusable*, which lands the session on
 `lite` rather than on free-form. If you want no local spec files at all, ask for `off`
 explicitly. Either way, an existing `openspec/` directory is left on disk untouched and new
 proposals get no OpenSpec slug line.
@@ -160,8 +159,4 @@ proposals get no OpenSpec slug line.
   content inline, and halt on any error. Do not mirror `tasks.md`. The proposal description
   must carry the exact line `OpenSpec change slug: <slug>`. When the mode is not `openspec`,
   do not scaffold `openspec/changes/` and do not add the slug line. The standalone
-  `public/skill/` distribution does not support spec modes.
-- **Cite.** `public/chorus-plugin/bin/resolve-spec-mode.sh` (the single-source resolution
-  contract), `docs/OPENSPEC_MODE.md` (user-facing summary), and the authoritative skills
-  `public/chorus-plugin/skills/openspec-aware/SKILL.md` (Claude Code) and
-  `plugins/chorus/skills/openspec-aware/SKILL.md` (Codex).
+  skill distribution does not support spec modes.

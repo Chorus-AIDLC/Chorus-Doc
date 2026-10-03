@@ -5,12 +5,10 @@ docsLocale: en
 route: /reference/agents/kiro/
 ---
 
-# Kiro
+Kiro CLI has a first-party Chorus integration with tools, workflow skills, reviewer agents,
+and hooks. Kiro is also a supported Chorus daemon backend.
 
-Kiro CLI has a first-party Chorus integration with tools, workflow skills, agents, and
-hooks. Kiro is also a supported Chorus daemon backend.
-
-Before installation, install Kiro CLI v2 and create an agent key by following
+Before you begin, install Kiro CLI v2 and create an agent key by following
 [Prepare agent access](/guides/administrator-setup/).
 
 ## Install the integration
@@ -33,7 +31,7 @@ installation.
 Skip this section if you only use Chorus from an interactive Kiro session. Otherwise,
 follow [Connect an agent runtime](/guides/operator-onboarding/) and select `kiro` as the
 backend. Verify the connection in the foreground before using
-[Daemon operations](/guides/daemon-operations/) to keep it online.
+[Operate the Chorus daemon](/guides/daemon-operations/) to keep it online.
 
 ## Verify the connection
 
@@ -51,12 +49,12 @@ and working directory are online.
 - Workspace configuration takes precedence over user-wide Kiro configuration.
 - Remote work inherits the local user's access. Register only trusted working directories.
 
-Use [Remote control](/guides/remote-control/) and
-[Session recovery](/guides/session-recovery/) for shared operating procedures.
+Use [Start work on a remote agent](/guides/remote-control/) and
+[Interrupt and resume a session](/guides/session-recovery/) for shared operating procedures.
 
 ## Resume from the terminal
 
-To take over a live conversation from your own terminal, copy its session id from the chat
+To take over a live conversation from your own terminal, copy its session ID from the chat
 UI (**Copy session ID** in the transcript header) and run, from the conversation's working
 directory:
 
@@ -64,7 +62,7 @@ directory:
 kiro-cli chat --resume-id <sessionId>
 ```
 
-The copied id is the same id Chorus passes to Kiro CLI when it resumes a session. See
+The copied ID is the same ID Chorus passes to Kiro CLI when it resumes a session. See
 [Interrupt and resume a session](/guides/session-recovery/#take-over-from-a-terminal) for
 the full flow.
 
@@ -76,4 +74,4 @@ the full flow.
 - **Check-in is unauthorized:** re-run `chorus agents add` so `mcp.json` and the credential
   are refreshed; for daemon mode the daemon supplies the key per wake.
 - **Daemon is offline:** run `chorus daemon status`, then see
-  [Troubleshooting](/guides/troubleshooting/).
+  [Troubleshoot agent connections](/guides/troubleshooting/).

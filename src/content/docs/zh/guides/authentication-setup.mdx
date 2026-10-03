@@ -9,13 +9,12 @@ sidebar:
 
 import Screenshot from '../../../../components/Screenshot.astro';
 
-Chorus 的大部分功能都限定在工作区内，但有一个角色凌驾于各个工作区之上：**Super
-Admin**（超级管理员）。你用它来创建工作区、为团队开启单点登录（SSO）。本页面向运维
-Chorus 部署的人；只是想登录的最终用户请看[账户与工作区](/zh/guides/account-and-workspace/)。
+Chorus 的大部分功能都限定在工作区内，但有一个角色凌驾于各个工作区之上：**超级管理员**。创建工作区、为团队开启单点登录（SSO）都要通过它完成。
+本页面向负责运维 Chorus 部署的人；只需登录的最终用户请参阅[账号与工作区](/zh/guides/account-and-workspace/)。
 
 ## 启用超级管理员
 
-超级管理员是一个平台级登录身份，独立于任何工作区。你在服务端通过两个环境变量启用它：管理员
+超级管理员是一个平台级账号，独立于任何工作区。你在服务端通过两个环境变量启用它：管理员
 邮箱，以及管理员密码的 bcrypt 哈希：
 
 ```sh
@@ -29,17 +28,17 @@ SUPER_ADMIN_PASSWORD_HASH="$2b$10$..."   # 你的密码的 bcrypt 哈希
 node -e "console.log(require('bcryptjs').hashSync('your-password', 10))"
 ```
 
-把 bcrypt 哈希存入部署的密钥库。管理员会话还需要安全的 `NEXTAUTH_SECRET`：npm `chorus` 启动器和 Docker 入口脚本可为单实例生成并持久保存。多副本必须显式配置同一值。参见 [Docker 会话密钥](/zh/guides/deploy-docker/#会话密钥nextauth_secret)。
+请把 bcrypt 哈希保存在部署的密钥存储中。管理员会话还需要一个安全的 `NEXTAUTH_SECRET`：单实例部署时，npm `chorus` 启动器和 Docker 入口脚本可以自动生成并持久保存它；有多个副本时，请在所有副本上显式设置相同的值。参见 [Docker 会话密钥](/zh/guides/deploy-docker/#会话密钥nextauth_secret)。
 
 ## 以超级管理员身份登录
 
-应用内没有通往管理面板的入口，你通过正常的登录界面进入。输入超级管理员邮箱，Chorus 会识别
-出它，并在单独的一步要求输入管理员密码，然后打开 **Super Admin** 面板。管理员会话独立于任何
-工作区，且比普通会话更短，所以你需要定期重新登录。
+应用内没有通往管理面板的链接，你需要通过正常的登录界面进入。输入超级管理员邮箱后，Chorus 会识别
+出它，并在单独的一步中要求输入管理员密码，然后打开**超级管理员**面板。管理员会话独立于任何
+工作区，且有效期比普通会话短，所以你需要定期重新登录。
 
 :::caution[超级管理员没有工作区边界]
-与工作区里的 admin 智能体不同，超级管理员不限定在某一个工作区，它管理整个部署。请据此妥善保管
-其凭证。工作区的 **admin 智能体**（见[管理智能体](/zh/guides/manage-agents/)）治理的是*某一个
+与工作区里的管理员智能体不同，超级管理员不限定在某一个工作区，它管理整个部署。请相应地妥善保管
+其凭据。工作区的**管理员智能体**（见[管理智能体与 API 密钥](/zh/guides/manage-agents/)）治理的是*某一个
 工作区内部*的工作；超级管理员治理的是*工作区本身*。
 :::
 
@@ -48,32 +47,32 @@ node -e "console.log(require('bcryptjs').hashSync('your-password', 10))"
   alt="超级管理员面板的仪表盘，含 Dashboard 与 Companies 导航以及工作区、用户、智能体计数"
   width={1440}
   height={900}
-  caption="超级管理员面板从专门的 Dashboard 和 Companies 视图管理整个部署的工作区。"
+  caption="超级管理员面板从专门的“仪表盘”和“公司”视图管理整个部署的工作区。"
 />
 
 ## 创建工作区
 
-在超级管理员面板里，**Companies** 列出每个工作区及其邮箱域名、OIDC 状态、用户数和智能体数。
-你在这里创建、编辑、删除工作区。
+在超级管理员面板里，**公司**列表列出每个工作区及其邮箱域名、OIDC 状态、用户数和智能体数。
+你可以在这里创建、编辑和删除工作区。
 
-创建时，你为它设置**名称**、一个或多个**邮箱域名**，以及它的 SSO 设置（见下文）。邮箱域名正是
-让用户的邮箱在登录时找到这个工作区的依据。
+创建时，你为它设置**名称**、一个或多个**邮箱域名**，以及它的 SSO 设置（见下文）。用户登录时，
+正是靠邮箱域名找到这个工作区。
 
 :::caution[删除工作区不可撤销]
-删除工作区会连同它的全部数据一起移除，包括项目、想法、提案、任务、文档、智能体和用户。没有撤销。
+删除工作区会将其连同全部数据一起移除，包括项目、想法、提案、任务、文档、智能体和用户。此操作无法撤销。
 :::
 
 ## 配置 SSO（OIDC）
 
-Chorus 通过你的身份提供商、使用带 PKCE 的 OpenID Connect 为用户登录，**没有 client
-secret** 需要管理。你按工作区配置它，在超级管理员面板中该工作区的设置里，位于 **OIDC
-Configuration** 之下。有两个必填值：
+Chorus 使用带 PKCE 的 OpenID Connect，通过你的身份提供方让用户登录，因此**无需管理客户端密钥**
+（client secret）。SSO 按工作区配置，位于超级管理员面板中该工作区设置的 **OIDC 配置**
+之下。有两个必填值：
 
-- **OIDC Issuer URL**：你的提供商的 OpenID Connect 发现地址。
-- **Client ID**：提供商侧该应用的 client ID。
+- **OIDC Issuer URL**：你的身份提供方的 OpenID Connect 发现地址。
+- **Client ID**：身份提供方侧该应用的 client ID。
 
-两项都填好后 SSO 自动开启；清空任一项则关闭。Chorus 请求标准的 `openid profile email`
-scope。
+两项都填好后 SSO 自动开启；清空任一项则关闭。Chorus 请求的是标准的 `openid profile email`
+作用域（scope）。
 
 <Screenshot
   src="/images/workspace/super-admin-oidc.webp"
@@ -83,17 +82,17 @@ scope。
   caption="每个工作区的 OIDC 设置都在它的编辑页；填齐 Issuer URL 与 Client ID 后 SSO 即启用。"
 />
 
-在你的身份提供商处，把 Chorus 注册为一个应用，并把它的**重定向（回调）URL** 加入白名单，即你的
-Chorus 站点地址后跟 `/login/callback`。Companies 列表会显示可直接复制的准确 URL，它是根据你实际
-访问 Chorus 的地址生成的，所以请从你的生产地址打开 Companies 页面，复制那里显示的值。
+在你的身份提供方处，把 Chorus 注册为一个应用，并把它的**重定向（回调）URL** 加入允许列表，即你的
+Chorus 站点地址后接 `/login/callback`。**公司**列表会显示可直接复制的准确 URL。由于它是根据你打开
+Chorus 时使用的地址生成的，请通过生产地址打开**公司**页面，再复制那里显示的值。
 
 ### 这如何作用到你的用户
 
-一旦某个工作区配好了 SSO，用其某个域名下邮箱登录的人就会被送往你的身份提供商再返回，也就是
-[账户与工作区](/zh/guides/account-and-workspace/)里描述的流程。若某人的邮箱匹配到多个 SSO
-工作区，会被要求选择一个。已被加入某工作区的人，即使邮箱域名不同也会解析到该工作区。
+某个工作区配置好 SSO 后，使用其域名下邮箱登录的用户会被跳转到你的身份提供方完成认证再返回，也就是
+[账号与工作区](/zh/guides/account-and-workspace/)里描述的流程。邮箱匹配到多个 SSO
+工作区的用户，会被要求从中选择一个。已被加入某个工作区的用户，即使邮箱域名不同，也会登录到该工作区。
 
 ## 下一步
 
-工作区与 SSO 就绪后，把日常配置交给各工作区的运维者：[准备智能体访问](/zh/guides/administrator-setup/)
-讲如何创建智能体凭证，[账户与工作区](/zh/guides/account-and-workspace/)讲你的用户登录时会看到什么。
+工作区与 SSO 就绪后，就可以把日常配置交给各工作区的运维人员：[为智能体创建访问权限](/zh/guides/administrator-setup/)
+介绍如何创建智能体凭据，[账号与工作区](/zh/guides/account-and-workspace/)介绍用户登录时会看到什么。

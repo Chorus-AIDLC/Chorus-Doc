@@ -5,9 +5,9 @@ docsLocale: zh
 route: /zh/reference/agents/opencode/
 ---
 
-# OpenCode
+OpenCode 集成由社区项目 [etnperlong/opencode-chorus](https://github.com/etnperlong/opencode-chorus) 维护，而不是由 Chorus 团队维护。升级 OpenCode 或 Chorus 时，请查看该项目的兼容性说明。
 
-OpenCode 集成由社区项目 [etnperlong/opencode-chorus](https://github.com/etnperlong/opencode-chorus) 维护，不属于 Chorus 第一方支持范围。安装前请查看社区项目的兼容性说明和已知问题。
+安装前，请按照[为智能体创建访问权限](/zh/guides/administrator-setup/)创建智能体密钥。
 
 ## 安装集成
 
@@ -18,33 +18,30 @@ npm install --global @chorus-aidlc/chorus
 chorus agents add --agents opencode
 ```
 
-`chorus agents add` 会运行 `opencode plugin opencode-chorus -g`，把社区包注册到全局 `~/.config/opencode/opencode.json`，OpenCode 会在下次启动时下载它。OpenCode 从 shell 读取凭据，因此请在启动 OpenCode 的环境中设置：
+`chorus agents add` 会运行 `opencode plugin opencode-chorus -g`，把社区包注册到全局 `~/.config/opencode/opencode.json`；OpenCode 会在下次启动时下载它。OpenCode 从 shell 读取凭据，因此请在启动 OpenCode 的环境中设置：
 
 ```bash
 export CHORUS_URL="https://chorus.example.com"
 export CHORUS_API_KEY="cho_REDACTED"
 ```
 
-`CHORUS_URL` 应填写 Chorus 根地址，不要附加 `/api/mcp`。
-
 ## 验证连接
 
-1. 启动 `opencode`。
-2. 输入 `check in to chorus`。
-3. 确认 `chorus_checkin` 返回正确的智能体身份和权限。
-
-成功签入表示 MCP 连接可用，不代表第一方平台的全部运行能力均受支持。
+启动 `opencode`，让它执行 `check in to chorus`，确认响应显示预期的智能体身份和权限。这只能验证社区
+MCP 连接可用，并不意味着获得官方支持。
 
 ## 能力与限制
 
-- 社区集成提供 MCP 工具、技能和社区维护的钩子。
-- Chorus 不负责该项目的发布节奏、兼容性或故障修复。
-- OpenCode 不是 Chorus 后台服务的运行后端。
-- 不支持从 Chorus 远程启动、追加指令、中断或恢复 OpenCode 会话。
+- 社区插件提供 Chorus MCP 工具、技能和钩子。
+- OpenCode 不是 Chorus 后台服务后端。
+- Chorus 不保证 OpenCode 支持远程启动、对话记录控制、中断或会话恢复。
+- 兼容性和对话恢复取决于 OpenCode 和社区插件。
 
 ## 常见问题
 
-- **社区包未加载**：检查 `~/.config/opencode/opencode.json`，并参考社区项目的安装说明。
-- **连接返回 `401`**：在 Chorus 中更新 API 密钥，重新设置环境变量后启动 OpenCode。
-- **升级后工作流异常**：核对 OpenCode、Chorus 和社区包的版本兼容性，并查看社区项目的问题列表。
-- **需要远程会话控制**：改用 Claude Code、Codex、Kiro 或 OpenClaw。
+- **插件未加载**：检查 `~/.config/opencode/opencode.json`，必要时清除社区包的缓存，然后重新启动 OpenCode。
+- **环境变量的修改未生效**：从已设置 `CHORUS_URL` 和 `CHORUS_API_KEY` 的 shell 启动 OpenCode。
+- **签到返回未授权**：轮换智能体密钥，并用更新后的环境重新启动 OpenCode。
+- **升级后行为改变**：查看社区项目的发布记录和问题列表。
+
+一般的密钥问题，见[排查智能体连接故障](/zh/guides/troubleshooting/)。

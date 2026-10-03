@@ -5,26 +5,24 @@ docsLocale: zh
 route: /zh/reference/agents/pi/
 ---
 
-# Pi
+[Pi 编码智能体](https://pi.dev)是 Chorus 的官方集成，以已发布的 npm 包 **`@chorus-aidlc/chorus-pi`**
+形式分发。它通过 Pi 原生的扩展、技能和智能体机制，提供 Chorus 工作流技能、只读评审子智能体、
+Pi 官方的 `subagent` 工具，以及会话感知的扩展钩子，只需一条 `pi install` 即可安装。
 
-[Pi 编码智能体](https://pi.dev)是 Chorus 的第一方集成，以已发布的 npm 包 **`@chorus-aidlc/chorus-pi`**
-形式分发。它通过 Pi 原生的扩展 + 技能 + 智能体机制，提供 Chorus 工作流技能、只读评审子智能体、
-官方 pi `subagent` 工具，以及会话感知的扩展钩子，只需一条 `pi install` 即可安装。
-
-Pi 还可以作为**可唤醒的 `--agent pi` 后台服务后端**运行：Chorus 后台服务会在收到远程派发时唤醒一个
-无头 pi 会话，因此 Pi 能像 Claude Code、Codex 和 Kiro 一样参与反向对话循环。
+Pi 还可以作为**可唤醒的 `--agent pi` 后台服务后端**运行：有工作被远程发给 Pi 时，Chorus 后台服务会唤醒一个
+无头 Pi 会话，因此 Pi 能像 Claude Code、Codex 和 Kiro 一样参与反向对话循环。
 
 安装前，请按照[为智能体创建访问权限](/zh/guides/administrator-setup/)创建一个智能体密钥。
 
 ## 前置条件
 
 - 已安装 `pi` CLI（参见 [pi.dev](https://pi.dev)）。
-- `pi-mcp-adapter` 包，唯一的运行时依赖，用于把 Chorus 的 `chorus_*` MCP 工具暴露给 Pi（Pi 没有
+- `pi-mcp-adapter` 包（唯一的运行时依赖），用于把 Chorus 的 `chorus_*` MCP 工具暴露给 Pi（Pi 没有
   原生 MCP）：
   ```bash
   pi install npm:pi-mcp-adapter
   ```
-  **无需**安装单独的子智能体包，`chorus-pi` 自身已捆绑 pi 官方的 `subagent` 工具。
+  **无需**安装单独的子智能体包，`chorus-pi` 自身已捆绑 Pi 官方的 `subagent` 工具。
 - 一个 Chorus **API 密钥**（以 `cho_` 开头）。
 
 ## 步骤 1：导出环境变量
@@ -54,7 +52,7 @@ Pi 的 `pi-mcp-adapter` 会自动发现标准 MCP 配置文件。在项目根目
 }
 ```
 
-字面量 URL + 字面量 Bearer 开箱即用，Pi 不需要在 `.mcp.json` 中展开 `${VAR}`。由于 `.mcp.json`
+直接写入 URL 和 Bearer 即可使用，Pi 不需要在 `.mcp.json` 中展开 `${VAR}`。由于 `.mcp.json`
 包含智能体密钥，请不要将其提交到版本控制。
 
 ## 步骤 3：安装 chorus-pi 包
@@ -82,10 +80,10 @@ pi install npm:@chorus-aidlc/chorus-pi
   `/skill:orchestrate`、`/skill:docs`、`/skill:chorus-cli`，外加 `openspec-aware`、`spec-lite` 与 `research` 子流程。
   `research` 是想法与提案技能调用的简短事实调研流程，也是想法的[**调研**操作](/zh/guides/capture-an-idea/#在开发之前请求调研)所运行的流程。
 - **3 个只读评审子智能体**：`chorus-proposal-reviewer`、`chorus-task-reviewer`、
-  `chorus-code-reviewer`，以包相对方式发现（无需复制），通过 `subagent` 工具派生；
-  它们发布一条 `VERDICT` 评论后停止。在社区的 `pi-subagents` 包下，在调用中被直接点名的 Chorus 评审
-  子智能体和 worker 会在后台运行，即使调用要求 `async: false` 也是如此，因为在那里前台子进程无法访问 Chorus 工具。
-- **官方 pi `subagent` 工具**，内置于 `extensions/subagent/`（pi 的参考实现），无需任何第三方
+  `chorus-code-reviewer`，从包内目录发现（无需复制），通过 `subagent` 工具派生；
+  它们发布一条 `VERDICT` 评论后停止。使用社区的 `pi-subagents` 包时，调用中直接点名的 Chorus 评审
+  子智能体和 worker 一律在后台运行（即使调用要求 `async: false`），因为该包的前台子进程无法访问 Chorus 工具。
+- **Pi 官方的 `subagent` 工具**，内置于 `extensions/subagent/`（Pi 的参考实现），无需任何第三方
   子智能体包。它同时**与社区的 `pi-subagents` 包（nicobailon）共存**：两者都注册名为 `subagent`
   的工具，因此需通过 `settings.packages` 过滤器排除内置的那一个；`chorus-pi` 的会话生命周期既支持
   该包的**异步 / detached** subagent 运行，也支持内置的阻塞式运行。过滤器与配置详见
@@ -100,55 +98,55 @@ pi install npm:@chorus-aidlc/chorus-pi
 详见 [OpenSpec 模式](/zh/guides/openspec-mode/)与 [Spec-lite 模式](/zh/guides/spec-lite-mode/)。
 评审开关仍是 `CHORUS_ENABLE_{PROPOSAL,TASK,CODE}_REVIEWER`（默认 `true`）。
 
-## 将 pi 作为可唤醒的后台服务后端运行
+## 将 Pi 作为可唤醒的后台服务后端运行
 
-Pi 是一等的**可唤醒后台服务后端**，Chorus 后台服务会在收到远程派发时（分配给你智能体的想法/任务、
-一次 `@mention`、一个方案决策）唤醒一个无头 pi 会话。
+Pi 是完整支持的**可唤醒后台服务后端**，有工作被远程发给它时（分配给你的智能体的想法/任务、
+一次 @提及、一个提案决策），Chorus 后台服务会唤醒一个无头 Pi 会话。
 
 最简单的方式是 `chorus agents add`：在智能体清单中选择 **Pi**，它会通过 `pi install` 安装
-`pi-mcp-adapter` 与 `chorus-pi`，在 `~/.chorus/daemon.json` 中把 pi 登记为**可唤醒**
-智能体，并且（如果你选择启用）安装开机唤醒它的后台服务。若要手动配置，请以 pi 后端运行后台服务：
+`pi-mcp-adapter` 与 `chorus-pi`，在 `~/.chorus/daemon.json` 中把 Pi 登记为**可唤醒**
+智能体，并且（如果你选择启用）安装开机唤醒它的后台服务。若要手动配置，请以 Pi 后端运行后台服务：
 
 ```bash
 chorus daemon --agent pi
 ```
 
-- 后台服务从 PATH 解析 `pi` 可执行文件（可用 `CHORUS_PI_PATH` 覆盖），每次唤醒启动一个无头的
+- 后台服务从 `PATH` 解析 `pi` 可执行文件（可用 `CHORUS_PI_PATH` 覆盖），每次唤醒启动一个无头的
   `pi --mode rpc` 进程，并把 `CHORUS_URL` / `CHORUS_API_KEY` / `CHORUS_AGENT_PROFILE` 导出到被唤醒
-  的会话中。后台唤醒需要 **pi 0.85.0 或更新版本**，详见 [0.20.0 的 daemon 行为](#0200-的-daemon-行为)。
+  的会话中。后台唤醒需要 **Pi 0.85.0 或更新版本**，详见 [0.20.0 的 daemon 行为](#0200-的-daemon-行为)。
 - Pi **没有权限系统**，因此不涉及沙箱 / 跳过权限的标志，`chorus` 与 `yolo` 两种后台服务模式运行
-  pi 的方式完全一致。
-- 被唤醒的 pi 只能通过本包的扩展 / `pi-mcp-adapter` 访问 Chorus MCP 工具，因此请在后台服务唤醒的环境
-  中保持安装 `chorus-pi`（npm 安装能让这一点更可靠）。
+  Pi 的方式完全一致。
+- 被唤醒的 Pi 只能通过本包的扩展 / `pi-mcp-adapter` 访问 Chorus MCP 工具，因此请在后台服务唤醒的环境
+  中保持安装 `chorus-pi`（从 npm 安装可确保后台服务能用到它）。
 
 后台服务提供 Chorus 连接（`CHORUS_URL`、`CHORUS_API_KEY` 和 `CHORUS_AGENT_PROFILE`），但不会
-替你获取模型提供方凭据。可通过该智能体的 `env` 提供，也可使用后台服务继承的环境或
+替你获取模型提供方凭据。可通过 `~/.chorus/daemon.json` 中该智能体的 `env` 提供，也可使用后台服务继承的环境或
 提供方支持的凭据存储。`systemd --user` 服务不会继承登录 shell 中导出的变量。[管理后台服务](/zh/guides/daemon-operations/)
 说明了模型与思考参数、每智能体 env、服务凭据和重启要求。
 
 ### 0.20.0 的 daemon 行为
 
-从 Chorus 0.20.0 起，每次 Pi 唤醒都通过 pi 的 RPC 模式运行，不再回退到之前的无头模式。请在每台运行
-daemon 的主机上升级 pi：
+从 Chorus 0.20.0 起，每次 Pi 唤醒都通过 Pi 的 RPC 模式运行，不再回退到之前的无头模式。因此请在每台运行
+后台服务的主机上升级 Pi：
 
 ```bash
 pi --version                                                # 需要 0.85.0 或更新版本
 npm install -g @earendil-works/pi-coding-agent@latest       # 升级 pi 本身
 ```
 
-`chorus upgrade --plugins` 会更新 `chorus-pi` 和 `pi-mcp-adapter`，但不会升级 pi 本身。该行为已在
-Linux 上用 pi **0.85.1** 实测验证；macOS 和 Windows 由平台测试覆盖，本次迁移尚未在这两个平台做实机验证。
+`chorus upgrade --plugins` 会更新 `chorus-pi` 和 `pi-mcp-adapter`，但不会升级 Pi 本身。该行为已在
+Linux 上用 Pi **0.85.1** 实测验证。
 
-- **pi 版本过旧**：daemon 会跳过这次唤醒，并在日志中给出上面的升级命令。如果读取不到 pi 版本，
-  daemon 会记录警告并照常尝试唤醒。
-- **会话连续性**：每个想法保留自己的 pi 会话，升级前创建的会话也一样。如果 pi 无法恢复之前会话的
+- **Pi 版本过旧**：后台服务会跳过这次唤醒，并在日志中给出上面的升级命令。如果读取不到 Pi 版本，
+  后台服务会记录警告并照常尝试唤醒。
+- **会话连续性**：每个想法保留自己的 Pi 会话，升级前创建的会话也一样。如果 Pi 无法恢复之前会话的
   历史，唤醒会在新会话中继续，对话中会显示一条提示，说明之前的历史无法恢复。
-- **中断**：在 Chorus 中点击**中断**会通过 RPC `abort` 停止 pi 当前的运行（包括正在执行的工具）；即使 Pi 以零退出，该轮仍记录为
-  已中断。如果 `sigintTimeoutMs` 到期时 pi 仍在运行，daemon 会像以前一样强制停止它。
+- **打断**：在 Chorus 中点击**打断**会通过 RPC `abort` 停止 Pi 当前的运行（包括正在执行的工具）；即使 Pi 进程以退出码 0 结束，该轮仍记录为
+  已中断。如果 `sigintTimeoutMs` 到期时 Pi 仍在运行，后台服务会像以前一样强制停止它。
 - **扩展对话框**：唤醒期间没有人在终端前，因此扩展弹出的对话框（select、confirm、input 或
-  editor）会被立即取消，daemon 日志记录 `cancelled pi extension <method> dialog`。请改用 Chorus
-  评论或澄清流程提问。
-- **查找进程**：pi 会把进程名改为 `pi`，所以在 Linux 上 `pgrep -f 'pi --mode rpc'` 找不到它。请使用
+  editor）会被立即取消，后台服务日志记录 `cancelled pi extension <method> dialog`。请改用 Chorus
+  评论或需求细化提问。
+- **查找进程**：Pi 会把进程名改为 `pi`，所以在 Linux 上 `pgrep -f 'pi --mode rpc'` 找不到它。请使用
   `pgrep -x pi -P <daemon-pid>`。
 
 ## 常见问题
@@ -163,4 +161,4 @@ Linux 上用 pi **0.85.1** 实测验证；macOS 和 Windows 由平台测试覆�
   名前缀。可调用 `mcp({ tool: "chorus_chorus_checkin" })`，或在 chorus 服务器上设置
   `"toolPrefix": "none"` 以使用原生的 `chorus_*` 名称。
 
-关于一般的连接问题，参见[故障排查](/zh/guides/troubleshooting/)。
+关于一般的连接问题，参见[排查智能体连接故障](/zh/guides/troubleshooting/)。

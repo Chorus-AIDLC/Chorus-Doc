@@ -43,7 +43,7 @@ In the New Idea dialog:
 2. Pick the **Agent** you want to talk to, then its **Working directory**. If that agent has
    a single online directory it is selected for you; if it has more than one, choose which
    one before you can send. When the project already has a
-   [fixed working directory](/guides/create-a-project/), that anchored directory is used and
+   [fixed working directory](/guides/create-a-project/), that fixed directory is used and
    there is nothing to pick.
 3. Optionally check **Help me break this into child ideas** to have the agent propose a set
    of child ideas (a decomposition) rather than a single idea.
@@ -53,11 +53,11 @@ In the New Idea dialog:
    the goal itself is unclear, it asks you first rather than searching.
 5. Type a description of what you want and select **Send to agent**.
 
-Chorus creates the idea, assigns it to the agent instance you picked, and hands it to that
-agent. The dialog closes and confirms that the request was submitted; you stay on the page
-you were on. From there the agent takes over: it gives the idea a proper title, polishes
-your description, and starts elaboration — so an idea created this way arrives already
-assigned and already in elaboration, and you answer its questions in the idea's Elaboration
+Chorus creates the idea, assigns it to the agent and working directory you picked, and hands
+it to that agent. The dialog closes and confirms that the request was submitted; you stay on
+the page you were on. From there the agent takes over: it gives the idea a proper title,
+polishes your description, and starts elaboration. An idea created this way therefore arrives
+already assigned and in elaboration, and you answer its questions in the idea's Elaboration
 tab (below). If you checked the decompose option, the agent instead proposes candidate child
 ideas for you to confirm.
 
@@ -90,19 +90,19 @@ Sometimes an idea needs facts before it needs questions — how comparable produ
 this, what a library actually supports, whether an approach has a known catch. You can ask an
 agent for one short research pass: open the idea, select **Actions**, then **Research**.
 
-- **Assign an agent first.** Research requires an assigned agent (or agent instance)
-  owned by you with permission to read the plan, edit ideas, and attach references. With no
+- **Assign an agent first.** Research requires an assigned agent that you own, with
+  permission to read the plan, edit ideas, and attach references. With no
   assignee or a human assignee, the action stays visible but disabled and tells you to assign
-  an agent. It no longer opens an agent chooser.
+  an agent.
 - **Bring that agent online.** At least one of the assigned agent's connections must be
   online. Another agent's connection or a stale connection is not enough. Availability
   updates as assignment and presence change, without reloading the page. Hover or focus the
   disabled action to read the reason; the action sheet shows it inline.
 - If the assigned agent's new Research conversation needs a working-directory choice,
   choose it when prompted. An online indicator does not guarantee that the required
-  directory or session origin is available: the server checks the target again and reports
-  a failure if it has changed or disconnected. An accepted request preserves the idea's
-  current stage and questions.
+  directory is still available: Chorus checks the target again and reports a failure if it
+  has changed or disconnected. An accepted request leaves the idea's current stage and
+  questions unchanged.
 - Research is available **only before development starts**. Once execution begins, or the
   idea is already complete, the action is disabled and says which of the two applies.
 - You can ask more than once. Each request is queued for the agent and shows up in the
@@ -117,7 +117,8 @@ report to open.
 
 :::note[What the agent does]
 The agent decides what is worth checking and keeps the pass short. It adds only findings that
-change this idea; if nothing useful turns up, it says so rather than inventing evidence. It looks up facts; your goals and preferences still come from elaboration.
+change this idea; if nothing useful turns up, it says so rather than inventing evidence. It
+looks up facts; your goals and preferences still come from elaboration.
 :::
 
 <Screenshot
@@ -181,13 +182,12 @@ drafted. On the idea panel, select **Verify Elaborate**. This confirms the share
 understanding and moves the idea from elaborating to **elaborated**.
 
 Its status badge advances (for example to **Planning** / **Review proposal**), and the
-idea is ready for the proposal stage. Only elaboration transitions are stored directly; all
-later progress — planning, building, verifying, done — is derived from the idea's linked
-proposals and tasks.
+idea is ready for the proposal stage. Later progress — planning, building, verifying, done —
+updates automatically from the idea's linked proposals and tasks.
 
 :::note[What the agent does]
 When you select **Verify Elaborate**, Chorus resolves the elaboration and — if the idea's
-assigned agent is online — wakes it to write the proposal. You do not draft the proposal
+assigned agent is online — has the agent start writing the proposal. You do not draft the proposal
 yourself; the agent produces the documents and task drafts and submits them for your
 review. See the [agent platforms reference](/reference/agents/) for how that connection
 works.

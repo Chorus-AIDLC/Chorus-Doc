@@ -14,8 +14,8 @@ take you the rest of the way.
 
 ## Deployment forms
 
-Chorus runs the same application in two shapes. The difference is where its data lives and how
-many people use it.
+Chorus runs the same application in two forms, local and production. The difference is where its
+data lives and how many people use it.
 
 ### Local single-machine
 
@@ -24,9 +24,13 @@ One process on one machine for a single user. Chorus bundles an embedded Postgre
 its own database, applies migrations, and serves the web app on port `8637`. This is the
 fastest way to try Chorus and the right choice for individual, local use.
 
-This is the path the [Get started guide](/guides/getting-started/) walks end to end — install
-the global package, set an administrator account, and sign in. That guide is the canonical
-install walkthrough for the single-user local form, so this page does not repeat its steps.
+The [Get started guide](/guides/getting-started/) walks through this path end to end: install
+the global package, set an administrator account, and sign in. This page does not repeat those
+steps.
+
+You can also run the local form in Docker as a **standalone container**: the same embedded
+database, with its data kept in a Docker volume. See
+[Standalone (embedded database)](/guides/deploy-docker/#standalone-embedded-database).
 
 ### Production
 
@@ -38,7 +42,7 @@ to in-memory eventing, which only works for a single instance.
 
 You can run the production form as a container (see [Deploy with Docker](/guides/deploy-docker/)),
 from the global npm package against your own PostgreSQL and Redis, or on the bundled AWS CDK
-stack (see [Production deployment](/guides/deploy-production/)).
+stack (see [Deploy in production](/guides/deploy-production/)).
 
 ## Prerequisites
 
@@ -56,7 +60,7 @@ stack (see [Production deployment](/guides/deploy-production/)).
 | If you want to… | Use | Database | Cache |
 | --- | --- | --- | --- |
 | Try Chorus or work solo on one machine | Local single-machine | Embedded PGlite | None |
-| Run a shared instance with the least moving parts | Standalone container | Embedded PGlite (in a volume) | None |
+| Run a shared instance with the least moving parts | Local form in a standalone container | Embedded PGlite (in a volume) | None |
 | Run a shared, resilient, or multi-instance install | Production (Docker, npm, or AWS CDK) | External PostgreSQL 16 | Redis 7 (required for 2+ instances) |
 
 ## Continue
@@ -64,7 +68,7 @@ stack (see [Production deployment](/guides/deploy-production/)).
 - **[Deploy with Docker](/guides/deploy-docker/)** — the published `chorusaidlc/chorus-app`
   image: standalone and production Compose files, a `docker run` example, the full
   environment-variable reference, and startup behaviour.
-- **[Production deployment](/guides/deploy-production/)** — running against your own PostgreSQL
+- **[Deploy in production](/guides/deploy-production/)** — running against your own PostgreSQL
   and Redis, multi-instance requirements, and the full AWS CDK walkthrough.
-- **[Operations](/guides/deploy-operations/)** — first-login bootstrap, deployment-side
+- **[Operate a self-hosted Chorus](/guides/deploy-operations/)** — first-login bootstrap, deployment-side
   authentication, automatic migrations, and backing up before you upgrade.
