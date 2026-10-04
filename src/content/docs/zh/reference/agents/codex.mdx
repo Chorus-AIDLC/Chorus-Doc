@@ -26,6 +26,17 @@ chorus agents add --agents codex
 
 在提示时输入 Chorus 地址和智能体密钥。`chorus agents add` 会安装 Codex 插件，把 `CHORUS_URL`、`CHORUS_API_KEY` 和 `CHORUS_AGENT_PROFILE` 写入 `~/.codex/.env`，并在 `~/.codex/config.toml` 中设置 `bearer_token_env_var = "CHORUS_API_KEY"`，因此 Codex 从环境变量读取密钥，配置文件中从不包含密钥。完成后重新启动 Codex。
 
+### 让已有 App Server 使用新配置
+
+从 Chorus 0.21.1 起，凭据和 MCP 配置成功写入后，交互式配置可提示你用已保存的环境重启正在运行的 **Codex App Server**。它不是 Chorus 后台服务。所有 Codex 路径都遵循 `CODEX_HOME`，默认 `~/.codex`。
+
+- 重启可能中断其他 Codex 会话及正在进行的工作。提示默认选择**否**，只有明确输入 `y` 或 `yes` 才会重启。
+- 非交互、`--yes` 或 `CHORUS_DAEMON_HEADLESS=1` 会延后重启。通用 `--yes` 不代表授权中断会话。
+- 没有运行中的 App Server 时不会自动启动；命令不支持、状态未知、配置失败或拒绝覆盖身份时，会安全延后。仅更新插件的流程跳过此步骤。
+- 重启失败仍保留已写入的配置；成功只代表重启命令完成，不代表新增的凭据、MCP 工具或模型调用验证。
+
+若暂缓重启，请先保存受影响会话的工作，待安全时在交互终端重新运行 `chorus agents add --agents codex`，不要加 `--yes`。受支持且正在运行的服务会再次给出专门确认，并使用已保存的环境。只重开终端界面可能仍连接旧服务。之后按下文验证连接。安装器不会为获取重启能力而自动升级 Codex。
+
 ## 启用远程启动
 
 如果只在交互式 Codex 会话中使用 Chorus，可以跳过这一节。否则，请按照
@@ -95,6 +106,6 @@ Codex 会自行生成线程 ID，因此复制到的是这个线程 ID，而不�
 ## 常见问题
 
 - **找不到 `codex`**：全局安装 `@openai/codex`，然后重新运行 `chorus agents add`。
-- **签到返回未授权**：轮换智能体密钥，然后重新运行 `chorus agents add`（它会刷新 `~/.codex/.env`）。
+- **配置后仍用旧凭据或缺少 `CHORUS_API_KEY`**：检查实际 `CODEX_HOME` 下的 `.env`，重新运行 `chorus agents add --agents codex`，并按上文安全重启 App Server。只有密钥无效或已撤销时才需更换。
 - **插件或钩子未启用**：在 `/plugins` 和 `/hooks` 中启用它们，然后重新启动 Codex。
 - **后台服务离线**：运行 `chorus daemon status`，然后参阅[排查智能体连接故障](/zh/guides/troubleshooting/)。

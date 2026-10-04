@@ -86,11 +86,7 @@ Codex의 MCP 서버는 플러그인에 포함되지 **않습니다**. Codex는 �
   [OpenClaw](/ko/reference/agents/openclaw/)를 참고하세요.
 - **Kiro**: 도구, 워크플로 스킬, 검토 에이전트, 훅을 갖춘 통합으로, 워크스페이스 단위 또는
   사용자 전체로 설치할 수 있습니다. [Kiro](/ko/reference/agents/kiro/)를 참고하세요.
-- **Pi**: 게시된 `@chorus-aidlc/chorus-pi` npm 패키지(`pi install npm:@chorus-aidlc/chorus-pi`)로,
-  Chorus MCP 도구(`pi-mcp-adapter`를 통해), 워크플로 스킬, 패키지에 포함된 검토 에이전트, Pi의 공식
-  `subagent` 도구, 그리고 Pi 네이티브 이벤트 훅을 갖춥니다. Pi는 **깨울 수 있는 Chorus 데몬
-  백엔드**(`chorus daemon --agent pi`)이지만, 자체적인 기본 MCP나 권한 시스템은 없습니다.
-  [Pi](/ko/reference/agents/pi/)를 참고하세요.
+- **Pi**: 공개 `@chorus-aidlc/chorus-pi` 패키지는 워크플로 스킬, 내장 서브에이전트, 세션 훅을 제공합니다. 안정 버전 Pi `>=0.99.0 <2.0.0`은 네이티브 MCP, `0.84.4–0.98.x`는 검증된 이전 어댑터를 사용합니다. 깨울 수 있는 데몬 백엔드(해당 범위의 Pi 0.85.0 이상)이지만 권한 샌드박스는 없습니다. [Pi](/ko/reference/agents/pi/)를 참고하세요.
 
 ## 플러그인 업그레이드
 

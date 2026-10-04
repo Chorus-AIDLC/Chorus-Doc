@@ -26,7 +26,18 @@ npm install --global @chorus-aidlc/chorus
 chorus agents add --agents codex
 ```
 
-프롬프트가 나오면 Chorus URL과 에이전트 키를 입력합니다. `chorus agents add`는 Codex 플러그인을 설치하고, `CHORUS_URL`, `CHORUS_API_KEY`, `CHORUS_AGENT_PROFILE`를 `~/.codex/.env`에 쓰며, `~/.codex/config.toml`에 `bearer_token_env_var = "CHORUS_API_KEY"`를 설정합니다. 따라서 Codex는 환경 변수에서 키를 읽고, 구성 파일에는 키가 저장되지 않습니다. 그 뒤 Codex를 재시작하세요.
+프롬프트가 나오면 Chorus URL과 에이전트 키를 입력합니다. `chorus agents add`는 Codex 플러그인을 설치하고, `CHORUS_URL`, `CHORUS_API_KEY`, `CHORUS_AGENT_PROFILE`를 `~/.codex/.env`에 쓰며, `~/.codex/config.toml`에 `bearer_token_env_var = "CHORUS_API_KEY"`를 설정합니다. 따라서 Codex는 환경 변수에서 키를 읽고, 구성 파일에는 키가 저장되지 않습니다.
+
+### 실행 중인 App Server에 구성 적용
+
+Chorus 0.21.1부터 인증 정보와 MCP 구성 저장에 성공하면 대화형 설정에서 실행 중인 **Codex App Server**를 저장된 환경으로 재시작할지 물을 수 있습니다. Chorus 데몬과는 다릅니다. 모든 Codex 경로는 `CODEX_HOME`을 따르며 기본값은 `~/.codex`입니다.
+
+- 재시작은 다른 Codex 세션과 진행 중인 작업을 중단할 수 있습니다. 기본값은 **아니요**이며 명시적인 `y` 또는 `yes`만 재시작을 허용합니다.
+- 비대화형, `--yes`, `CHORUS_DAEMON_HEADLESS=1`에서는 재시작을 미룹니다. 일반 `--yes`는 세션 중단을 허가하지 않습니다.
+- 실행 중인 App Server가 없으면 시작하지 않습니다. 명령 미지원, 상태 불명, 구성 실패, 신원 덮어쓰기 거부 시에도 추측하지 않고 미룹니다. 플러그인만 업데이트할 때는 이 단계를 건너뜁니다.
+- 재시작 실패 시에도 저장된 구성은 유지됩니다. 성공은 명령 완료만 의미하며 인증 정보, MCP 도구 또는 모델 호출을 새로 검증했다는 뜻은 아닙니다.
+
+미뤘다면 영향을 받는 세션의 작업을 저장하고 안전할 때 대화형 터미널에서 `chorus agents add --agents codex`를 `--yes` 없이 다시 실행하세요. 지원되는 실행 중 서버에는 별도 확인이 다시 표시되며 저장된 환경을 사용합니다. 터미널 UI만 다시 열면 이전 서버에 재연결될 수 있습니다. 이후 아래 연결 확인을 진행하세요. 설치기가 재시작 지원을 위해 Codex 자체를 자동 업그레이드하지는 않습니다.
 
 ## 원격 시작 활성화
 
@@ -106,8 +117,7 @@ Codex는 자체 스레드 ID를 생성하므로, 복사한 값은 Chorus가 제�
 
 - **`codex`를 찾을 수 없음:** `@openai/codex`를 전역으로 설치하고 `chorus agents add`를 다시
   실행합니다.
-- **체크인이 승인되지 않음:** 에이전트 키를 교체하고 `chorus agents add`를 다시 실행합니다
-  (`~/.codex/.env`가 갱신됩니다).
+- **구성 후에도 이전 인증 정보를 쓰거나 `CHORUS_API_KEY`가 없음**: 실제 `CODEX_HOME`의 `.env`를 확인하고 `chorus agents add --agents codex`를 다시 실행한 뒤 위의 안전한 App Server 재시작을 따르세요. 키가 잘못되거나 폐기된 경우에만 교체하세요.
 - **플러그인 또는 훅이 비활성화됨:** `/plugins`와 `/hooks`에서 활성화한 뒤 Codex를 재시작합니다.
 - **데몬이 오프라인:** `chorus daemon status`를 실행한 뒤
   [에이전트 연결 문제 해결](/ko/guides/troubleshooting/)을 참고합니다.

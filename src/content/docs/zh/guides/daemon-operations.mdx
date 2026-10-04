@@ -241,6 +241,14 @@ chorus daemon uninstall
 在 macOS 上，`chorus daemon install` 会像在 Linux 上一样安装真正的 launchd 开机服务。在 Windows 上，它会输出服务模板和手动配置步骤；测试连接时，请以前台运行的 `chorus daemon` 作为基准。
 :::
 
+### 退出登录后继续运行 Linux 后台服务
+
+从 Chorus 0.21.0 起，`chorus daemon install` 会尝试为当前用户启用 **systemd lingering（用户驻留）**，让用户服务在最后一次退出登录后继续运行，并在开机后无需登录即可启动。授权尝试为非交互且有超时限制，不会等待密码对话框。
+
+若授权被拒绝或 logind 不可用，服务安装仍可成功，但 Chorus 会警告无法保证退出登录后或开机时继续运行。运行 `chorus daemon status` 检查 `linger: yes`。若主机策略允许，请管理员执行输出中的 `sudo loginctl enable-linger <user>` 命令。
+
+已有主机可重新运行 `chorus daemon install` 修复。`chorus agents add` 在安装服务或发现已有服务时也会检查驻留，即使未加 `--daemon-autostart` 或拒绝自动启动。两个命令都可加 `--no-linger` 跳过尝试，但不会关闭已有设置。未启用驻留时，后台服务可能在退出登录后停止，直到下次登录才启动。卸载 Chorus 服务不会关闭驻留，因为其他用户服务可能依赖它。
+
 ## 不安装服务直接运行
 
 短期使用的连接可以让 `chorus daemon` 保持在前台运行。也可以使用分离（后台）模式：

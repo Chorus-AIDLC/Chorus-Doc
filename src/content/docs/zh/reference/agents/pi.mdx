@@ -14,31 +14,61 @@ Pi 还可以作为**可唤醒的 `--agent pi` 后台服务后端**运行：有�
 
 安装前，请按照[为智能体创建访问权限](/zh/guides/administrator-setup/)创建一个智能体密钥。
 
-## 前置条件
+## 推荐：自动配置
 
-- 已安装 `pi` CLI（参见 [pi.dev](https://pi.dev)）。
-- `pi-mcp-adapter` 包（唯一的运行时依赖），用于把 Chorus 的 `chorus_*` MCP 工具暴露给 Pi（Pi 没有
-  原生 MCP）：
-  ```bash
-  pi install npm:pi-mcp-adapter
-  ```
-  **无需**安装单独的子智能体包，`chorus-pi` 自身已捆绑 Pi 官方的 `subagent` 工具。
-- 一个 Chorus **API 密钥**（以 `cho_` 开头）。
+运行以下命令，按提示输入 Chorus 网址和智能体密钥：
 
-## 步骤 1：导出环境变量
+```sh
+chorus agents add --agents pi
+```
+
+对受支持的稳定版 Pi，它会安装 `chorus-pi`，并**自动写好 MCP 配置**：原生 MCP 写入 `~/.pi/agent/mcp.json`，旧版适配器写入 `~/.pi/agent/mcp-adapter.json`，两者都遵循 `PI_CODING_AGENT_DIR`。原生 Pi 使用内置 MCP 能力，无需安装适配器，也无需另行执行 `pi mcp add`。自动配置成功后，不用再做下文手动步骤 1–3。
+
+要在交互会话中也免去手动导出凭据，可先列出已配置的智能体，再按名称或 UUID 启动 Pi 智能体：
+
+```sh
+chorus agents
+chorus agents run <name-or-uuid>
+```
+
+启动器会从已保存的智能体配置注入 `CHORUS_URL`、`CHORUS_API_KEY` 和 `CHORUS_AGENT_PROFILE`，之后直接[验证连接](#验证连接)。只有直接运行 `pi` 时，才需在启动它的 shell 中提供密钥；后台唤醒同样会自动注入凭据。如果已有旧适配器或禁用了内置 MCP，仍需按下文迁移说明清理冲突。
+
+## 选择 MCP 后端
+
+安装前运行 `pi --version`，确认使用稳定版。Chorus 0.21.1 的 `chorus agents add --agents pi` 会按版本选择后端：
+
+| Pi 版本 | MCP 后端 | 安装的包 |
+| --- | --- | --- |
+| `>=0.99.0 <2.0.0` | 原生 MCP | 仅 `@chorus-aidlc/chorus-pi` |
+| `0.84.4–0.98.x` | 旧版适配器 | `pi-mcp-adapter@5.0.0` 和 `@chorus-aidlc/chorus-pi` |
+
+不支持更早版本或 Pi 2.x，安装器不会对它们执行包操作。版本未知或为预发布版时，不会变更适配器，也不会宣称 MCP 配置完成。请先安装受支持的稳定版。远程后台唤醒还要求在该范围内使用 Pi 0.85.0 或更新版本。
+
+无需单独安装子智能体包，`chorus-pi` 已捆绑 Pi 官方的 `subagent` 工具。另需准备 Chorus API 密钥。以下步骤用于手动配置。
+
+## 手动步骤 1：导出环境变量
 
 ```bash
 export CHORUS_URL="http://localhost:8637"
 export CHORUS_API_KEY="cho_REDACTED"
 ```
 
-把它们添加到 `~/.bashrc` / `~/.zshrc`，以便 Pi 在启动时读取。`CHORUS_URL` 可以是根 URL，也可以是完整
-的 `/api/mcp` 端点。如果未设置，扩展会回退到从 `.mcp.json` 读取 `chorus` 服务器条目。
+在启动交互式 Pi 的 shell 中设置这些值，安装器不会把它们存入 Pi 的 env 文件。`CHORUS_URL` 可为根 URL 或完整的 `/api/mcp` 端点。要选择已配置的智能体，还可设置 `CHORUS_AGENT_PROFILE`。后台唤醒会自动注入这些变量。
 
-## 步骤 2：配置 MCP 服务器
+显式环境变量优先。Chorus 扩展也会从下文对应的全局 MCP 文件读取会话和签到凭据，但不会发现原生项目级 `.pi/mcp.json`，因此仅配置项目文件时仍需导出上述两个变量。
 
-Pi 的 `pi-mcp-adapter` 会自动发现标准 MCP 配置文件。在项目根目录放置一个 `.mcp.json`（或全局的
-`~/.pi/agent/mcp.json`），让主智能体获得 `chorus_*` 工具：
+## 手动步骤 2：按 Pi 版本配置 MCP
+
+### 原生 MCP：稳定版 Pi `>=0.99.0 <2.0.0`
+
+```bash
+pi mcp add chorus --url "http://localhost:8637/api/mcp" --bearer-token-env-var CHORUS_API_KEY
+pi mcp list
+```
+
+该命令写入 `~/.pi/agent/mcp.json`，可用 `PI_CODING_AGENT_DIR` 覆盖智能体目录。项目级配置使用 `pi mcp add --local`，文件为 `.pi/mcp.json`，需要信任项目，不是根目录的 `.mcp.json`。
+
+等效的全局配置如下：
 
 ```json
 {
@@ -46,16 +76,29 @@ Pi 的 `pi-mcp-adapter` 会自动发现标准 MCP 配置文件。在项目根目
     "chorus": {
       "type": "http",
       "url": "http://localhost:8637/api/mcp",
-      "headers": { "Authorization": "Bearer cho_REDACTED" }
+      "headers": { "Authorization": "Bearer ${CHORUS_API_KEY}" }
     }
   }
 }
 ```
 
-直接写入 URL 和 Bearer 即可使用，Pi 不需要在 `.mcp.json` 中展开 `${VAR}`。由于 `.mcp.json`
-包含智能体密钥，请不要将其提交到版本控制。
+原生 MCP 默认使用 codemode，无需强制直接暴露工具。`pi mcp list` 检查内置 MCP，而已安装的适配器仍可能接管交互式 `/mcp` 命令。
 
-## 步骤 3：安装 chorus-pi 包
+### 旧版适配器：Pi 0.84.4–0.98.x
+
+运行 `pi install npm:pi-mcp-adapter@5.0.0`。将上述 JSON 写入 `~/.pi/agent/mcp-adapter.json`（或 `$PI_CODING_AGENT_DIR/mcp-adapter.json`），并在 `mcpServers.chorus` 中添加 `"directTools": true`。修改 `toolPrefix` 仅改变名称，不会启用直接工具。
+
+两种后端都能解析 `${CHORUS_API_KEY}`，请把真实密钥留在环境变量中。旧版 adapter5 也支持发现或导入旧配置，但全局 `mcp.json` 已不是其主配置文件。
+
+`chorus agents add` 保留已有的直接工具选择、其他服务器和设置。旧版主配置不存在时，会复制旧全局 `mcp.json` 到新主配置并保留原文件；主配置已存在时以它为准，不覆盖格式错误或不可读的文件。生成的 Chorus 请求头引用环境变量，不写入真实密钥。
+
+### 升级与迁移已有适配器
+
+`chorus upgrade --plugins` 与 `chorus init --update-installed` 只更新符合条件的 Chorus 组件，不更新所有扩展或 Pi 本身。旧版保留已验证的适配器 `5.0.0` 固定版本，不追随 latest。其他适配器约束及 Chorus 固定版本或范围也会保留，可能导致配置或最新版本刷新未完成。
+
+在原生宿主上，Chorus 只对已有适配器或 `-builtin:mcp` 扩展过滤器发出警告。若选择原生 MCP，请检查全局 `~/.pi/agent/settings.json`（遵循 `PI_CODING_AGENT_DIR`）与项目 `.pi/settings.json`，仅在原配置作用域移除适配器和该过滤器，保留其他设置。`pi remove npm:pi-mcp-adapter` 用于全局 npm 安装，不适用于项目级条目。重启 Pi 后验证实际工具，写入配置本身并不证明连接已恢复。
+
+## 手动步骤 3：安装 chorus-pi 包
 
 ```bash
 pi install npm:@chorus-aidlc/chorus-pi
@@ -103,9 +146,7 @@ pi install npm:@chorus-aidlc/chorus-pi
 Pi 是完整支持的**可唤醒后台服务后端**，有工作被远程发给它时（分配给你的智能体的想法/任务、
 一次 @提及、一个提案决策），Chorus 后台服务会唤醒一个无头 Pi 会话。
 
-最简单的方式是 `chorus agents add`：在智能体清单中选择 **Pi**，它会通过 `pi install` 安装
-`pi-mcp-adapter` 与 `chorus-pi`，在 `~/.chorus/daemon.json` 中把 Pi 登记为**可唤醒**
-智能体，并且（如果你选择启用）安装开机唤醒它的后台服务。若要手动配置，请以 Pi 后端运行后台服务：
+最简单的方式是运行 `chorus agents add --agents pi`：按 Pi 版本选择原生 MCP 或已验证的旧版适配器，安装 `chorus-pi`，并在 `~/.chorus/daemon.json` 中登记 Pi。经你同意后，还会安装后台开机服务。手动启动后端可运行：
 
 ```bash
 chorus daemon --agent pi
@@ -116,8 +157,7 @@ chorus daemon --agent pi
   的会话中。后台唤醒需要 **Pi 0.85.0 或更新版本**，详见 [0.20.0 的 daemon 行为](#0200-的-daemon-行为)。
 - Pi **没有权限系统**，因此不涉及沙箱 / 跳过权限的标志，`chorus` 与 `yolo` 两种后台服务模式运行
   Pi 的方式完全一致。
-- 被唤醒的 Pi 只能通过本包的扩展 / `pi-mcp-adapter` 访问 Chorus MCP 工具，因此请在后台服务唤醒的环境
-  中保持安装 `chorus-pi`（从 npm 安装可确保后台服务能用到它）。
+- 请在后台服务唤醒的环境中保留 `chorus-pi` 和对应版本的 MCP 配置；原生 Pi 不需要适配器。
 
 后台服务提供 Chorus 连接（`CHORUS_URL`、`CHORUS_API_KEY` 和 `CHORUS_AGENT_PROFILE`），但不会
 替你获取模型提供方凭据。可通过 `~/.chorus/daemon.json` 中该智能体的 `env` 提供，也可使用后台服务继承的环境或
@@ -131,11 +171,10 @@ chorus daemon --agent pi
 
 ```bash
 pi --version                                                # 需要 0.85.0 或更新版本
-npm install -g @earendil-works/pi-coding-agent@latest       # 升级 pi 本身
+npm install -g "@earendil-works/pi-coding-agent@>=0.85.0 <2.0.0"       # 升级 pi 本身
 ```
 
-`chorus upgrade --plugins` 会更新 `chorus-pi` 和 `pi-mcp-adapter`，但不会升级 Pi 本身。该行为已在
-Linux 上用 Pi **0.85.1** 实测验证。
+`chorus upgrade --plugins` 更新符合条件的 Chorus 组件，不升级 Pi 本身；旧版 adapter5 按上文保留固定版本。RPC 传输已在 Linux 上用 Pi **0.85.1** 验证。
 
 - **Pi 版本过旧**：后台服务会跳过这次唤醒，并在日志中给出上面的升级命令。如果读取不到 Pi 版本，
   后台服务会记录警告并照常尝试唤醒。
@@ -151,14 +190,10 @@ Linux 上用 Pi **0.85.1** 实测验证。
 
 ## 常见问题
 
-- **找不到 MCP 服务器：** 把 `.mcp.json` 放在项目根目录（或 `~/.pi/agent/mcp.json`），或运行
-  `/mcp setup`。
-- **技能未加载：** 重启会话（`/reload`），技能在会话启动时加载。
-- **评审智能体不可用：** 确认已安装 `chorus-pi` 且已重启 Pi；评审智能体随包内置（无需单独安装子
-  智能体，也无需手动复制）。
-- **连接未授权：** 重新检查 `CHORUS_URL` / `CHORUS_API_KEY`（或 `.mcp.json` 中的 Bearer），然后重启 Pi。
-- **工具名看起来重复了**（`chorus_chorus_checkin`）：`pi-mcp-adapter` 在网关模式下会给工具名加上服务器
-  名前缀。可调用 `mcp({ tool: "chorus_chorus_checkin" })`，或在 chorus 服务器上设置
-  `"toolPrefix": "none"` 以使用原生的 `chorus_*` 名称。
+- **找不到 MCP 服务器**：检查上文对应版本的配置文件。原生 Pi 可运行 `pi mcp list`；若交互工具不同，还需检查项目是否受信任、旧适配器及 `-builtin:mcp` 过滤器。
+- **技能或评审智能体未加载**：确认已安装 `chorus-pi` 并重启 Pi。评审智能体随包提供，无需手动复制或另装子智能体包。
+- **连接未授权**：检查启动 shell 的 `CHORUS_URL`、`CHORUS_API_KEY`，然后重启 Pi。不要把真实密钥写入共享配置。
+- **工具名称不同**：先发现实际工具，不要猜测。原生 MCP 使用 `mcp__chorus__chorus_checkin` 等名称，旧版直接工具常用 `chorus_chorus_checkin`。`toolPrefix: "none"` 只改变旧版名称，不启用直接工具。
+- **旧插件的工作流提醒或原生评审异常**：升级 Chorus 至 0.21.1 或更新版本。该版本修复 Pi/dsh 在不同 MCP 前缀下的工作流提醒及 Pi 原生 MCP 评审兼容性。评审智能体除发布结论外仍保持只读。
 
-关于一般的连接问题，参见[排查智能体连接故障](/zh/guides/troubleshooting/)。
+通用连接问题见[排查智能体连接故障](/zh/guides/troubleshooting/)。

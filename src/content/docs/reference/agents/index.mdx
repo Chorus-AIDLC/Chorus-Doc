@@ -90,11 +90,7 @@ Code and Codex. Treat the notes below as pointers, not a parity claim.
   workflow lifecycle hooks. See [OpenClaw](/reference/agents/openclaw/).
 - **Kiro** — an integration with tools, workflow skills, reviewer agents, and hooks,
   installable per workspace or user-wide. See [Kiro](/reference/agents/kiro/).
-- **Pi** — the published `@chorus-aidlc/chorus-pi` npm package
-  (`pi install npm:@chorus-aidlc/chorus-pi`), with Chorus MCP tools (via `pi-mcp-adapter`),
-  workflow skills, package-relative reviewer agents, Pi's official `subagent` tool, and
-  Pi-native event hooks. Pi is a **wakeable Chorus daemon backend**
-  (`chorus daemon --agent pi`), though it has no native MCP or permission system of its own. See [Pi](/reference/agents/pi/).
+- **Pi** — the published `@chorus-aidlc/chorus-pi` package provides workflow skills, bundled sub-agents, and session hooks. Stable Pi `>=0.99.0 <2.0.0` uses native MCP; `0.84.4–0.98.x` uses the verified legacy adapter. Pi is a wakeable daemon backend (Pi 0.85.0 or newer within that range) but has no permission sandbox. See [Pi](/reference/agents/pi/).
 
 ## Upgrade the plugin
 

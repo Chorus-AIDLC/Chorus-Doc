@@ -71,6 +71,12 @@ original connection and working directory.
 If the process crashed, inspect partial filesystem changes before resuming. For the full
 recovery procedure, see [Interrupt and resume a session](/guides/session-recovery/).
 
+## A turn fails before the agent replies
+
+Open the failed conversation turn and read **Agent wake failed**. Expand **Show error details** if offered; no reply does not mean no diagnostic was recorded. See [failed-turn diagnostics](/guides/session-recovery/#read-a-failed-turns-diagnostics) before retrying.
+
+If the Linux daemon goes offline after SSH logout or reboot, check `chorus daemon status` and the [lingering setup](/guides/daemon-operations/#keep-the-linux-daemon-running-after-logout). For Codex that still uses old credentials after setup, follow the [safe App Server restart](/reference/agents/codex/#apply-configuration-to-an-existing-app-server), not just `chorus daemon restart`.
+
 ## Collect useful diagnostics
 
 Reproduce the problem once in restricted foreground mode:

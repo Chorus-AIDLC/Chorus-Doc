@@ -76,10 +76,7 @@ Codex 的 MCP 服务器**不**随插件打包。Codex 不会在插件 MCP 配置
   [OpenClaw](/zh/reference/agents/openclaw/)。
 - **Kiro**：一个提供工具、工作流技能、评审智能体与钩子的集成，可按工作区或用户级安装。
   参见 [Kiro](/zh/reference/agents/kiro/)。
-- **Pi**：已发布的 `@chorus-aidlc/chorus-pi` npm 包（`pi install npm:@chorus-aidlc/chorus-pi`），
-  提供 Chorus MCP 工具（通过 `pi-mcp-adapter`）、工作流技能、随包发现的评审智能体、Pi 官方的 `subagent`
-  工具，以及 Pi 原生事件钩子。Pi 是**可唤醒的 Chorus 后台服务后端**（`chorus daemon --agent pi`），
-  尽管它自身没有原生 MCP 或权限系统。参见 [Pi](/zh/reference/agents/pi/)。
+- **Pi**：已发布的 `@chorus-aidlc/chorus-pi` 包提供工作流技能、内置子智能体和会话钩子。稳定版 Pi `>=0.99.0 <2.0.0` 使用原生 MCP，`0.84.4–0.98.x` 使用已验证的旧版适配器。Pi 是可唤醒的后台服务后端（需该范围内的 Pi 0.85.0 或更新版本），但没有权限沙箱。详见 [Pi](/zh/reference/agents/pi/)。
 
 ## 升级插件
 

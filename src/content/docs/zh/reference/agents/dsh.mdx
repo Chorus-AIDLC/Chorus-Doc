@@ -56,6 +56,8 @@ chorus daemon --agent dsh
 
 ## 常见问题
 
+- **调用 Chorus 工具后缺少工作流提醒**：按上文安装流程将 Chorus dsh bundle 更新至 0.21.1 或更新版本，再开启新会话。该版本修复 Pi/dsh 的 MCP 前缀匹配，不会增加工具权限。
+
 - **找不到 `dsh` 或 `pnpm`**：安装这两个前置工具并重新打开 shell。
 - **`ERR_PNPM_ADDING_TO_ROOT`**：带 `-w` 重新运行命令，因为 dsh profile 是一个 pnpm workspace 根。
 - **找不到包**：确认 registry 访问和包名 `@chorus-aidlc/chorus-dsh`，然后重新运行安装命令。

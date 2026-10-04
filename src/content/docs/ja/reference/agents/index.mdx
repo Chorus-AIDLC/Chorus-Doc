@@ -89,11 +89,7 @@ Codex の MCP サーバーはプラグインに同梱**されません**。Codex
   しません。[OpenClaw](/ja/reference/agents/openclaw/) を参照してください。
 - **Kiro**：ツール、ワークフロースキル、レビューエージェント、フックを備えた統合。ワークスペース
   単位でもユーザー全体でもインストールできます。[Kiro](/ja/reference/agents/kiro/) を参照してください。
-- **Pi**：公開された `@chorus-aidlc/chorus-pi` npm パッケージ（`pi install npm:@chorus-aidlc/chorus-pi`）で、
-  Chorus MCP ツール（`pi-mcp-adapter` 経由）、ワークフロースキル、パッケージ相対のレビュアー
-  エージェント、Pi 公式の `subagent` ツール、Pi ネイティブのイベントフックを備えます。Pi は
-  **起動可能な Chorus デーモンバックエンド**（`chorus daemon --agent pi`）ですが、独自のネイティブ
-  MCP や権限システムは持ちません。[Pi](/ja/reference/agents/pi/) を参照してください。
+- **Pi**：公開 npm パッケージ `@chorus-aidlc/chorus-pi` がワークフロースキル、同梱サブエージェント、セッションフックを提供します。安定版 Pi `>=0.99.0 <2.0.0` はネイティブ MCP、`0.84.4–0.98.x` は検証済み旧アダプターを使います。起動可能なデーモンバックエンド（この範囲内の Pi 0.85.0 以降）ですが、権限サンドボックスはありません。[Pi](/ja/reference/agents/pi/)を参照してください。
 
 ## プラグインをアップグレードする
 

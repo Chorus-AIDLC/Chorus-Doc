@@ -30,7 +30,18 @@ Enter the Chorus URL and agent key when prompted. `chorus agents add` installs t
 plugin, writes `CHORUS_URL`, `CHORUS_API_KEY`, and `CHORUS_AGENT_PROFILE` into
 `~/.codex/.env`, and sets `bearer_token_env_var = "CHORUS_API_KEY"` in
 `~/.codex/config.toml`, so Codex reads its key from the environment and the config file
-never contains it. Restart Codex afterward.
+never contains it.
+
+### Apply configuration to an existing App Server
+
+From Chorus 0.21.1, after credentials and MCP configuration are successfully written, interactive setup can offer to restart an already running **Codex App Server** with the saved environment. This is not the Chorus daemon. All Codex paths respect `CODEX_HOME` (default `~/.codex`).
+
+- A restart can interrupt other Codex sessions and active work. The prompt defaults to **No**; only an explicit `y` or `yes` authorizes it.
+- Non-interactive sessions, `--yes`, and `CHORUS_DAEMON_HEADLESS=1` defer the restart. The general `--yes` flag does not authorize interrupting sessions.
+- If no App Server is running, setup does not start one. Unsupported commands, unknown state, failed configuration, or a declined identity overwrite defer the restart rather than guessing. Plugin-only updates skip this step.
+- A failed restart leaves the saved configuration intact. A successful restart reports only the command result, not a new credential, MCP-tool, or model verification.
+
+If you defer, save work in affected sessions and rerun `chorus agents add --agents codex` from an interactive terminal without `--yes` when it is safe. A supported running server will offer the dedicated prompt again and use the saved environment. Simply reopening the terminal UI may reconnect to the same old server. Then follow the connection check below. Setup does not upgrade Codex to obtain restart support.
 
 ## Enable remote start
 
@@ -143,8 +154,7 @@ for the full flow.
 ## Common issues
 
 - **`codex` is not found:** install `@openai/codex` globally and re-run `chorus agents add`.
-- **Check-in is unauthorized:** rotate the agent key and re-run `chorus agents add` (which
-  refreshes `~/.codex/.env`).
+- **Old credentials after configuration, or missing `CHORUS_API_KEY`:** check `.env` under the actual `CODEX_HOME` and rerun `chorus agents add --agents codex`; use the safe App Server restart flow above. Rotate the key only if it is invalid or revoked.
 - **Plugin or hooks are disabled:** enable them in `/plugins` and `/hooks`, then restart
   Codex.
 - **Daemon is offline:** run `chorus daemon status`, then see

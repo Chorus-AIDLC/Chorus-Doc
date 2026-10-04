@@ -349,6 +349,14 @@ on Linux. On Windows it prints a service template and manual setup steps; use fo
 `chorus daemon` as the baseline when testing a connection.
 :::
 
+### Keep the Linux daemon running after logout
+
+From Chorus 0.21.0, `chorus daemon install` tries to enable **systemd lingering** for the current user, so the user service survives the last logout and starts at boot without a login. The authorization attempt is non-interactive and time-bounded; it never waits for a password dialog.
+
+If authorization is denied or logind is unavailable, service installation can still succeed, but Chorus warns that logout/boot persistence is not assured. Run `chorus daemon status` to check for `linger: yes`. Ask an administrator to run the printed `sudo loginctl enable-linger <user>` command if your host policy allows it.
+
+Rerun `chorus daemon install` to repair an existing host. `chorus agents add` also checks lingering when installing the service or finding an existing service, even without `--daemon-autostart` or after declining auto-start. Pass `--no-linger` to either command to skip the attempt; it does not disable an existing setting. Without lingering, the daemon may stop after logout and not start until the next login. Uninstalling the Chorus service leaves lingering enabled because other user services may need it.
+
 ## Run without a service
 
 For a short-lived connection, keep `chorus daemon` in the foreground. Detached mode is

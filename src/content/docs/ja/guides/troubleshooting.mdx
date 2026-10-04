@@ -58,6 +58,12 @@ chorus daemon --cwd /path/to/your/project --chorus-only
 
 プロセスがクラッシュした場合は、再開する前に途中までのファイルシステムの変更を確認します。復旧の全手順は[セッションを中断して再開する](/ja/guides/session-recovery/)をご覧ください。
 
+## 返信の前にターンが失敗する
+
+会話の失敗したターンで**エージェントの起動・実行に失敗**の要約を読み、可能なら**エラーの詳細を表示**を選びます。返信がなくても診断は記録される場合があります。再試行前に[失敗したターンの診断](/ja/guides/session-recovery/#失敗したターンの診断を読む)を確認してください。
+
+Linux デーモンが SSH のログアウトや再起動後にオフラインになる場合は、`chorus daemon status` と [lingering 設定](/ja/guides/daemon-operations/#ログアウト後も-linux-デーモンを動かす)を確認します。設定後も Codex が旧認証情報を使う場合は、`chorus daemon restart` だけでなく [App Server の安全な再起動](/ja/reference/agents/codex/#既存の-app-server-に設定を適用する)に従います。
+
 ## 役に立つ診断情報を集める
 
 制限付きのフォアグラウンドモードで、問題を一度再現します。

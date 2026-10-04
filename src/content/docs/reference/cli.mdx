@@ -61,10 +61,7 @@ not the path set in `CHORUS_DAEMON_CONFIG_PATH`.
 - **Kiro:** refresh Chorus templates from the entry's configured Chorus instance. Upgrade
   that server first so it serves the new templates. Conflicting instance URLs for one shared
   destination are reported as incomplete.
-- **Pi:** update only `@chorus-aidlc/chorus-pi` and `pi-mcp-adapter`. Version pins, ranges,
-  and non-latest tags are preserved and always reported as incomplete; remove the constraint
-  to get the latest version. If Pi cannot update these packages individually, the command
-  reports that limitation rather than updating all extensions.
+- **Pi:** stable `>=0.99.0 <2.0.0` uses native MCP and updates only eligible `@chorus-aidlc/chorus-pi` installations. Pi `0.84.4–0.98.x` retains the verified `pi-mcp-adapter@5.0.0` pin. Other adapter constraints and Chorus pins/ranges/tags are preserved and may leave setup or latest refresh incomplete. No update of all extensions, Pi itself, or automatic removal of an existing adapter is performed. See [Pi setup and migration](/reference/agents/pi/).
 
 If a host CLI is installed but its Chorus plugin is missing, the command installs the
 plugin. It preserves registrations and credentials and does not install or upgrade the host
@@ -105,11 +102,7 @@ chorus agents add --agents claude,codex \
   --url https://chorus.example.com --api-key cho_xxx
 ```
 
-It is idempotent — safe to re-run to add an agent, refresh a plugin, or rotate a key.
-Detected agents that don't have the Chorus plugin yet stay selectable. Supported agents are
-Claude Code, Codex, Kiro, Pi, OpenCode, OpenClaw, and the DeepSeek Harness (dsh). With `pi`
-on `PATH`, setup installs both `pi-mcp-adapter` and `chorus-pi`; otherwise it prints manual
-install instructions.
+Setup can be rerun to add agents or refresh credentials. Supported agents are Claude Code, Codex, Kiro, Pi, OpenCode, OpenClaw, and DeepSeek Harness (dsh). Pi setup selects native MCP for stable `>=0.99.0 <2.0.0` or `pi-mcp-adapter@5.0.0` for `0.84.4–0.98.x`, alongside `chorus-pi`. Missing, unsupported, or uncertain Pi versions receive guidance rather than an unconditional MCP-complete claim. See [Pi](/reference/agents/pi/).
 
 Useful flags (`chorus agents add --help` lists them all):
 
@@ -123,6 +116,7 @@ Useful flags (`chorus agents add --help` lists them all):
   reachable by `chorus mcp` but not woken by the daemon until opted in here or at the
   per-agent TTY prompt.
 - `--daemon-autostart` — also install and enable the daemon boot service (Linux systemd / macOS launchd).
+- `--no-linger` — skip Linux systemd lingering setup or repair; it does not disable an existing setting. See [daemon operations](/guides/daemon-operations/).
 - `-y, --yes` — skip confirmations (implied when not a TTY, where you must pass `--agents` or `--all`).
 
 List and remove configured agents:
@@ -134,6 +128,8 @@ chorus agents remove <name|uuid>  # remove one (match by name or UUID)
 
 `chorus agents` never prints an API key. A listed name or UUID is a valid value for
 `chorus mcp --agent` or the `CHORUS_AGENT_PROFILE` environment variable.
+
+For Codex, `--yes` never authorizes an App Server restart. Successful credential/MCP setup offers a separate interruption warning and consent prompt only in an interactive terminal. See [Codex](/reference/agents/codex/).
 
 ## Launch an agent — `chorus agents run`
 

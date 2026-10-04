@@ -49,7 +49,7 @@ chorus update --plugins    # upgrade 的别名
 
 - **Claude Code 与 Codex**：通过宿主的插件机制刷新 Chorus 插件。
 - **Kiro**：从记录所配置的 Chorus 实例刷新模板。需先升级该服务端，才能获取新版模板。同一目标目录对应多个冲突的实例地址时，会报告未完成。
-- **Pi**：只更新 `@chorus-aidlc/chorus-pi` 和 `pi-mcp-adapter`。保留已有的版本固定、范围或非 latest 标签，并始终报告未完成；移除这些限制后才能更新到最新版本。若 Pi 不支持单独更新这些包，会说明限制，不会更新所有扩展。
+- **Pi**：稳定版 `>=0.99.0 <2.0.0` 使用原生 MCP，仅更新符合条件的 `@chorus-aidlc/chorus-pi` 安装；`0.84.4–0.98.x` 保留已验证的 `pi-mcp-adapter@5.0.0` 固定版本。其他适配器约束及 Chorus 固定版本、范围或标签会保留，可能导致配置或最新版本刷新未完成。不更新所有扩展或 Pi 本身，也不自动卸载旧适配器。详见 [Pi 配置与迁移](/zh/reference/agents/pi/)。
 
 若宿主 CLI 已安装但缺少 Chorus 插件，命令会补装插件。它保留注册信息与凭据，不会安装或升级宿主 CLI。修改配置文件前，它会把原文件备份为 `<file>.chorus-upgrade.bak`（下次升级时覆盖）。`offline` 或未知类型记录（包括默认的 OpenCode、OpenClaw 和 dsh 记录），以及在各自 `PATH` 中找不到宿主的记录，会跳过并标为 **INCOMPLETE**。这些宿主请使用[对应平台的配置或升级流程](/zh/reference/agents/)。
 
@@ -73,9 +73,7 @@ chorus agents add --agents claude,codex \
   --url https://chorus.example.com --api-key cho_xxx
 ```
 
-它是幂等的：可以安全地重新运行，以添加智能体、刷新插件或轮换密钥。已检测到但尚未安装 Chorus 插件的
-智能体仍可选择。支持的智能体有 Claude Code、Codex、Kiro、Pi、OpenCode、OpenClaw 和 DeepSeek Harness（dsh）。
-`pi` 在 `PATH` 中时，配置过程会同时安装 `pi-mcp-adapter` 和 `chorus-pi`；否则给出手动安装指引。
+可重新运行配置以添加智能体或刷新凭据。支持 Claude Code、Codex、Kiro、Pi、OpenCode、OpenClaw 和 DeepSeek Harness（dsh）。Pi 稳定版 `>=0.99.0 <2.0.0` 使用原生 MCP，`0.84.4–0.98.x` 使用 `pi-mcp-adapter@5.0.0`，并安装 `chorus-pi`。Pi 未安装、不受支持或版本不确定时会给出指引，不会一律报告 MCP 配置完成。详见 [Pi](/zh/reference/agents/pi/)。
 
 常用参数（`chorus agents add --help` 会列出全部）：
 
@@ -85,6 +83,7 @@ chorus agents add --agents claude,codex \
 - `--dsh-profile <name>`：把 bundle 安装进哪个 DeepSeek Harness profile。
 - `--daemon-wake <a,b>` / `--daemon-wake-all`：把指定的（或全部可唤醒的）智能体选入后台服务唤醒范围。可唤醒的智能体（Claude Code、Codex、Kiro、Pi）默认以「停靠」状态添加：`chorus mcp` 可以访问它们，但在你通过此参数（或 TTY 下逐个智能体的提示）选入之前，后台服务不会唤醒它们。
 - `--daemon-autostart`：同时安装并启用后台服务的开机自启（Linux systemd / macOS launchd）。
+- `--no-linger`：跳过 Linux systemd 用户驻留的配置或修复，不关闭已有设置。详见[后台服务运维](/zh/guides/daemon-operations/)。
 - `-y, --yes`：跳过确认（非 TTY 环境下自动生效，此时必须传入 `--agents` 或 `--all`）。
 
 列出并移除已配置的智能体：
@@ -96,6 +95,8 @@ chorus agents remove <name|uuid>  # remove one (match by name or UUID)
 
 `chorus agents` 绝不会打印 API 密钥。列出的名称或 UUID 都是 `chorus mcp --agent` 或
 `CHORUS_AGENT_PROFILE` 环境变量的有效取值。
+
+对 Codex，`--yes` 不会授权重启 App Server。凭据和 MCP 配置成功后，仅交互终端会提供单独的中断警告和确认。详见 [Codex](/zh/reference/agents/codex/)。
 
 ## 启动智能体：`chorus agents run`
 

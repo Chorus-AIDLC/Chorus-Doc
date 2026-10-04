@@ -234,6 +234,14 @@ chorus daemon uninstall
 macOS では、`chorus daemon install` は Linux と同じように、実際の launchd 起動サービスをインストールします。Windows ではサービスのテンプレートと手動セットアップの手順を出力します。接続を試すときの基準として、フォアグラウンドの `chorus daemon` を使ってください。
 :::
 
+### ログアウト後も Linux デーモンを動かす
+
+Chorus 0.21.0 以降の `chorus daemon install` は現在のユーザーの **systemd lingering** を有効にしようとします。最後のログアウト後もユーザーサービスを維持し、ログインなしで起動時に開始するためです。認可は非対話型で時間制限があり、パスワード画面を待ちません。
+
+認可が拒否された場合や logind が利用できない場合でも、サービスのインストールは成功し得ますが、ログアウト後や起動時の継続を保証できないと警告します。`chorus daemon status` で `linger: yes` を確認します。ホストの方針で許可される場合、表示された `sudo loginctl enable-linger <user>` を管理者に実行してもらってください。
+
+既存ホストは `chorus daemon install` の再実行で修復できます。`chorus agents add` もサービスのインストール時や既存サービスの検出時に確認し、`--daemon-autostart` がない場合や自動起動を断った場合も対象です。どちらも `--no-linger` で試行を省略できますが、既存設定を無効にはしません。lingering がなければログアウト後に停止し、次のログインまで起動しないことがあります。他のユーザーサービスが必要とする可能性があるため、Chorus サービスのアンインストールでも lingering は維持されます。
+
 ## サービスなしで実行する
 
 一時的な接続なら、`chorus daemon` をフォアグラウンドで実行したままにします。デタッチモードも使えます。

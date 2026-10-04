@@ -18,34 +18,61 @@ Codex、Kiro と同じように反転した対話のループに参加します�
 インストール前に、[エージェントのアクセスを準備する](/ja/guides/administrator-setup/)に従って
 API キーを作成します。
 
-## 前提条件
+## 推奨：自動で設定する
 
-- `pi` CLI がインストールされていること（[pi.dev](https://pi.dev) を参照）。
-- `pi-mcp-adapter` パッケージ。Chorus の `chorus_*` MCP ツールを Pi に公開する唯一のランタイム
-  依存関係です（Pi にはネイティブの MCP がありません）。
-  ```bash
-  pi install npm:pi-mcp-adapter
-  ```
-  インストールすべき別個のサブエージェント用パッケージは**ありません**。`chorus-pi` が Pi 公式の
-  `subagent` ツールそのものを同梱しています。
-- Chorus の **API キー**（`cho_` で始まります）。
+次のコマンドを実行し、Chorus URL とエージェントキーを入力します。
 
-## ステップ 1: 環境変数をエクスポートする
+```sh
+chorus agents add --agents pi
+```
+
+対応する安定版 Pi では `chorus-pi` をインストールし、**MCP 設定も自動で書き込みます**。ネイティブ MCP は `~/.pi/agent/mcp.json`、旧アダプターは `~/.pi/agent/mcp-adapter.json` を使い、どちらも `PI_CODING_AGENT_DIR` に従います。ネイティブ Pi は組み込み MCP を使うため、アダプターや別途の `pi mcp add` は不要です。自動設定に成功したら、下記の手動ステップ 1–3 は不要です。
+
+対話型セッションでも認証情報を手動で export せずに使うには、構成済みエージェントを一覧し、Pi エージェントを名前または UUID で起動します。
+
+```sh
+chorus agents
+chorus agents run <name-or-uuid>
+```
+
+ランチャーは保存済みの設定から `CHORUS_URL`、`CHORUS_API_KEY`、`CHORUS_AGENT_PROFILE` を渡します。その後、[接続を確認](#接続を確認する)してください。`pi` を直接起動する場合だけ、シェル環境にキーを設定する必要があります。デーモン起動時にも自動で渡されます。既存アダプターや無効化された組み込み MCP がある場合は、下記の移行手順で競合を解消してください。
+
+## MCP バックエンドを選ぶ
+
+インストール前に `pi --version` で安定版を確認します。Chorus 0.21.1 の `chorus agents add --agents pi` はバージョンに応じて構成を選びます。
+
+| Pi のバージョン | MCP バックエンド | インストールするパッケージ |
+| --- | --- | --- |
+| `>=0.99.0 <2.0.0` | ネイティブ MCP | `@chorus-aidlc/chorus-pi` のみ |
+| `0.84.4–0.98.x` | 旧アダプター | `pi-mcp-adapter@5.0.0` と `@chorus-aidlc/chorus-pi` |
+
+それ以前のバージョンと Pi 2.x は非対応で、パッケージ操作は行いません。バージョン不明やプレリリース版ではアダプターを変更せず、MCP 設定完了とも報告しません。対応する安定版を先にインストールしてください。デーモンからの起動には、この範囲内の Pi 0.85.0 以降が必要です。
+
+別のサブエージェントパッケージは不要です。`chorus-pi` に Pi 公式の `subagent` ツールが含まれます。Chorus API キーも用意してください。以下は手動設定の手順です。
+
+## 手動ステップ 1：環境変数を設定する
 
 ```bash
 export CHORUS_URL="http://localhost:8637"
 export CHORUS_API_KEY="cho_REDACTED"
 ```
 
-Pi が起動時に読み込めるよう、これらを `~/.bashrc` / `~/.zshrc` に追加します。`CHORUS_URL` はルート
-URL でも、完全な `/api/mcp` エンドポイントでもかまいません。これらが未設定の場合、拡張は
-`.mcp.json` の `chorus` サーバーエントリを読み取るフォールバックに切り替えます。
+対話型 Pi を起動するシェルで設定します。インストーラーは Pi の env ファイルには保存しません。`CHORUS_URL` はルート URL または完全な `/api/mcp` エンドポイントです。構成済みエージェントを選ぶ場合は `CHORUS_AGENT_PROFILE` も設定します。デーモン起動時には自動で渡されます。
 
-## ステップ 2: MCP サーバーを設定する
+明示的な環境変数が優先されます。Chorus 拡張はセッションやチェックイン用に以下の対応するグローバル MCP ファイルも読み取りますが、ネイティブのプロジェクト専用 `.pi/mcp.json` は検出しません。その構成では両方の変数を引き続き設定してください。
 
-Pi の `pi-mcp-adapter` は標準の MCP 設定ファイルを自動検出します。メインエージェントが `chorus_*`
-ツールを取得できるよう、プロジェクトのルート（またはグローバルに `~/.pi/agent/mcp.json`）に
-`.mcp.json` を配置します。
+## 手動ステップ 2：Pi のバージョンに合わせて MCP を設定する
+
+### ネイティブ MCP：安定版 Pi `>=0.99.0 <2.0.0`
+
+```bash
+pi mcp add chorus --url "http://localhost:8637/api/mcp" --bearer-token-env-var CHORUS_API_KEY
+pi mcp list
+```
+
+保存先は `~/.pi/agent/mcp.json` です。`PI_CODING_AGENT_DIR` でエージェントディレクトリを変更できます。プロジェクト用には `pi mcp add --local` を使います。保存先は `.pi/mcp.json` で、プロジェクトの信頼が必要です。ルートの `.mcp.json` ではありません。
+
+同等のグローバル設定は次のとおりです。
 
 ```json
 {
@@ -53,17 +80,29 @@ Pi の `pi-mcp-adapter` は標準の MCP 設定ファイルを自動検出しま
     "chorus": {
       "type": "http",
       "url": "http://localhost:8637/api/mcp",
-      "headers": { "Authorization": "Bearer cho_REDACTED" }
+      "headers": { "Authorization": "Bearer ${CHORUS_API_KEY}" }
     }
   }
 }
 ```
 
-URL と Bearer トークンはリテラルのままで動作します。Pi は `.mcp.json` での `${VAR}` 展開を
-必要としません。`.mcp.json` には API キーが含まれるため、バージョン管理には含めないで
-ください。
+ネイティブ MCP の既定は codemode です。直接ツール公開に切り替える必要はありません。`pi mcp list` は組み込み MCP を確認しますが、対話型の `/mcp` は既存アダプターが提供している場合があります。
 
-## ステップ 3: chorus-pi パッケージをインストールする
+### 旧アダプター：Pi 0.84.4–0.98.x
+
+`pi install npm:pi-mcp-adapter@5.0.0` を実行します。上の JSON を `~/.pi/agent/mcp-adapter.json`（または `$PI_CODING_AGENT_DIR/mcp-adapter.json`）に保存し、`mcpServers.chorus` 内に `"directTools": true` を追加します。`toolPrefix` の変更は名前だけに作用し、直接ツール公開を有効にはしません。
+
+両バックエンドとも `${CHORUS_API_KEY}` を解決します。実際のキーは環境変数に保持してください。adapter5 は旧設定の検出やインポートにも対応しますが、旧グローバル `mcp.json` は主設定ファイルではありません。
+
+`chorus agents add` は既存の直接ツール設定や他のサーバー、設定を保持します。旧アダプターの主設定がなければ、旧グローバル `mcp.json` を新しい主設定にコピーし、元ファイルは残します。既存の主設定を優先し、壊れたファイルや読み取れないファイルは上書きしません。生成する Chorus ヘッダーは実際のキーではなく環境変数を参照します。
+
+### 既存アダプターの更新と移行
+
+`chorus upgrade --plugins` と `chorus init --update-installed` は対象となる Chorus コンポーネントだけを更新し、全拡張や Pi 本体は更新しません。旧アダプターは検証済みの `5.0.0` 固定を保持し、latest にはしません。他のアダプター制約や Chorus の固定版・範囲も保持するため、設定や最新版への更新が未完了になることがあります。
+
+ネイティブ対応環境では、既存アダプターや `-builtin:mcp` 拡張フィルターについて警告するだけです。ネイティブ MCP を選ぶ場合は、グローバル `~/.pi/agent/settings.json`（`PI_CODING_AGENT_DIR` に従う）とプロジェクトの `.pi/settings.json` を確認し、元のスコープでのみアダプターとそのフィルターを削除します。他の設定は保持してください。`pi remove npm:pi-mcp-adapter` はグローバル npm インストール用で、プロジェクトの項目には適用しません。Pi を再起動し、実際の MCP ツールを確認します。設定を書くだけでは接続の回復は保証されません。
+
+## 手動ステップ 3: chorus-pi パッケージをインストールする
 
 ```bash
 pi install npm:@chorus-aidlc/chorus-pi
@@ -122,11 +161,7 @@ Pi は第一級の **起動可能なデーモンバックエンド**です。リ
 （エージェントへの着想・課題の割り当て、`@mention`、提案の決定）、Chorus デーモンがヘッドレスな Pi
 セッションを起動します。
 
-最も簡単な経路は `chorus agents add` です。エージェントのチェックリストで
-**Pi** を選ぶと、`pi install` で `pi-mcp-adapter` と `chorus-pi` がインストールされ、Pi が
-`~/.chorus/daemon.json` に **起動可能** なエージェントとして登録されます。さらに、オプトイン
-すれば、デーモンを自動起動するサービスがインストールされます。手動で設定するには、Pi バックエンドで
-デーモンを実行します。
+最も簡単なのは `chorus agents add --agents pi` です。Pi のバージョンに合うネイティブ MCP または検証済み旧アダプターを選び、`chorus-pi` をインストールし、`~/.chorus/daemon.json` に Pi を登録します。同意すれば起動時サービスもインストールします。手動で起動する場合：
 
 ```bash
 chorus daemon --agent pi
@@ -138,9 +173,7 @@ chorus daemon --agent pi
   **Pi 0.85.0 以降**が必要です。[0.20.0 のデーモン動作](#0200-のデーモン動作)を参照してください。
 - Pi には**権限システムがありません**。そのためサンドボックスや skip-permissions フラグは関与
   しません。`chorus` モードでも `yolo` モードでも、デーモンによる Pi の実行方法は同じです。
-- 起動された Pi が Chorus MCP ツールに到達できるのは、このパッケージの拡張 / `pi-mcp-adapter` を
-  通じてのみです。したがって、デーモンが起動する環境に `chorus-pi` をインストールしたままに
-  してください（npm からインストールしておけば、デーモンから引き続き利用できます）。
+- デーモンが起動する環境に `chorus-pi` とバージョンに合う MCP 設定を用意してください。ネイティブ Pi にはアダプターは不要です。
 
 デーモンは Chorus 接続（`CHORUS_URL`、`CHORUS_API_KEY`、`CHORUS_AGENT_PROFILE`）を提供しますが、
 モデルプロバイダーの認証情報を取得してくれるわけではありません。`~/.chorus/daemon.json` 内のそのエージェントの `env`、
@@ -155,11 +188,10 @@ Chorus 0.20.0 から、Pi の起動はすべて Pi の RPC モードで実行さ
 
 ```bash
 pi --version                                                # 0.85.0 以降が必要
-npm install -g @earendil-works/pi-coding-agent@latest       # pi 本体を更新
+npm install -g "@earendil-works/pi-coding-agent@>=0.85.0 <2.0.0"       # pi 本体を更新
 ```
 
-`chorus upgrade --plugins` は `chorus-pi` と `pi-mcp-adapter` を更新しますが、Pi 本体は更新しません。
-この動作は Linux 上の Pi **0.85.1** で実機検証済みです。
+`chorus upgrade --plugins` は対象の Chorus コンポーネントを更新し、Pi 本体は更新しません。旧 adapter5 は前述の固定版を保持します。RPC 通信は Linux の Pi **0.85.1** で検証済みです。
 
 - **古い Pi：** デーモンはその起動をスキップし、上記の更新コマンドをログに出します。Pi のバージョンを
   読み取れない場合は警告を記録し、そのまま起動を試みます。
@@ -177,18 +209,10 @@ npm install -g @earendil-works/pi-coding-agent@latest       # pi 本体を更新
 
 ## よくある問題
 
-- **MCP サーバーが見当たらない：** `.mcp.json` をプロジェクトのルート（または
-  `~/.pi/agent/mcp.json`）に置くか、`/mcp setup` を実行します。
-- **スキルが見当たらない：** セッションを再起動します（`/reload`）。スキルはセッション開始時に
-  読み込まれます。
-- **レビュアーエージェントが見当たらない：** `chorus-pi` がインストールされ、Pi が再起動された
-  ことを確認します。レビュアーエージェントはパッケージ内に同梱されています（別個のサブエージェント
-  のインストールも、手動のコピーも不要です）。
-- **接続が認可されない：** `CHORUS_URL` / `CHORUS_API_KEY`（または `.mcp.json` の Bearer）を再確認し、
-  Pi を再起動します。
-- **ツール名が二重に見える**（`chorus_chorus_checkin`）：`pi-mcp-adapter` はゲートウェイモードで
-  ツール名にサーバー名をプレフィックスとして付けます。`mcp({ tool: "chorus_chorus_checkin" })` を
-  呼び出すか、chorus サーバーに `"toolPrefix": "none"` を設定してネイティブの `chorus_*` 名を
-  使用します。
+- **MCP サーバーが見つからない**：バージョンに合う設定ファイルを確認します。ネイティブ Pi では `pi mcp list` を実行し、対話型ツールが異なる場合はプロジェクトの信頼、旧アダプター、`-builtin:mcp` フィルターも確認します。
+- **スキルやレビュアーがない**：`chorus-pi` のインストールを確認し Pi を再起動します。レビュアーは同梱され、手動コピーや別パッケージは不要です。
+- **接続が認証されない**：起動シェルの `CHORUS_URL` と `CHORUS_API_KEY` を確認して Pi を再起動します。共有設定に実際のキーを書かないでください。
+- **ツール名が異なる**：推測せず、検出されたスキーマを確認します。ネイティブ MCP は `mcp__chorus__chorus_checkin` など、旧直接ツールは通常 `chorus_chorus_checkin` を使います。`toolPrefix: "none"` は旧版の名前のみを変えます。
+- **旧プラグインでワークフロー通知やネイティブ MCP でのレビューが失敗する**：Chorus 0.21.1 以降に更新します。この版は MCP 接頭辞ごとの Pi/dsh 通知と Pi ネイティブ MCP レビュアーの互換性を修正します。レビュアーは判定の投稿以外は読み取り専用です。
 
-一般的な接続の問題については、[エージェント接続のトラブルシューティング](/ja/guides/troubleshooting/)を参照してください。
+一般的な接続問題は[接続のトラブルシューティング](/ja/guides/troubleshooting/)を参照してください。

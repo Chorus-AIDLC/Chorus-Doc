@@ -76,6 +76,8 @@ the Chorus MCP tools.
 
 ## Common issues
 
+- **Workflow reminders are missing after Chorus tool calls:** update the Chorus dsh bundle to 0.21.1 or later using the setup procedure above, then start a fresh session. This fixes MCP-prefix matching for Pi/dsh workflow reminders; it does not grant extra tool permissions.
+
 - **`dsh` or `pnpm` not found:** install both prerequisites and open a new shell.
 - **`ERR_PNPM_ADDING_TO_ROOT`:** re-run the command with `-w` — a dsh profile is a pnpm
   workspace root.

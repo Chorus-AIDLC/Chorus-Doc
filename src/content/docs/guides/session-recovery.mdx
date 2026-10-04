@@ -49,6 +49,12 @@ running. None of this limits how long a turn may run, but backend limits still a
 DeepSeek Harness (`dsh`) defaults to 30 minutes per turn, configurable through
 `CHORUS_DSH_TIMEOUT_MS`. Check the final output and any remaining processes before resuming.
 
+## Read a failed turn's diagnostics
+
+From Chorus 0.21.0, a failed startup or execution shows an **Agent wake failed** summary in its conversation turn, even when the agent produced no reply. Select **Show error details** when available to inspect captured diagnostic output, exit code, or signal. These diagnostics are saved with the turn and remain available after refreshing or reopening the conversation.
+
+Details are not always available. Older turns or failures without captured diagnostics show a fallback explanation; a user-requested interrupt is not a crash. Use the summary to check the working directory, backend login/model configuration, or credentials, and consult `chorus daemon logs` if needed. Inspect partial changes before resuming: failure does not undo files or external actions. Diagnostic text can contain sensitive information; redact it before sharing.
+
 ## Inspect the partial result
 
 Before resuming:

@@ -50,7 +50,7 @@ chorus update --plugins    # upgrade の別名
 
 - **Claude Code と Codex**：ホストのプラグイン機構で Chorus プラグインを更新します。
 - **Kiro**：設定された Chorus インスタンスからテンプレートを取得します。新版テンプレートを取得するには、先にそのサーバーを更新してください。一つの共有の更新先に異なるインスタンス URL が指定されている場合は、未完了として報告されます。
-- **Pi**：`@chorus-aidlc/chorus-pi` と `pi-mcp-adapter` だけを更新します。バージョン固定、範囲指定、latest 以外のタグは維持され、常に未完了と報告されます。最新版に更新するには、その制約を外してください。個別のパッケージ更新に対応していない Pi では、その制限を報告し、全拡張の更新は行いません。
+- **Pi**：安定版 `>=0.99.0 <2.0.0` はネイティブ MCP を使い、対象の `@chorus-aidlc/chorus-pi` のみ更新します。`0.84.4–0.98.x` は検証済み `pi-mcp-adapter@5.0.0` の固定を保持します。他のアダプター制約や Chorus の固定版・範囲・タグも保持するため、設定や最新版への更新が未完了になる場合があります。全拡張や Pi 本体の更新、既存アダプターの自動削除は行いません。[Pi の設定と移行](/ja/reference/agents/pi/)を参照してください。
 
 ホスト CLI がインストールされていて Chorus プラグインがない場合は、プラグインをインストールします。登録情報と認証情報は保持し、ホスト CLI 自体のインストールや更新は行いません。設定ファイルを変更する前に、そのコピーを `<file>.chorus-upgrade.bak` として保存します（次回の更新で上書きされます）。種別が `offline` または未知の場合（既定の OpenCode、OpenClaw、dsh の設定を含む）や、各設定の `PATH` にホスト CLI がない場合はスキップし、**INCOMPLETE** と表示します。これらのホストについては、[エージェントプラットフォーム](/ja/reference/agents/)にある設定・更新手順に従ってください。
 
@@ -76,10 +76,7 @@ chorus agents add --agents claude,codex \
   --url https://chorus.example.com --api-key cho_xxx
 ```
 
-冪等なので、エージェントの追加、プラグインの更新、キーのローテーションのために再実行しても安全です。
-Chorus プラグインがまだ入っていない検出済みのエージェントも選択できます。サポートされるエージェントは
-Claude Code、Codex、Kiro、Pi、OpenCode、OpenClaw、DeepSeek Harness（dsh）です。`pi` が `PATH` にあれば
-`pi-mcp-adapter` と `chorus-pi` の両方をインストールし、なければ手動インストールの手順を表示します。
+設定はエージェント追加や認証情報更新のために再実行できます。Claude Code、Codex、Kiro、Pi、OpenCode、OpenClaw、DeepSeek Harness（dsh）に対応します。Pi 安定版 `>=0.99.0 <2.0.0` はネイティブ MCP、`0.84.4–0.98.x` は `pi-mcp-adapter@5.0.0` を選び、`chorus-pi` もインストールします。Pi が未導入、非対応、バージョン不明の場合は案内を表示し、一律に MCP 設定完了とは報告しません。[Pi](/ja/reference/agents/pi/)を参照してください。
 
 主なフラグ（全フラグは `chorus agents add --help` で確認できます）。
 
@@ -90,6 +87,7 @@ Claude Code、Codex、Kiro、Pi、OpenCode、OpenClaw、DeepSeek Harness（dsh�
 - `--dsh-profile <name>` — バンドルをインストールする DeepSeek Harness のプロファイル。
 - `--daemon-wake <a,b>` / `--daemon-wake-all` — 指定したエージェント（または起動できるすべてのエージェント）をデーモンの起動対象にします。起動できるエージェント（Claude Code、Codex、Kiro、Pi）は既定で「パーク」状態で追加されます。`chorus mcp` からは到達できますが、ここで明示的に選ぶ（または TTY で各エージェントのプロンプトに答える）まではデーモンに起動されません。
 - `--daemon-autostart` — デーモンの起動サービスもインストールして有効化します（Linux systemd / macOS launchd）。
+- `--no-linger`：Linux systemd lingering の設定・修復を省略します。既存設定は無効にしません。[デーモン運用](/ja/guides/daemon-operations/)を参照してください。
 - `-y, --yes` — 確認をスキップします（TTY でないときは暗黙的に有効になり、その場合は `--agents` または `--all` を渡す必要があります）。
 
 設定済みのエージェントを一覧・削除します。
@@ -101,6 +99,8 @@ chorus agents remove <name|uuid>  # remove one (match by name or UUID)
 
 `chorus agents` は API キーを決して出力しません。一覧に表示された名前または UUID は、
 `chorus mcp --agent` や `CHORUS_AGENT_PROFILE` 環境変数の有効な値です。
+
+Codex の App Server 再起動は `--yes` では許可されません。認証情報と MCP 設定に成功した後、対話型端末だけで中断の警告と個別確認を表示します。[Codex](/ja/reference/agents/codex/)を参照してください。
 
 ## エージェントを起動する — `chorus agents run`
 

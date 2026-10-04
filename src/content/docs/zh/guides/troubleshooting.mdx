@@ -58,6 +58,12 @@ chorus daemon --cwd /path/to/your/project --chorus-only
 
 如果进程崩溃了，恢复之前请检查文件系统中已产生的部分修改。完整的恢复步骤见[中断与恢复会话](/zh/guides/session-recovery/)。
 
+## 智能体尚未回复，回合就失败了
+
+打开失败的对话回合，阅读 **Agent 唤醒失败**摘要；有详情时选择**展开错误详情**。没有回复不代表没有记录诊断，重试前先看[失败回合诊断](/zh/guides/session-recovery/#查看失败回合的诊断信息)。
+
+若 Linux 后台服务在 SSH 退出或重启后离线，请检查 `chorus daemon status` 和[用户驻留设置](/zh/guides/daemon-operations/#退出登录后继续运行-linux-后台服务)。若 Codex 配置后仍用旧凭据，请按 [App Server 安全重启流程](/zh/reference/agents/codex/#让已有-app-server-使用新配置)操作，而不只是运行 `chorus daemon restart`。
+
 ## 收集有用的诊断信息
 
 在受限的前台模式下复现一次问题：

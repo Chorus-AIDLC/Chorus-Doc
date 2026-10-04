@@ -49,7 +49,7 @@ chorus update --plugins    # upgrade의 별칭
 
 - **Claude Code와 Codex**: 호스트의 플러그인 기능으로 Chorus 플러그인을 갱신합니다.
 - **Kiro**: 항목에 설정된 Chorus 인스턴스에서 템플릿을 가져옵니다. 새 템플릿을 받으려면 해당 서버를 먼저 업그레이드하세요. 하나의 공유 대상에 서로 다른 인스턴스 URL이 지정되어 있으면 미완료로 보고합니다.
-- **Pi**: `@chorus-aidlc/chorus-pi`와 `pi-mcp-adapter`만 업데이트합니다. 버전 고정, 범위, latest가 아닌 태그는 유지되며 항상 미완료로 보고됩니다. 최신 버전으로 업데이트하려면 해당 제한을 제거하세요. Pi가 이 패키지들을 개별로 업데이트할 수 없으면, 모든 확장을 업데이트하는 대신 그 제한 사항을 보고합니다.
+- **Pi**: 안정 버전 `>=0.99.0 <2.0.0`은 네이티브 MCP를 사용하며 대상 `@chorus-aidlc/chorus-pi`만 업데이트합니다. `0.84.4–0.98.x`는 검증된 `pi-mcp-adapter@5.0.0` 고정을 유지합니다. 다른 어댑터 제약과 Chorus 고정·범위·태그도 보존하므로 설정 또는 최신 버전 갱신이 미완료일 수 있습니다. 모든 확장이나 Pi 자체를 갱신하거나 기존 어댑터를 자동 제거하지 않습니다. [Pi 설정과 마이그레이션](/ko/reference/agents/pi/)을 참고하세요.
 
 호스트 CLI는 설치되어 있지만 Chorus 플러그인이 없으면 플러그인을 설치합니다. 등록 정보와 인증 정보는 유지하며, 호스트 CLI 자체를 설치하거나 업그레이드하지는 않습니다. 설정 파일을 변경하기 전에 `<file>.chorus-upgrade.bak`으로 사본을 저장하며, 이 사본은 다음 업그레이드 때 덮어씁니다.
 
@@ -76,10 +76,7 @@ chorus agents add --agents claude,codex \
   --url https://chorus.example.com --api-key cho_xxx
 ```
 
-멱등적이므로 에이전트를 추가하거나, 플러그인을 갱신하거나, 키를 교체하려고 다시 실행해도
-안전합니다. 감지되었지만 아직 Chorus 플러그인이 없는 에이전트도 선택할 수 있습니다. 지원되는 에이전트는 Claude
-Code, Codex, Kiro, Pi, OpenCode, OpenClaw, DeepSeek Harness(dsh)입니다. `pi`가 `PATH`에 있으면
-`pi-mcp-adapter`와 `chorus-pi`를 자동 설치하고, 없으면 수동 설치 방법을 안내합니다.
+에이전트 추가나 인증 정보 갱신을 위해 설정을 다시 실행할 수 있습니다. Claude Code, Codex, Kiro, Pi, OpenCode, OpenClaw, DeepSeek Harness(dsh)를 지원합니다. Pi 안정 버전 `>=0.99.0 <2.0.0`에는 네이티브 MCP, `0.84.4–0.98.x`에는 `pi-mcp-adapter@5.0.0`을 선택하고 `chorus-pi`를 설치합니다. Pi가 없거나 미지원 또는 버전 불명이면 안내를 제공하며 무조건 MCP 설정 완료를 보고하지 않습니다. [Pi](/ko/reference/agents/pi/)를 참고하세요.
 
 유용한 플래그(`chorus agents add --help`가 전부 나열합니다):
 
@@ -90,6 +87,7 @@ Code, Codex, Kiro, Pi, OpenCode, OpenClaw, DeepSeek Harness(dsh)입니다. `pi`�
 - `--dsh-profile <name>` — 번들을 설치할 DeepSeek Harness 프로필.
 - `--daemon-wake <a,b>` / `--daemon-wake-all` — 지정한(또는 깨울 수 있는 모든) 에이전트를 데몬 깨우기 대상으로 선택합니다. 깨울 수 있는 에이전트(Claude Code, Codex, Kiro, Pi)는 기본적으로 "파킹" 상태로 추가됩니다. `chorus mcp`로는 접근할 수 있지만, 여기서 명시적으로 선택하거나 TTY의 에이전트별 프롬프트에서 선택하기 전까지는 데몬이 깨우지 않습니다.
 - `--daemon-autostart` — 데몬 부팅 서비스도 함께 설치·활성화(Linux systemd / macOS launchd).
+- `--no-linger`: Linux systemd lingering 설정이나 복구를 건너뛰며 기존 설정은 끄지 않습니다. [데몬 운영](/ko/guides/daemon-operations/)을 참고하세요.
 - `-y, --yes` — 확인 건너뛰기(TTY가 아니면 암묵적으로 적용되며, 이때는 `--agents` 또는 `--all`을 전달해야 합니다).
 
 구성된 에이전트를 나열하고 제거합니다.
@@ -101,6 +99,8 @@ chorus agents remove <name|uuid>  # remove one (match by name or UUID)
 
 `chorus agents`는 API 키를 절대 출력하지 않습니다. 나열된 이름이나 UUID는 `chorus mcp --agent` 또는
 `CHORUS_AGENT_PROFILE` 환경 변수에 쓸 수 있는 유효한 값입니다.
+
+Codex App Server 재시작은 `--yes`로 허가되지 않습니다. 인증 정보와 MCP 구성에 성공한 뒤 대화형 터미널에서만 별도의 중단 경고와 동의 질문을 표시합니다. [Codex](/ko/reference/agents/codex/)를 참고하세요.
 
 ## 에이전트 실행하기 — `chorus agents run`
 
