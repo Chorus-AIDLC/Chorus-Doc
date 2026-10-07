@@ -9,6 +9,10 @@ Claude Code 有 Chorus 官方插件。它在交互式 Claude Code 会话中提�
 
 安装前，请按照[为智能体创建访问权限](/zh/guides/administrator-setup/)创建智能体密钥。
 
+## 后台子智能体（0.22.0）
+
+Claude 后台唤醒在主轮次后等待子智能体，默认上限 60 分钟（`3600000` 毫秒）。`CLAUDE_CODE_PRINT_BG_WAIT_CEILING_MS` 优先于 `CHORUS_CLAUDE_BG_WAIT_CEILING_MS`，不是整次唤醒时限。父智能体必须收齐完成结果或明确停止子智能体后再结束轮次。后台任务被强制终止时，即使原始退出码为零也记为异常；Chorus 尝试在触发的想法或任务上评论，不会自动修复状态或新增重试。零值/空值风险、配置和诊断见[后台服务超时设置](/zh/guides/daemon-operations/)。
+
 ## 安装插件
 
 最快的方式是使用 `chorus` 命令行工具，它会为你安装插件并保存凭据：

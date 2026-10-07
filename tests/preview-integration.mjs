@@ -13,6 +13,10 @@ const routes = [
   '/ko/guides/getting-started/',
   '/reference/workflow/',
   '/zh/reference/workflow/',
+  '/reference/agents/hermes/',
+  '/zh/reference/agents/hermes/',
+  '/ja/reference/agents/hermes/',
+  '/ko/reference/agents/hermes/',
 ];
 const resources = [
   ['/index.md', '## The reversed conversation'],
@@ -28,6 +32,10 @@ const resources = [
   ['/llms.txt', '# Chorus Docs'],
   ['/sitemap-index.xml', 'sitemapindex'],
   ['/sitemap-0.xml', 'urlset'],
+  ...['', '/zh', '/ja', '/ko'].map((locale) => [
+    `${locale}/reference/agents/hermes.md`,
+    'VERSION=0.22.0',
+  ]),
 ];
 
 for (const [route, expected] of resources) {

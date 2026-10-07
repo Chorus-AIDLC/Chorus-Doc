@@ -49,7 +49,7 @@ const englishPages = relativePaths.filter(
 const missing = [];
 for (const englishPage of englishPages) {
   if (SINGLE_LOCALE_ALLOWLIST.has(englishPage)) continue;
-  for (const locale of ['ja', 'ko']) {
+  for (const locale of PREFIX_LOCALES) {
     const counterpart = `${locale}/${englishPage}`;
     if (!present.has(counterpart)) {
       missing.push({ englishPage, locale, counterpart });
@@ -66,7 +66,7 @@ if (missing.length > 0) {
     .join('\n');
   console.error(
     `Translation coverage failed — ${missing.length} missing counterpart(s):\n${details}\n` +
-      'Every English content page must have a ja and a ko translation at the matching ' +
+      'Every English content page must have zh, ja, and ko translations at the matching ' +
       'route stem. Add the missing file, or add the English page to ' +
       'SINGLE_LOCALE_ALLOWLIST in tests/locale-coverage.mjs if it is intentionally ' +
       'single-locale.',
@@ -75,7 +75,7 @@ if (missing.length > 0) {
 } else {
   assert.ok(englishPages.length > 0, 'expected to find English content pages');
   console.log(
-    `Translation coverage verified — ${englishPages.length} English page(s) each have ja and ko counterparts ` +
+    `Translation coverage verified — ${englishPages.length} English page(s) each have zh, ja, and ko counterparts ` +
       `(${SINGLE_LOCALE_ALLOWLIST.size} intentional single-locale exclusion(s)).`,
   );
 }

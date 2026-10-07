@@ -13,6 +13,7 @@ route: /zh/reference/agents/
 | [Codex](./codex/) | Chorus 团队 | 想获得完整 Chorus 工作流的 Codex 用户 | 支持，通过 Chorus 后台服务 | Chorus 后台服务 |
 | [Kiro](./kiro/) | Chorus 团队 | 想获得完整 Chorus 工作流的 Kiro CLI 用户 | 支持，通过 Chorus 后台服务 | Chorus 后台服务 |
 | [OpenClaw](./openclaw/) | Chorus 团队 | 已在运行 OpenClaw 网关的用户 | 支持，通过 OpenClaw | OpenClaw 网关 |
+| [Hermes Agent](./hermes/) | Chorus 团队 | 使用网关服务代码仓库的 Hermes 用户 | 支持，通过 Hermes | Hermes 网关 |
 | [DeepSeek Harness](./dsh/) | Chorus 团队 | 想获得完整 Chorus 工作流的 DeepSeek Harness 用户 | 支持，通过 Chorus 后台服务 | Chorus 后台服务 |
 | [OpenCode](./opencode/) | 社区 | 能接受社区支持的 OpenCode 用户 | 不支持 | 不支持 |
 | [Pi](./pi/) | Chorus 团队 | 想获得完整 Chorus 工作流的 Pi 用户 | 支持，通过 Chorus 后台服务 | Chorus 后台服务 |
@@ -21,6 +22,8 @@ route: /zh/reference/agents/
 Claude Code、Codex、Kiro、Pi 和 DeepSeek Harness 是受支持的 Chorus 后台服务后端。OpenClaw 通过自己的网关和插件保持在线。OpenCode 和通用 MCP 客户端以交互方式连接，不能被选作 Chorus 后台服务后端。
 
 API 密钥与权限请先阅读[为智能体创建访问权限](/zh/guides/administrator-setup/)。要让 Claude Code、Codex、Kiro、Pi 或 DeepSeek Harness 能接受远程工作，请完成平台安装，再继续阅读[管理后台服务](/zh/guides/daemon-operations/)。
+
+[Hermes](/zh/reference/agents/hermes/) 通过自己的网关保持在线，不使用 Chorus 后台服务。支持评论审批命令和中断/恢复；网关不执行调研和创建想法的专用操作轮次。
 
 ## 插件打包了什么
 

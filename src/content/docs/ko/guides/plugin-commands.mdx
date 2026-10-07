@@ -10,6 +10,8 @@ Chorus 플러그인은 AI-DLC 파이프라인의 각 단계마다 명령 하나�
 다룹니다. 파이프라인 자체는 다시 설명하지 않습니다. 그에 대해서는
 [AI-DLC 워크플로](/ko/guides/ai-dlc-workflow/)와 아래에 링크한 각 단계 가이드를 읽으세요.
 
+[Hermes](/ko/reference/agents/hermes/)에서는 `skill_view("chorus:idea")`, `skill_view("chorus:develop")`, `skill_view("chorus:yolo")`로 네임스페이스 스킬을 불러옵니다. 모든 단계와 세 종류의 리뷰어가 포함됩니다. Claude 슬래시 명령이 아니며 모든 Chorus UI 동작을 게이트웨이에서 실행한다는 뜻도 아닙니다.
+
 ## 런타임마다 호출 방식이 다르다
 
 Claude Code는 이 명령들을 `chorus` 네임스페이스 아래의 슬래시 명령으로 노출합니다. Codex는 같은 스킬을

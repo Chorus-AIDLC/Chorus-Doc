@@ -15,6 +15,10 @@ lifecycle stages or how to install, run, and recover a runtime — see
 [Interrupt and resume a session](/guides/session-recovery/), and the
 [agent platforms reference](/reference/agents/) for those.
 
+## Hermes automation
+
+[Hermes](/reference/agents/hermes/) injects session check-in and spec context through native hooks and appends review reminders after proposal submission, task submission, and final task verification. The main agent invokes `delegate_task` with a `[chorus-reviewer:proposal]`, `[chorus-reviewer:task]`, or `[chorus-reviewer:code]` marker and loads the matching skill. Marked children may read and post verdicts but cannot execute terminal commands, edit files, or delegate further. Gateway command approvals go to the owner through Chorus comments; use `approvals.mode manual` and `security.approval.transport chorus`. Interactive sessions use the configured `builtin` fallback. This is distinct from the Claude daemon headless guard below.
+
 ## Reviewer sub-agents
 
 The plugin adds an independent quality gate at three points in the pipeline. At each point a

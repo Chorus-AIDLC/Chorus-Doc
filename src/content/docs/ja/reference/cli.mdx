@@ -65,7 +65,7 @@ npm のインストールは進捗を表示し、インストールのタイム�
 `chorus agents add` は、マシンのコーディングエージェントを Chorus に接続する唯一のコマンドです。
 すでにインストールしているエージェントを検出し、それぞれの Chorus プラグインをそのエージェント自身の
 プラグイン機構を通じてインストールし、Chorus の URL と API キーを一度だけ
-`~/.chorus/daemon.json` に取り込みます。Claude Code、Codex、DeepSeek Harness については、認証情報を
+`~/.chorus/daemon.json` に取り込みます。Claude Code、Codex、Hermes、DeepSeek Harness については、認証情報を
 そのエージェント自身の設定にも書き込むため、対話的なセッションが手動の環境設定なしで認証されます
 （[認証情報の保存先](#認証情報の保存先)を参照）。
 
@@ -76,7 +76,7 @@ chorus agents add --agents claude,codex \
   --url https://chorus.example.com --api-key cho_xxx
 ```
 
-設定はエージェント追加や認証情報更新のために再実行できます。Claude Code、Codex、Kiro、Pi、OpenCode、OpenClaw、DeepSeek Harness（dsh）に対応します。Pi 安定版 `>=0.99.0 <2.0.0` はネイティブ MCP、`0.84.4–0.98.x` は `pi-mcp-adapter@5.0.0` を選び、`chorus-pi` もインストールします。Pi が未導入、非対応、バージョン不明の場合は案内を表示し、一律に MCP 設定完了とは報告しません。[Pi](/ja/reference/agents/pi/)を参照してください。
+設定はエージェント追加や認証情報更新のために再実行できます。Claude Code、Codex、Kiro、Pi、OpenCode、OpenClaw、Hermes、DeepSeek Harness（dsh）に対応します。Pi 安定版 `>=0.99.0 <2.0.0` はネイティブ MCP、`0.84.4–0.98.x` は `pi-mcp-adapter@5.0.0` を選び、`chorus-pi` もインストールします。Pi が未導入、非対応、バージョン不明の場合は案内を表示し、一律に MCP 設定完了とは報告しません。[Pi](/ja/reference/agents/pi/)を参照してください。
 
 主なフラグ（全フラグは `chorus agents add --help` で確認できます）。
 
@@ -101,6 +101,12 @@ chorus agents remove <name|uuid>  # remove one (match by name or UUID)
 `chorus mcp --agent` や `CHORUS_AGENT_PROFILE` 環境変数の有効な値です。
 
 Codex の App Server 再起動は `--yes` では許可されません。認証情報と MCP 設定に成功した後、対話型端末だけで中断の警告と個別確認を表示します。[Codex](/ja/reference/agents/codex/)を参照してください。
+
+## Hermes の設定（0.22.0）
+
+`chorus agents add --agents hermes --hermes-cwd /path/to/repo` は CLI のリリースタグから `chorus` と `chorus-mcp` をインストールし、`$HERMES_HOME/.env`、リポジトリ、未設定の承認項目を構成します。`--hermes-cwd <path>` が優先され、省略時は既存ディレクトリか現在の Git リポジトリを使います。タグがなければ失敗します。
+
+Hermes は Chorus daemon では `offline` 登録です。`chorus upgrade --plugins` と `chorus agents run --type hermes` は対応しません。CLI 更新後、`chorus agents add --agents hermes` で両方を再インストールし、`hermes gateway restart` を実行します。リリースタグでのインストール、リモート MCP、スキル、所有者承認は [Hermes Agent](/ja/reference/agents/hermes/) を参照してください。
 
 ## エージェントを起動する — `chorus agents run`
 
@@ -194,7 +200,7 @@ chorus mcp list                                   # list the tools this agent ma
 ## 認証情報の保存先
 
 `chorus agents add` は、検証済みの認証情報を常に `~/.chorus/daemon.json` に書き込みます
-（モード `0600`。キーがエコー表示されることはありません）。3 つのエージェントについては、
+（モード `0600`。キーがエコー表示されることはありません）。4 つのエージェントについては、
 対話的なセッションが手動のエクスポートなしで認証されるよう、そのエージェント自身の設定にも
 認証情報を埋め込みます。
 
@@ -203,6 +209,7 @@ chorus mcp list                                   # list the tools this agent ma
 | Claude Code | `~/.claude/settings.json` の `env` ブロック（`CLAUDE_CONFIG_DIR` に従う）。 |
 | Codex | `~/.codex/.env`（`CODEX_HOME` に従う）。Codex はキーレスの `config.toml` エントリを通じて、環境変数からキーを読みます。 |
 | DeepSeek Harness | `$DSH_HOME/.env`。 |
+| Hermes | `$HERMES_HOME/.env`（既定は `~/.hermes/.env`、モード `0600`）。リモート MCP 設定はキーのプレースホルダーを保存します。 |
 
 Kiro、OpenCode、OpenClaw は、それぞれ自身のインストール済みの設定から認証情報を読みます。
 デーモンが起動した Kiro は、デーモンが起動のたびにエクスポートする環境変数から読みます。

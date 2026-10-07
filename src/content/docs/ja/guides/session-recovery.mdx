@@ -11,6 +11,14 @@ import Screenshot from '../../../../components/Screenshot.astro';
 
 エージェントが誤った方向に進んでいるとき、いつまでも待っているとき、あるいは追加の指示が必要なときに、これらの操作を使います。これらは既存の会話に作用します。新しい会話を作るには[リモートのエージェントで作業を始める](/ja/guides/remote-control/)を使ってください。
 
+## Hermes の復旧
+
+Chorus daemon ではなく元の [Hermes ゲートウェイ](/ja/reference/agents/hermes/)を復旧します。Interrupt はゲートウェイ作業を中止し、Resume は Hermes 継続ターン対応サーバーを必要とし、元のリポジトリを使います。再開前に途中の変更を確認します。
+
+## バックグラウンド子エージェント（0.22.0）
+
+Claude daemon 実行では主ターン後に既定で 60 分（`3600000` ms）子を待ちます。`CLAUDE_CODE_PRINT_BG_WAIT_CEILING_MS` が `CHORUS_CLAUDE_BG_WAIT_CEILING_MS` より優先し、実行全体の制限ではありません。親は完了結果を集めるか子を明示的に停止してからターンを終了します。子が強制終了されれば実際の終了コードがゼロでも異常となり、起点のアイデアやタスクにコメントしようとします。状態修復や新たな自動再試行はありません。ゼロ・空値の危険、設定、診断は [daemon のタイムアウト設定](/ja/guides/daemon-operations/)を参照してください。
+
 ## 実行中の作業を中断する
 
 1. 実行中の会話を開きます。

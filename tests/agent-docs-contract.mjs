@@ -25,11 +25,12 @@ const proseOnly = (content) =>
 const assertMatch = (content, pattern, file, contract) =>
   assert.match(content, pattern, `${sourceLabel(file)}: ${contract}`);
 
-const expectedIds = ['claude-code', 'codex', 'kiro', 'pi', 'openclaw', 'opencode', 'generic-mcp'];
+const expectedIds = ['claude-code', 'codex', 'kiro', 'pi', 'openclaw', 'hermes', 'opencode', 'generic-mcp'];
 assert.deepEqual(AGENT_SUPPORT_MATRIX.map(({ id }) => id), expectedIds);
 assert.deepEqual(
   AGENT_SUPPORT_MATRIX.map(({ support }) => support),
   [
+    SUPPORT_LEVELS.FIRST_PARTY,
     SUPPORT_LEVELS.FIRST_PARTY,
     SUPPORT_LEVELS.FIRST_PARTY,
     SUPPORT_LEVELS.FIRST_PARTY,
@@ -138,13 +139,41 @@ for (const route of ['/guides/operator-onboarding/', '/zh/guides/operator-onboar
   assertMatch(content, /chorus daemon --agent claude-code/, file, 'foreground verification before service installation');
 }
 
-for (const id of ['pi', 'opencode', 'generic-mcp']) {
+for (const id of ['opencode', 'generic-mcp']) {
   for (const locale of ['', 'zh/']) {
     const file = path.join(contentRoot, `${locale}reference/agents/${id}.mdx`);
     const content = await readFile(file, 'utf8');
     assert.doesNotMatch(content, /chorus daemon (?:install|start|restart)/, `${sourceLabel(file)}: unsupported daemon instructions`);
   }
 }
+
+for (const locale of ['', 'zh/', 'ja/', 'ko/']) {
+  const file = path.join(contentRoot, `${locale}reference/agents/hermes.mdx`);
+  const content = await readFile(file, 'utf8');
+  for (const token of [
+    'VERSION=0.22.0', 'refs/tags/v$VERSION^{}', 'refs/tags/v$VERSION',
+    'chorus agents add --agents hermes', '--hermes-cwd',
+    'packages/chorus-hermes/chorus --ref', 'packages/chorus-hermes/chorus-mcp --ref',
+    '$HERMES_HOME/.env', '0600', 'mcp_servers.chorus.url', 'terminal.cwd',
+    'security.approval.transport chorus', 'transport_fallback builtin',
+    'approvals.mode manual', 'approve once <token>', 'deny <token>',
+    'hermes gateway restart', 'mcp__chorus__chorus_checkin', 'chorus-reviewer:task',
+  ]) {
+    assert.ok(content.includes(token), `${sourceLabel(file)}: missing Hermes contract ${token}`);
+  }
+  assertMatch(content, new RegExp(`/${locale}guides/session-recovery/`), file, 'localized recovery link');
+  const daemonFile = path.join(contentRoot, `${locale}guides/daemon-operations.mdx`);
+  const daemonContent = await readFile(daemonFile, 'utf8');
+  for (const token of ['CLAUDE_CODE_PRINT_BG_WAIT_CEILING_MS', 'CHORUS_CLAUDE_BG_WAIT_CEILING_MS', '3600000', 'CHORUS_DSH_TIMEOUT_MS']) {
+    assert.ok(daemonContent.includes(token), `${sourceLabel(daemonFile)}: missing timeout contract ${token}`);
+  }
+}
+
+const hermes = AGENT_SUPPORT_MATRIX.find(({ id }) => id === 'hermes');
+assert.equal(hermes.capabilities.daemonWake.supported, false);
+assert.equal(hermes.capabilities.remoteControl.supported, true);
+assert.equal(hermes.capabilities.sessionRecovery.supported, true);
+assert.equal(AGENT_SUPPORT_MATRIX.find(({ id }) => id === 'pi').capabilities.daemonWake.supported, true);
 
 const [matrixEnglish, matrixChinese] = await Promise.all([
   readFile(path.join(contentRoot, 'reference/agents/index.mdx'), 'utf8'),

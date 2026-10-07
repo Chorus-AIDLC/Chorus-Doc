@@ -52,6 +52,10 @@ try {
       '/zh/guides/spec-lite-mode/',
       '/ja/guides/spec-lite-mode/',
       '/ko/guides/spec-lite-mode/',
+      '/reference/agents/hermes/',
+      '/zh/reference/agents/hermes/',
+      '/ja/reference/agents/hermes/',
+      '/ko/reference/agents/hermes/',
     ]) {
       const page = await context.newPage();
       await page.goto(`http://127.0.0.1:${address.port}${route}`, {
@@ -112,6 +116,7 @@ try {
 
       const reachable = [];
       let visibleFocus = false;
+      let navigationReachable = false;
       for (let count = 0; count < 40; count += 1) {
         await page.keyboard.press('Tab');
         const state = await page.evaluate(() => {
@@ -124,6 +129,10 @@ try {
               active.getAttribute('title') ||
               active.textContent?.trim() ||
               active.tagName,
+            navigation:
+              active.matches('a[href]') &&
+              (Boolean(active.closest('nav')) ||
+                /^\/(?:zh\/|ja\/|ko\/)?(?:guides|reference)\//.test(active.getAttribute('href') ?? '')),
             visible:
               style.outlineStyle !== 'none' ||
               (style.boxShadow !== 'none' && style.boxShadow !== ''),
@@ -131,6 +140,7 @@ try {
         });
         reachable.push(state.label);
         visibleFocus ||= state.visible;
+        navigationReachable ||= state.navigation;
       }
       if (!reachable.some((label) => /search|搜索|検索|검색/i.test(label))) {
         throw new Error(`${route} search is not keyboard reachable`);
@@ -142,11 +152,7 @@ try {
       ) {
         throw new Error(`${route} locale control is not keyboard reachable`);
       }
-      if (
-        !reachable.some((label) =>
-          /guides|指南|reference|参考|참고|ガイド|가이드|エージェント|에이전트/i.test(label),
-        )
-      ) {
+      if (!navigationReachable) {
         throw new Error(`${route} navigation is not keyboard reachable`);
       }
       if (!visibleFocus) throw new Error(`${route} has no visible keyboard focus treatment`);

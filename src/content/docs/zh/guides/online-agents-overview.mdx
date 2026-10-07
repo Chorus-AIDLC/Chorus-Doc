@@ -11,6 +11,8 @@ import Screenshot from '../../../../components/Screenshot.astro';
 
 Chorus 可以在你保持在线的机器上启动并操控智能体工作。本页讲清这个模型：什么是在线智能体、项目如何把工作固定到某个连接、一条会话如何跟随一个想法，以及你如何打断、恢复或接管，最后列出每项操作的详细说明页面。想了解这些智能体运行的协作流程，请参阅 [AI-DLC 工作流](/zh/guides/ai-dlc-workflow/)；想了解它们提供的插件命令，请参阅[命令与技能路由](/zh/guides/plugin-commands/)。
 
+[Hermes](/zh/reference/agents/hermes/) 也是网关型连接。在线目录是 `terminal.cwd` 配置的代码仓库，不是网关服务目录。每个仓库使用独立网关/配置档案；它仅在 Chorus 后台服务配置中登记为 `offline`，网关在线状态显示为 **Hermes**。中断/恢复和所有者命令审批通过同一网关进行。
+
 ## 什么是在线智能体
 
 **在线智能体**是一个 `chorus daemon` 进程，它用智能体 API 密钥完成认证，并与 Chorus 保持一条常驻连接。只要它在运行，Chorus 就能触达它来启动工作、追加指令、打断正在运行的轮次或恢复已停止的轮次，而无需你操作那台机器。

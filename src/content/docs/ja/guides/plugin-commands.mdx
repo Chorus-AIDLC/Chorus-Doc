@@ -10,6 +10,8 @@ Chorus プラグインは、AI-DLC パイプラインの各段階につき 1 つ
 何が得られるかを説明します。パイプラインそのものの説明は繰り返しません。それについては
 [AI-DLC ワークフロー](/ja/guides/ai-dlc-workflow/)と、下記にリンクした各段階のガイドをお読みください。
 
+[Hermes](/ja/reference/agents/hermes/) では `skill_view("chorus:idea")`、`skill_view("chorus:develop")`、`skill_view("chorus:yolo")` で名前空間付きスキルを読み込みます。全段階と 3 種のレビュアーが含まれます。Claude のスラッシュコマンドではなく、すべての Chorus UI 操作をゲートウェイで実行できるという意味でもありません。
+
 ## ランタイムによって呼び出し方が異なる
 
 Claude Code はこれらのコマンドを `chorus` 名前空間下のスラッシュコマンドとして公開します。Codex は

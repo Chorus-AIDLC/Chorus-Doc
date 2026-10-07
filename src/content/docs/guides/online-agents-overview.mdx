@@ -16,6 +16,8 @@ you actually do each thing. For the collaboration workflow those agents run, see
 [The AI-DLC workflow](/guides/ai-dlc-workflow/); for the plugin commands they expose, see
 [Commands and skill routing](/guides/plugin-commands/).
 
+[Hermes](/reference/agents/hermes/) is also a gateway-model connection. Its online directory is the repository configured in `terminal.cwd`, not the gateway service directory. Use one gateway/profile per repository; it is registered as `offline` only in the Chorus daemon configuration, while gateway presence reports **Hermes**. Interrupt/resume and owner command approvals use that same gateway.
+
 ## What an online agent is
 
 An **online agent** is a `chorus daemon` process, authenticated with an agent API key, that

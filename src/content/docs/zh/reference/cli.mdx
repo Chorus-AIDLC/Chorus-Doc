@@ -63,7 +63,7 @@ npm 安装会持续输出进度，没有安装超时限制。失败时按输出�
 
 只需 `chorus agents add` 这一条命令，即可把本机编码智能体连接到 Chorus。它会检测你已安装的智能体，
 通过各智能体自己的插件机制为其安装 Chorus 插件，并把 Chorus 网址和智能体密钥一次性写入
-`~/.chorus/daemon.json`。对 Claude Code、Codex 和 DeepSeek Harness，它还会把凭据写入该智能体
+`~/.chorus/daemon.json`。对 Claude Code、Codex、Hermes 和 DeepSeek Harness，它还会把凭据写入该智能体
 自己的配置，因此交互式会话无需手动设置环境变量即可完成认证（见[凭据写往何处](#凭据写往何处)）。
 
 ```sh
@@ -73,7 +73,7 @@ chorus agents add --agents claude,codex \
   --url https://chorus.example.com --api-key cho_xxx
 ```
 
-可重新运行配置以添加智能体或刷新凭据。支持 Claude Code、Codex、Kiro、Pi、OpenCode、OpenClaw 和 DeepSeek Harness（dsh）。Pi 稳定版 `>=0.99.0 <2.0.0` 使用原生 MCP，`0.84.4–0.98.x` 使用 `pi-mcp-adapter@5.0.0`，并安装 `chorus-pi`。Pi 未安装、不受支持或版本不确定时会给出指引，不会一律报告 MCP 配置完成。详见 [Pi](/zh/reference/agents/pi/)。
+可重新运行配置以添加智能体或刷新凭据。支持 Claude Code、Codex、Kiro、Pi、OpenCode、OpenClaw、Hermes 和 DeepSeek Harness（dsh）。Pi 稳定版 `>=0.99.0 <2.0.0` 使用原生 MCP，`0.84.4–0.98.x` 使用 `pi-mcp-adapter@5.0.0`，并安装 `chorus-pi`。Pi 未安装、不受支持或版本不确定时会给出指引，不会一律报告 MCP 配置完成。详见 [Pi](/zh/reference/agents/pi/)。
 
 常用参数（`chorus agents add --help` 会列出全部）：
 
@@ -97,6 +97,12 @@ chorus agents remove <name|uuid>  # remove one (match by name or UUID)
 `CHORUS_AGENT_PROFILE` 环境变量的有效取值。
 
 对 Codex，`--yes` 不会授权重启 App Server。凭据和 MCP 配置成功后，仅交互终端会提供单独的中断警告和确认。详见 [Codex](/zh/reference/agents/codex/)。
+
+## 配置 Hermes（0.22.0）
+
+`chorus agents add --agents hermes --hermes-cwd /path/to/repo` 从 CLI 对应发布标签安装 `chorus` 和 `chorus-mcp`，写入 `$HERMES_HOME/.env`，配置仓库及未设置的审批默认值。`--hermes-cwd <path>` 覆盖目录；否则保留现有目录或使用当前 Git 仓库。标签缺失时安装失败。
+
+Hermes 在 Chorus 后台服务中登记为 `offline`。`chorus upgrade --plugins` 和 `chorus agents run --type hermes` 均不支持它。更新 CLI 后，用 `chorus agents add --agents hermes` 重装两个插件，再运行 `hermes gateway restart`。发布标签安装、远端 MCP、技能和所有者审批详见 [Hermes Agent](/zh/reference/agents/hermes/)。
 
 ## 启动智能体：`chorus agents run`
 
@@ -193,7 +199,7 @@ chorus mcp list                                   # list the tools this agent ma
 ## 凭据写往何处
 
 `chorus agents add` 总是把校验后的凭据写入 `~/.chorus/daemon.json`（权限 `0600`；密钥绝不会
-回显）。对其中三种智能体，它还会把凭据写入该智能体自己的配置，让交互式会话无需任何手动导出
+回显）。对其中四种智能体，它还会把凭据写入该智能体自己的配置，让交互式会话无需任何手动导出
 即可完成认证：
 
 | 智能体 | 额外的凭据落地位置 |
@@ -201,6 +207,7 @@ chorus mcp list                                   # list the tools this agent ma
 | Claude Code | `~/.claude/settings.json` 的 `env` 块（遵循 `CLAUDE_CONFIG_DIR`）。 |
 | Codex | `~/.codex/.env`（遵循 `CODEX_HOME`）；Codex 通过一个不内置密钥的 `config.toml` 条目从环境变量读取密钥。 |
 | DeepSeek Harness | `$DSH_HOME/.env`。 |
+| Hermes | `$HERMES_HOME/.env`（默认 `~/.hermes/.env`，权限 `0600`）；远端 MCP 配置保存密钥占位符。 |
 
 Kiro、OpenCode 和 OpenClaw 从各自已安装的配置读取凭据；对于后台服务唤醒的 Kiro，则从后台服务
 每次唤醒时导出的环境变量读取。

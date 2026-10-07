@@ -11,6 +11,14 @@ import Screenshot from '../../../../components/Screenshot.astro';
 
 当智能体的做法不对、无限期等待，或需要补充指示时，可以使用这些控制操作。它们作用于已有的对话；要创建新对话，请参阅[从 Chorus 发起远程工作](/zh/guides/remote-control/)。
 
+## Hermes 恢复
+
+恢复原 [Hermes 网关](/zh/reference/agents/hermes/)，而不是 Chorus 后台服务。中断取消网关工作；恢复需要服务器支持 Hermes 续接轮次，并保持原仓库。恢复前检查部分完成的修改。
+
+## 后台子智能体（0.22.0）
+
+Claude 后台唤醒在主轮次后等待子智能体，默认上限 60 分钟（`3600000` 毫秒）。`CLAUDE_CODE_PRINT_BG_WAIT_CEILING_MS` 优先于 `CHORUS_CLAUDE_BG_WAIT_CEILING_MS`，不是整次唤醒时限。父智能体必须收齐完成结果或明确停止子智能体后再结束轮次。后台任务被强制终止时，即使原始退出码为零也记为异常；Chorus 尝试在触发的想法或任务上评论，不会自动修复状态或新增重试。零值/空值风险、配置和诊断见[后台服务超时设置](/zh/guides/daemon-operations/)。
+
 ## 中断正在执行的工作
 
 1. 打开正在运行的对话。

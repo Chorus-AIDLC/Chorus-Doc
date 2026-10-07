@@ -68,14 +68,8 @@ online, see the other agent setup guides, starting with
 
 Choose what you want to do next:
 
-- **Use Chorus from the agent's terminal:** complete the platform page's check-in step.
-  OpenCode, Pi, and generic MCP clients stop here; they do not appear as remotely
-  available runtimes.
-- **Start work remotely from Chorus:** use Claude Code, Codex, Kiro, or OpenClaw. For
-  Claude Code, Codex, and Kiro, [connect the runtime](/guides/operator-onboarding/),
-  [keep it online](/guides/daemon-operations/), and then
-  [start your first session](/guides/remote-control/). OpenClaw stays online through its
-  own gateway.
+- **Use Chorus from the agent's terminal:** complete the platform check-in. OpenCode and generic MCP clients are interactive-only.
+- **Start work remotely:** Claude Code, Codex, Kiro, and Pi use the [Chorus daemon](/guides/daemon-operations/); follow [operator setup](/guides/operator-onboarding/) and [start a session](/guides/remote-control/). OpenClaw and [Hermes](/reference/agents/hermes/) use their own gateways. DeepSeek Harness has [separate setup](/reference/agents/dsh/) and defaults to an `offline` registration.
 
 When another person manages the machine or credential, begin with
 [Prepare agent access](/guides/administrator-setup/).

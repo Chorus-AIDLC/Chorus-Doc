@@ -1,0 +1,174 @@
+---
+title: Hermes Agent
+description: Hermes の Chorus ツール、ゲートウェイ実行、コメント承認、セッション復旧を設定します。
+docsLocale: ja
+route: /ja/reference/agents/hermes/
+---
+
+Hermes は Chorus 公式の MCP ツール、ワークフロースキル、セッションフック、読み取り専用
+レビュアーを提供します。リモート実行は **Hermes ゲートウェイ**が担当し、`chorus daemon`
+は使いません。ゲートウェイごとに 1 つのリポジトリを扱います。
+
+Chorus **0.22.0** から利用できます。Hermes との互換性はコミット `2b52acc2d` で検証されています。
+
+## 前提条件
+
+- Hermes をインストールし、`hermes` と `git` を `PATH` から実行可能にします。
+- [エージェントのアクセス設定](/ja/guides/administrator-setup/)で Chorus URL とキーを準備します。
+  ゲートウェイの実行と承認には、人間の所有者が設定されたエージェントが必要です。
+- 対象リポジトリを決めます。複数リポジトリには別々の Hermes プロファイルと `HERMES_HOME` を使います。
+
+## インストールと設定
+
+Chorus CLI 0.22.0 以降をインストールして設定します。
+
+```sh
+npm install --global @chorus-aidlc/chorus@latest
+cd /path/to/your/repo
+chorus agents add --agents hermes --hermes-cwd /path/to/your/repo
+```
+
+セットアップで Chorus URL とキーを入力します。CLI は `v<CLI version>` を完全なコミット SHA
+に解決し、**両方**のパッケージをインストールして有効化します。`chorus` はネイティブフック、
+スキル、ゲートウェイ、承認を、`chorus-mcp` はポータブル MCP ツールを提供します。
+タグを解決できなければ停止し、デフォルトブランチへ切り替えません。両方が既に存在する場合は
+再インストールを確認します。`--yes` または非 TTY 実行では再インストールを受け入れます。
+
+さらに、次の設定を保存します。
+
+- `$HERMES_HOME/.env`（既定は `~/.hermes/.env`、モード `0600`）に `CHORUS_URL`、
+  `CHORUS_API_KEY`、`CHORUS_AGENT_PROFILE` を保存し、他の項目を保持します。
+- リモート Chorus に必要なネイティブ `mcp_servers.chorus` 設定を追加します。localhost に
+  戻す場合も、以前の固定ネイティブ URL を修正します。
+- `$HERMES_HOME/config.yaml` の `terminal.cwd` と未設定の承認項目を設定します。
+  `--hermes-cwd` が優先され、それ以外は既存ディレクトリか現在の Git リポジトリを使います。
+  リポジトリ外の非対話実行では警告して未設定のままにします。既存の承認設定は上書きしません。
+
+Chorus daemon 設定の Hermes 登録は `offline` です。これは daemon が起動しないという意味で、
+Hermes ゲートウェイのオンライン状態とは別です。`chorus daemon --agent hermes` や
+`chorus agents run --type hermes` は使わず、Hermes を直接起動してください。
+
+### 手動インストール
+
+`--ref` はタグ名や短い SHA ではなく、40 文字の完全なコミット SHA を要求します。
+リリースタグを先に解決します。フォールバックは軽量タグにも対応します。
+
+```sh
+VERSION=0.22.0
+REPO=https://github.com/Chorus-AIDLC/Chorus.git
+SHA=$(git ls-remote "$REPO" "refs/tags/v$VERSION^{}" | cut -f1)
+[ -n "$SHA" ] || SHA=$(git ls-remote "$REPO" "refs/tags/v$VERSION" | cut -f1)
+[ -n "$SHA" ] || { echo "error: tag v$VERSION not found" >&2; exit 1; }
+hermes plugins install Chorus-AIDLC/Chorus/packages/chorus-hermes/chorus --ref "$SHA" --enable
+hermes plugins install Chorus-AIDLC/Chorus/packages/chorus-hermes/chorus-mcp --ref "$SHA" --enable
+hermes plugins list --plain --no-bundled
+```
+
+手動インストール後は `$HERMES_HOME/.env`（既定は `~/.hermes/.env`）を安全に編集します。
+
+```dotenv
+CHORUS_URL=https://chorus.example.com
+CHORUS_API_KEY=cho_REDACTED
+```
+
+キーをローカルで置き換え、モードを `0600` にし、コミットしないでください。
+Hermes はサービス起動時にもこのファイルを読み、古いシェルの値より優先します。
+サービスは端末の export を継承しません。モデルプロバイダーの認証は Hermes 側で別途設定します。
+
+### MCP URL と作業ディレクトリ
+
+ポータブルパッケージの既定 URL は `http://localhost:8637/api/mcp` です。
+他の Chorus にはネイティブ設定を使います。単一引用符で秘密値ではなくプレースホルダーを保存します。
+
+```sh
+hermes config set mcp_servers.chorus.url '${CHORUS_URL}/api/mcp'
+hermes config set mcp_servers.chorus.headers.Authorization 'Bearer ${CHORUS_API_KEY}'
+hermes config set terminal.cwd /path/to/your/repo
+```
+
+ネイティブ設定が優先されるため、ポータブル `chorus` サーバーとの競合によりスキップしたという
+ログは正常です。接続先の変更時も MCP とゲートウェイを同じインスタンスに向けてください。
+
+サービス自身のディレクトリはリポジトリではありません。各実行は `terminal.cwd` を使い、
+実パスを Chorus に報告します。未設定や `.`、`auto`、`cwd` の場合、ローカル端末バックエンドは
+`MESSAGING_CWD` にフォールバックできます。最後の候補が `$HOME` だけなら接続を拒否します。
+設定変更後はゲートウェイを再起動してください。
+
+## Chorus でコマンドを承認する
+
+自動セットアップでも既存設定を保持するため、以下を確認してください。
+
+```sh
+hermes config set security.approval.transport chorus
+hermes config set security.approval.transport_fallback builtin
+hermes config set approvals.mode manual
+hermes config set approvals.timeout 300
+```
+
+`manual` は警告対象のコマンドを人間に確認します。`smart` ではガーディアンモデルが人間への
+確認なしに承認する場合があります。`builtin` は Chorus 以外から開始した CLI/TUI の対話承認を
+維持します。任意のタイムアウトは秒単位で、返答がなければ拒否します。
+
+エージェントは現在のアイデアまたはタスクにコメントし、所有者をメンションして 6 文字のトークンを
+示します。**所有者**が同じ項目に `approve once <token>` または `deny <token>` と返信します。
+`approve session <token>` や `approve always <token>` は提示された場合のみ、より広い権限が
+必要なときに使います。一致した承認返信は新しい作業ターンを起動しません。他の人は承認できません。
+
+返信を一意に対応付けられない場合、通常のメンションとして扱い、**コマンドは承認しません**。
+ほぼ同時の複数メンションや、ターン時刻を返さない古いサーバーで起こります。再返信するか
+タイムアウトを待ちます。曖昧な返信は通常の作業ターンを起動する場合がありますが、元の承認は未回答です。
+
+## 起動と確認
+
+```sh
+hermes gateway install
+hermes gateway start
+hermes gateway status
+hermes chat -q "call chorus_checkin"
+```
+
+前景診断は `hermes gateway run`、既存サービスの再起動は `hermes gateway restart` です。
+URL とキーがありプラグインが有効なら `chorus` プラットフォームも自動で有効になります。
+明示的なプラットフォーム無効設定は尊重されます。
+
+`mcp__chorus__chorus_checkin` が期待する ID を返し、Chorus に正しいリポジトリのオンライン
+**Hermes** 接続が表示されることを確認します。アイデアやタスクを割り当てるかメンションし、
+会話に出力が届くことを確認してください。
+
+## スキル、制御、復旧
+
+`skill_view("chorus:develop")` や `skill_view("chorus:yolo")` でスキルを読み込みます。
+アイデア、調査、提案、開発、レビュー、オーケストレーション、quick-dev、ドキュメント、
+OpenSpec/spec-lite、3 種のレビュアーが含まれます。`delegate_task` のレビュアーは context を
+`[chorus-reviewer:proposal]`、`[chorus-reviewer:task]`、`[chorus-reviewer:code]` のいずれかで
+始めます。読み取りと判定コメントのみ許可され、端末実行、ファイル編集、再委派はできません。
+
+セッション開始時にチェックインし、ID と仕様モードを注入します。`CHORUS_ENABLE_OPENSPEC=false`
+は OpenSpec 検出を無効にします（旧設定は `CHORUS_OPENSPEC_MODE=off`）。
+`CHORUS_ENABLE_CODE_REVIEWER=false` は最終コードレビューのリマインダーを無効にします。
+
+**Interrupt** は実行中のゲートウェイ作業を中止し、**Resume** は同じゲートウェイとリポジトリで
+続行します。オフラインなら先に再起動してください。復旧には Hermes の継続ターンに対応した
+Chorus サーバーが必要です。古いサーバーでは無関係な保留指示を実行せず拒否します。
+再接続はサーバーから保留作業を復元しますが、完了済みのコマンドを取り消しません。
+[セッション復旧](/ja/guides/session-recovery/)も参照してください。
+
+## 制限とトラブルシューティング
+
+- **調査とアイデア作成の専用操作ターン**はゲートウェイ未対応です。その UI 操作には
+  Claude Code/Codex daemon を使うか、Hermes の対話セッションで作業してください。
+- **オフラインのまま:** 両プラグイン、認証とモデル設定、所有者、`terminal.cwd` を確認します。
+  `chorus daemon logs` ではなく、Hermes ゲートウェイのログを確認してください。
+- **接続競合:** 同じエージェント、ホスト、cwd の接続は 1 つだけです。重複を停止するか別の
+  リポジトリ/エージェントに変更して再起動します。競合時は自動再接続を停止します。
+- **ツールがない:** `chorus-mcp`、ネイティブのリモート URL、キーを確認します。
+  未解決の認証プレースホルダーは使用できません。プラグインの安全性検査を回避しないでください。
+- **承認が拒否される:** 所有者、トークン、項目、タイムアウト、`builtin` を確認します。
+  確認なしに実行されたら `smart` モードになっていないか確認します。
+- **通知が早く既読になる:** チェックインは直近最大 5 件を既読にしますが、ゲートウェイは
+  未読通知だけでなくサーバーの保留作業も取得します。
+- **更新:** 両プラグインを同じ検証済みの新 SHA に更新し、ゲートウェイを再起動します。
+  `chorus upgrade --plugins` は Hermes の `offline` 登録を更新しません。
+  CLI 更新後に `chorus agents add --agents hermes` で両方を再インストールできます。
+
+権限やキーの問題は[接続のトラブルシューティング](/ja/guides/troubleshooting/)を参照してください。

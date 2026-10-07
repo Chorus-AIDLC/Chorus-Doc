@@ -1,0 +1,182 @@
+---
+title: Hermes Agent
+description: Connect Hermes to Chorus with native tools, gateway scheduling, comment approvals, and session recovery.
+docsLocale: en
+route: /reference/agents/hermes/
+---
+
+Hermes has a first-party Chorus integration. It provides MCP tools, workflow skills,
+session hooks, and read-only reviewers. Remote work runs through the **Hermes gateway**,
+not `chorus daemon`. One gateway serves one repository.
+
+Available from Chorus **0.22.0**. Hermes compatibility was verified against commit `2b52acc2d`.
+
+## Prerequisites
+
+- Install Hermes with `hermes` on `PATH`, and have `git` available.
+- Prepare a reachable Chorus URL and an agent key using [Prepare agent access](/guides/administrator-setup/).
+  The agent must have a human owner for gateway scheduling and approvals.
+- Choose the repository this gateway will serve. For multiple repositories, use separate
+  Hermes profiles and configure each profile's `HERMES_HOME` independently.
+
+## Install and configure
+
+Install Chorus CLI 0.22.0 or newer, then configure Hermes:
+
+```sh
+npm install --global @chorus-aidlc/chorus@latest
+cd /path/to/your/repo
+chorus agents add --agents hermes --hermes-cwd /path/to/your/repo
+```
+
+Setup asks for the Chorus URL and key. It resolves `v<CLI version>` to a full commit SHA,
+then installs and enables **both** packages: `chorus` (native hooks, skills, gateway and
+approvals) and `chorus-mcp` (portable MCP tools). An unresolved release tag stops the
+installation; it does not silently install the default branch. When both packages already
+exist, reinstall is offered interactively and accepted with `--yes` or without a TTY.
+
+Setup also writes:
+
+- `CHORUS_URL`, `CHORUS_API_KEY`, and `CHORUS_AGENT_PROFILE` to `$HERMES_HOME/.env`
+  (default `~/.hermes/.env`, mode `0600`, preserving other entries).
+- Native `mcp_servers.chorus` configuration when needed for a remote Chorus. Switching
+  back to localhost also corrects an existing literal native URL.
+- `terminal.cwd` and unset approval settings in `$HERMES_HOME/config.yaml`. An explicit
+  `--hermes-cwd` overrides the directory; otherwise setup keeps an existing directory or
+  uses the current Git repository. Outside a repository, non-interactive setup warns and
+  leaves it unset. Existing approval choices are not overwritten.
+
+Hermes credentials are registered as `offline` in the Chorus daemon configuration. This
+means **not daemon-wakeable**, not that a running Hermes gateway is offline. Do not use
+`chorus daemon --agent hermes` or `chorus agents run --type hermes`; start Hermes directly.
+
+### Manual installation
+
+Hermes requires a full 40-character commit SHA for `--ref`, not a tag or short SHA.
+Resolve the release tag first; the fallback also supports lightweight tags:
+
+```sh
+VERSION=0.22.0
+REPO=https://github.com/Chorus-AIDLC/Chorus.git
+SHA=$(git ls-remote "$REPO" "refs/tags/v$VERSION^{}" | cut -f1)
+[ -n "$SHA" ] || SHA=$(git ls-remote "$REPO" "refs/tags/v$VERSION" | cut -f1)
+[ -n "$SHA" ] || { echo "error: tag v$VERSION not found" >&2; exit 1; }
+hermes plugins install Chorus-AIDLC/Chorus/packages/chorus-hermes/chorus --ref "$SHA" --enable
+hermes plugins install Chorus-AIDLC/Chorus/packages/chorus-hermes/chorus-mcp --ref "$SHA" --enable
+hermes plugins list --plain --no-bundled
+```
+
+After manual installation, edit `$HERMES_HOME/.env` (default `~/.hermes/.env`) securely:
+
+```dotenv
+CHORUS_URL=https://chorus.example.com
+CHORUS_API_KEY=cho_REDACTED
+```
+
+Replace the placeholder locally with your key, restrict the file to mode `0600`, and
+never commit it. Hermes loads this file on startup, including service startup, and its
+values override stale shell exports. A gateway service does not inherit your terminal's
+exports. Supply Hermes model-provider credentials separately using its normal setup.
+
+### MCP URL and working directory
+
+The portable package uses `http://localhost:8637/api/mcp`. For any other Chorus instance,
+configure the native override; single quotes keep secret placeholders out of config:
+
+```sh
+hermes config set mcp_servers.chorus.url '${CHORUS_URL}/api/mcp'
+hermes config set mcp_servers.chorus.headers.Authorization 'Bearer ${CHORUS_API_KEY}'
+hermes config set terminal.cwd /path/to/your/repo
+```
+
+Native MCP overrides the portable entry. A log saying the portable `chorus` server conflicts
+with native config and is skipped is expected. Keep the MCP URL and gateway URL pointing
+at the same instance when changing credentials.
+
+The service's own directory is not the repository. Every wake uses `terminal.cwd` and
+reports its real path to Chorus. For unset values or placeholders (`.`, `auto`, `cwd`),
+the local terminal backend can fall back to `MESSAGING_CWD`; the plugin refuses to connect
+if the only fallback is `$HOME`. Restart the gateway after changing its configuration.
+
+## Approve commands in Chorus
+
+Check these settings even after automated setup, which preserves existing choices:
+
+```sh
+hermes config set security.approval.transport chorus
+hermes config set security.approval.transport_fallback builtin
+hermes config set approvals.mode manual
+hermes config set approvals.timeout 300
+```
+
+`manual` sends flagged commands to you. In `smart` mode the guardian model can approve a
+command without asking you. The `builtin` fallback preserves interactive CLI/TUI prompts
+outside Chorus-woken turns. The optional timeout is in seconds; no reply means denial.
+
+The agent posts a comment on the current idea or task, mentions its owner, and includes a
+six-character token. The **owner** must reply on that same item with `approve once <token>`
+or `deny <token>`. Use `approve session <token>` or `approve always <token>` only when
+offered, and only if that wider scope is intended. A matched approval reply does not start
+another work turn. Other people's replies cannot authorize the command.
+
+If a reply cannot be uniquely matched, it is treated as an ordinary mention, **not an
+approval**. This can happen with near-simultaneous mentions or older servers missing turn
+timestamps. Reply again or let the request expire; the ambiguous message can start a
+normal work turn while the original approval remains unanswered.
+
+## Start and verify
+
+```sh
+hermes gateway install
+hermes gateway start
+hermes gateway status
+hermes chat -q "call chorus_checkin"
+```
+
+Use `hermes gateway run` for foreground diagnosis, or `hermes gateway restart` for an
+existing service. The `chorus` platform enables itself when the URL and key are available
+and its plugin is enabled; an explicit platform disable is respected.
+
+Confirm the check-in returns the expected identity through `mcp__chorus__chorus_checkin`,
+then check Chorus shows an online **Hermes** connection at the correct repository. Assign
+an idea or task, or mention the agent on one, and confirm output appears in its conversation.
+
+## Skills, controls, and recovery
+
+Load workflow skills with `skill_view("chorus:develop")` or `skill_view("chorus:yolo")`.
+The bundle includes idea, research, proposal, development, review, orchestration,
+quick-dev, documentation, OpenSpec/spec-lite, and all three reviewer skills. Reviewer
+children use `delegate_task` with context beginning `[chorus-reviewer:proposal]`,
+`[chorus-reviewer:task]`, or `[chorus-reviewer:code]`. Marked reviewers may read and post
+their verdict, but cannot run terminal commands, edit files, or delegate again.
+
+Session-start check-in injects identity and spec-mode context. `CHORUS_ENABLE_OPENSPEC=false`
+disables OpenSpec detection (legacy: `CHORUS_OPENSPEC_MODE=off`);
+`CHORUS_ENABLE_CODE_REVIEWER=false` disables the final code-review reminder.
+
+**Interrupt** cancels active gateway work; **Resume** continues through the original
+gateway and repository. Restart the gateway if offline. Hermes resume requires a Chorus
+server with Hermes continuation-turn support: older servers are rejected rather than
+resuming an unrelated pending instruction. Reconnection recovers pending work from the
+server; it does not undo partially completed commands. See [session recovery](/guides/session-recovery/).
+
+## Limits and troubleshooting
+
+- **Research and idea-creation operation turns** are not executed by the gateway. Use a
+  Claude Code/Codex daemon agent for those UI operations, or an interactive Hermes session.
+- **Offline:** check both plugins are enabled, gateway credentials and provider setup,
+  owner identity, and `terminal.cwd`. Inspect the gateway log, not `chorus daemon logs`.
+- **Connection conflict:** only one connection may serve the same agent, host, and cwd.
+  Stop the duplicate or change the profile's repository/agent, then restart; conflicts
+  stop automatic reconnect attempts.
+- **Missing tools:** check `chorus-mcp`, the native remote URL, and the key. Unresolved
+  credential placeholders cannot authenticate. Do not bypass a plugin security-scan block.
+- **Unexpected approval denial:** check owner, token, item, timeout, and `builtin` fallback.
+  If a command ran without asking, check for `smart` mode.
+- **Notifications look read early:** check-in marks up to five recent notifications read;
+  gateway scheduling also recovers server-side pending work, not only unread notifications.
+- **Upgrades:** install both plugins at the same newer verified SHA and restart the gateway.
+  `chorus upgrade --plugins` does not refresh Hermes' `offline` registration. After updating
+  the CLI, `chorus agents add --agents hermes` can reinstall both packages instead.
+
+For permission or key problems, see [Troubleshoot agent connections](/guides/troubleshooting/).

@@ -14,6 +14,7 @@ route: /ja/reference/agents/
 | [Codex](./codex/) | Chorus チーム | 完全な Chorus ワークフローを求める Codex ユーザー | 対応（Chorus デーモン経由） | Chorus デーモン |
 | [Kiro](./kiro/) | Chorus チーム | 完全な Chorus ワークフローを求める Kiro CLI ユーザー | 対応（Chorus デーモン経由） | Chorus デーモン |
 | [OpenClaw](./openclaw/) | Chorus チーム | すでにゲートウェイを運用している OpenClaw ユーザー | 対応（OpenClaw 経由） | OpenClaw ゲートウェイ |
+| [Hermes Agent](./hermes/) | Chorus チーム | ゲートウェイでリポジトリを扱う Hermes ユーザー | 対応（Hermes 経由） | Hermes ゲートウェイ |
 | [DeepSeek Harness](./dsh/) | Chorus チーム | 完全な Chorus ワークフローを求める DeepSeek Harness ユーザー | 対応（Chorus デーモン経由） | Chorus デーモン |
 | [OpenCode](./opencode/) | コミュニティ | コミュニティサポートで問題ない OpenCode ユーザー | 非対応 | 非対応 |
 | [Pi](./pi/) | Chorus チーム | 完全な Chorus ワークフローを求める Pi ユーザー | 対応（Chorus デーモン経由） | Chorus デーモン |
@@ -26,6 +27,8 @@ OpenClaw は自前のゲートウェイとプラグインを通じてオンラ�
 API キーと権限については、まず[エージェントのアクセスを準備する](/ja/guides/administrator-setup/)を
 ご覧ください。Claude Code、Codex、Kiro、Pi、DeepSeek Harness をリモートで利用可能にするには、プラットフォームの
 セットアップを終えたあとで[Chorus デーモンを運用する](/ja/guides/daemon-operations/)に進みます。
+
+[Hermes](/ja/reference/agents/hermes/) は Chorus daemon ではなく自前のゲートウェイでオンラインを維持します。コメント承認と中断・再開に対応しますが、調査とアイデア作成の専用操作ターンは実行しません。
 
 ## プラグインが同梱するもの
 

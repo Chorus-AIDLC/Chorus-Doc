@@ -1,0 +1,164 @@
+---
+title: Hermes Agent
+description: 配置 Hermes 的 Chorus 工具、网关调度、评论审批和会话恢复。
+docsLocale: zh
+route: /zh/reference/agents/hermes/
+---
+
+Hermes 提供 Chorus 官方集成，包含 MCP 工具、工作流技能、会话钩子和只读审查智能体。
+远程工作通过 **Hermes 网关**运行，不使用 `chorus daemon`。一个网关服务一个代码仓库。
+
+从 Chorus **0.22.0** 起可用，Hermes 兼容性在提交 `2b52acc2d` 上验证。
+
+## 准备条件
+
+- 安装 Hermes，确保 `hermes` 和 `git` 在 `PATH` 中。
+- 按[准备智能体访问权限](/zh/guides/administrator-setup/)取得可访问的 Chorus 地址和智能体密钥。
+  网关调度和审批需要智能体绑定人类所有者。
+- 选定代码仓库。服务多个仓库时，为每个仓库使用独立的 Hermes 配置档案及 `HERMES_HOME`。
+
+## 安装与配置
+
+安装 Chorus CLI 0.22.0 或更新版本，再配置 Hermes：
+
+```sh
+npm install --global @chorus-aidlc/chorus@latest
+cd /path/to/your/repo
+chorus agents add --agents hermes --hermes-cwd /path/to/your/repo
+```
+
+安装向导询问 Chorus 地址和密钥，将 `v<CLI version>` 解析为完整提交 SHA，并安装启用
+**两个**包：`chorus` 提供原生钩子、技能、网关和审批；`chorus-mcp` 提供可移植 MCP 工具。
+版本标签无法解析时停止安装，不会静默改用默认分支。两个包已存在时，交互模式询问是否重装；
+`--yes` 或无终端模式会接受重装。
+
+向导还会写入：
+
+- `$HERMES_HOME/.env`（默认 `~/.hermes/.env`）：保存 `CHORUS_URL`、`CHORUS_API_KEY`
+  和 `CHORUS_AGENT_PROFILE`，权限为 `0600`，保留其他条目。
+- 远端 Chorus 所需的原生 `mcp_servers.chorus` 配置。切回本机实例时，也会修正已有的固定原生地址。
+- `$HERMES_HOME/config.yaml` 中的 `terminal.cwd` 和尚未设置的审批选项。
+  显式 `--hermes-cwd` 优先；否则保留现有目录或采用当前 Git 仓库。
+  无终端且不在仓库中时会警告并保留未设置状态。已有审批选择不会被覆盖。
+
+Hermes 在 Chorus daemon 配置中登记为 `offline`，意为**不由 daemon 唤醒**，
+不代表正在运行的 Hermes 网关离线。不要使用 `chorus daemon --agent hermes`
+或 `chorus agents run --type hermes`，请直接启动 Hermes。
+
+### 手动安装
+
+Hermes 的 `--ref` 需要 40 位完整提交 SHA，不接受标签名或短 SHA。
+先解析发布标签，回退逻辑同时兼容轻量标签：
+
+```sh
+VERSION=0.22.0
+REPO=https://github.com/Chorus-AIDLC/Chorus.git
+SHA=$(git ls-remote "$REPO" "refs/tags/v$VERSION^{}" | cut -f1)
+[ -n "$SHA" ] || SHA=$(git ls-remote "$REPO" "refs/tags/v$VERSION" | cut -f1)
+[ -n "$SHA" ] || { echo "error: tag v$VERSION not found" >&2; exit 1; }
+hermes plugins install Chorus-AIDLC/Chorus/packages/chorus-hermes/chorus --ref "$SHA" --enable
+hermes plugins install Chorus-AIDLC/Chorus/packages/chorus-hermes/chorus-mcp --ref "$SHA" --enable
+hermes plugins list --plain --no-bundled
+```
+
+手动安装后，安全编辑 `$HERMES_HOME/.env`（默认 `~/.hermes/.env`）：
+
+```dotenv
+CHORUS_URL=https://chorus.example.com
+CHORUS_API_KEY=cho_REDACTED
+```
+
+在本机替换密钥占位符，限制文件权限为 `0600`，不要提交到版本库。Hermes 启动时加载此文件，
+包括服务启动；其中的值会覆盖过期的 shell 导出值。网关服务不会继承终端中的导出变量。
+模型供应商凭据仍需通过 Hermes 自身的配置方式单独提供。
+
+### MCP 地址和工作目录
+
+可移植包默认使用 `http://localhost:8637/api/mcp`。其他 Chorus 实例需要原生覆盖配置；
+保留单引号，使配置只存占位符而不是密钥：
+
+```sh
+hermes config set mcp_servers.chorus.url '${CHORUS_URL}/api/mcp'
+hermes config set mcp_servers.chorus.headers.Authorization 'Bearer ${CHORUS_API_KEY}'
+hermes config set terminal.cwd /path/to/your/repo
+```
+
+原生 MCP 配置优先于可移植包。日志提示可移植 `chorus` 服务与原生配置冲突并跳过是正常现象。
+切换凭据时，确保 MCP 和网关地址始终指向同一个实例。
+
+服务进程所在目录不是代码仓库。每次唤醒使用 `terminal.cwd`，并向 Chorus 上报真实路径。
+未设置或使用占位符（`.`、`auto`、`cwd`）时，本地终端后端可回退到 `MESSAGING_CWD`；
+若只能回退到 `$HOME`，插件拒绝连接。修改配置后重启网关。
+
+## 在 Chorus 中审批命令
+
+即使使用安装向导，也要检查以下配置，因为向导保留已有选择：
+
+```sh
+hermes config set security.approval.transport chorus
+hermes config set security.approval.transport_fallback builtin
+hermes config set approvals.mode manual
+hermes config set approvals.timeout 300
+```
+
+`manual` 将被标记的命令交给你审批；`smart` 模式下，守卫模型可能直接批准而不询问你。
+`builtin` 回退保留非 Chorus 唤醒的 CLI/TUI 交互提示。可选超时单位是秒，没有回复即拒绝。
+
+智能体在当前想法或任务上评论并提及所有者，附上六字符令牌。**所有者**必须在同一条目回复
+`approve once <token>` 或 `deny <token>`。只有提示提供这些选项且你确实需要扩大授权范围时，
+才使用 `approve session <token>` 或 `approve always <token>`。
+匹配成功的审批回复不会触发另一轮工作，其他人的回复不能授权命令。
+
+如果无法唯一匹配回复，它会被视为普通提及，**不会批准命令**。这可能出现在几乎同时的多条提及，
+或缺少执行轮次时间戳的旧服务器上。重新回复或等待超时；有歧义的消息可能启动普通工作轮次，
+而原审批仍未得到回答。
+
+## 启动与验证
+
+```sh
+hermes gateway install
+hermes gateway start
+hermes gateway status
+hermes chat -q "call chorus_checkin"
+```
+
+前台诊断使用 `hermes gateway run`，已有服务使用 `hermes gateway restart`。
+URL 和密钥就绪且插件启用后，`chorus` 平台会自动启用；显式禁用平台的设置仍然有效。
+
+确认 `mcp__chorus__chorus_checkin` 返回预期身份，Chorus 中显示位于正确仓库的在线 **Hermes**
+连接。分配想法或任务，或在条目上提及智能体，确认输出出现在对应会话中。
+
+## 技能、控制与恢复
+
+通过 `skill_view("chorus:develop")` 或 `skill_view("chorus:yolo")` 加载工作流技能。
+插件包含想法、调研、提案、开发、审查、编排、快速开发、文档、OpenSpec/spec-lite 和三类审查技能。
+审查子智能体使用 `delegate_task`，上下文以 `[chorus-reviewer:proposal]`、
+`[chorus-reviewer:task]` 或 `[chorus-reviewer:code]` 开头。
+标记后的审查智能体只能读取和发布结论，不能执行终端命令、写文件或再次委派。
+
+会话开始时签到并注入身份及规范模式上下文。`CHORUS_ENABLE_OPENSPEC=false` 关闭 OpenSpec 检测
+（旧变量为 `CHORUS_OPENSPEC_MODE=off`）；`CHORUS_ENABLE_CODE_REVIEWER=false` 关闭最终代码审查提醒。
+
+**中断**取消活跃网关工作，**恢复**通过原网关和仓库继续。离线时先重启网关。
+恢复要求 Chorus 服务器支持 Hermes 的续接轮次；旧服务器会被拒绝，不会误执行其他待处理指令。
+重新连接会从服务器恢复待处理工作，但不会撤销已完成的命令。参见[会话恢复](/zh/guides/session-recovery/)。
+
+## 限制与排障
+
+- **调研和创建想法的专用操作轮次**尚不由网关执行。此类界面操作请使用 Claude Code/Codex daemon
+  智能体，或在 Hermes 交互会话中完成。
+- **保持离线**：检查两个插件是否启用、网关凭据和模型配置、所有者身份及 `terminal.cwd`。
+  查看网关日志，而不是 `chorus daemon logs`。
+- **连接冲突**：同一智能体、主机和目录只能有一个连接。停止重复网关或更换仓库/智能体后重启；
+  冲突会停止自动重连。
+- **工具缺失**：检查 `chorus-mcp`、原生远端地址和密钥。未解析的凭据占位符无法认证。
+  不要绕过插件安全扫描阻止。
+- **审批意外拒绝**：检查所有者、令牌、条目、超时及 `builtin` 回退。
+  命令未询问就执行时，检查是否仍为 `smart` 模式。
+- **通知提前已读**：签到会将最近最多五条通知标记已读；网关还从服务端待处理工作中恢复调度，
+  不仅依赖未读通知。
+- **升级**：把两个插件安装到同一个经过验证的新 SHA，再重启网关。
+  `chorus upgrade --plugins` 不更新 Hermes 的 `offline` 登记。
+  更新 CLI 后，可用 `chorus agents add --agents hermes` 重装两个包。
+
+权限或密钥问题参见[排查智能体连接问题](/zh/guides/troubleshooting/)。

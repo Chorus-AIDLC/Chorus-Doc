@@ -11,6 +11,10 @@ in an interactive Claude Code session, and it can run as a supported Chorus daem
 Before you install, create an agent key by following
 [Prepare agent access](/guides/administrator-setup/).
 
+## Background agents (0.22.0)
+
+Claude daemon wakes wait up to 60 minutes (`3600000` ms) after the main turn for background children. `CLAUDE_CODE_PRINT_BG_WAIT_CEILING_MS` takes precedence over `CHORUS_CLAUDE_BG_WAIT_CEILING_MS`. This is not a whole-wake timeout. Parents must collect completion or explicitly stop their children before ending the turn. Forced background termination is abnormal even with a raw zero exit code; Chorus attempts to comment on the triggering idea/task without repairing task status or retrying automatically. See [daemon timeout settings](/guides/daemon-operations/) for zero/empty-value risks, configuration, and diagnostics.
+
 ## Install the plugin
 
 The quickest path is the `chorus` CLI, which installs the plugin and stores the credential

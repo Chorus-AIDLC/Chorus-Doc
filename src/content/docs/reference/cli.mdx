@@ -91,7 +91,7 @@ Active sessions and the daemon are not restarted automatically.
 `chorus agents add` is the one command that connects a machine's coding agents to Chorus.
 It detects the agents you already have installed, installs each one's Chorus plugin through
 that agent's own plugin mechanism, and captures your Chorus URL and agent key once into
-`~/.chorus/daemon.json`. For Claude Code, Codex, and the DeepSeek Harness it also writes the
+`~/.chorus/daemon.json`. For Claude Code, Codex, Hermes, and DeepSeek Harness it also writes the
 credential into that agent's own configuration, so interactive sessions authenticate with no
 manual environment setup (see [Where the credential goes](#where-the-credential-goes)).
 
@@ -102,7 +102,7 @@ chorus agents add --agents claude,codex \
   --url https://chorus.example.com --api-key cho_xxx
 ```
 
-Setup can be rerun to add agents or refresh credentials. Supported agents are Claude Code, Codex, Kiro, Pi, OpenCode, OpenClaw, and DeepSeek Harness (dsh). Pi setup selects native MCP for stable `>=0.99.0 <2.0.0` or `pi-mcp-adapter@5.0.0` for `0.84.4–0.98.x`, alongside `chorus-pi`. Missing, unsupported, or uncertain Pi versions receive guidance rather than an unconditional MCP-complete claim. See [Pi](/reference/agents/pi/).
+Setup can be rerun to add agents or refresh credentials. Supported agents are Claude Code, Codex, Kiro, Pi, OpenCode, OpenClaw, Hermes, and DeepSeek Harness (dsh). Pi setup selects native MCP for stable `>=0.99.0 <2.0.0` or `pi-mcp-adapter@5.0.0` for `0.84.4–0.98.x`, alongside `chorus-pi`. Missing, unsupported, or uncertain Pi versions receive guidance rather than an unconditional MCP-complete claim. See [Pi](/reference/agents/pi/).
 
 Useful flags (`chorus agents add --help` lists them all):
 
@@ -130,6 +130,12 @@ chorus agents remove <name|uuid>  # remove one (match by name or UUID)
 `chorus mcp --agent` or the `CHORUS_AGENT_PROFILE` environment variable.
 
 For Codex, `--yes` never authorizes an App Server restart. Successful credential/MCP setup offers a separate interruption warning and consent prompt only in an interactive terminal. See [Codex](/reference/agents/codex/).
+
+## Hermes setup (0.22.0)
+
+`chorus agents add --agents hermes --hermes-cwd /path/to/repo` installs both `chorus` and `chorus-mcp` from the CLI release tag, seeds `$HERMES_HOME/.env`, and configures the repository and unset approval defaults. `--hermes-cwd <path>` overrides the directory; otherwise setup keeps an existing directory or uses the current Git repository. Missing tags fail installation.
+
+Hermes is registered as `offline` for Chorus daemon purposes. Neither `chorus upgrade --plugins` nor `chorus agents run --type hermes` supports it. After updating the CLI, rerun `chorus agents add --agents hermes` to reinstall both packages, then `hermes gateway restart`. See [Hermes Agent](/reference/agents/hermes/) for release-tag installation, remote MCP, skills, and owner approvals.
 
 ## Launch an agent — `chorus agents run`
 
@@ -268,7 +274,7 @@ for an interactive shell that should act as a specific configured agent.
 ## Where the credential goes
 
 `chorus agents add` always writes the validated credential to `~/.chorus/daemon.json`
-(mode `0600`; the key is never echoed). For three agents it also seeds the agent's own
+(mode `0600`; the key is never echoed). For four agents it also seeds the agent's own
 configuration so interactive sessions authenticate without any manual export:
 
 | Agent | Also written to |
@@ -276,6 +282,7 @@ configuration so interactive sessions authenticate without any manual export:
 | Claude Code | The `env` block of `~/.claude/settings.json` (honors `CLAUDE_CONFIG_DIR`). |
 | Codex | `~/.codex/.env` (honors `CODEX_HOME`); Codex reads its key from the environment through a keyless `config.toml` entry. |
 | DeepSeek Harness | `$DSH_HOME/.env`. |
+| Hermes | `$HERMES_HOME/.env` (default `~/.hermes/.env`, mode `0600`); remote MCP configuration stores a key placeholder. |
 
 Kiro, OpenCode, and OpenClaw read their credential from their own installed configuration
 or, for a daemon-woken Kiro, from the per-wake environment the daemon exports.

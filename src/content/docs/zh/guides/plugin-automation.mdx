@@ -7,6 +7,10 @@ route: /zh/guides/plugin-automation/
 
 接入 Chorus 插件后，它会在你已经熟悉的工作流（见 [AI-DLC 工作流](/zh/guides/ai-dlc-workflow/)）之上叠加一些行为：在合适的节点提示进行独立评审、无需手工记账即可跟踪智能体会话，并对无人值守的智能体施加限制。本页说明这些行为。它不重复讲解生命周期各阶段，也不重复讲解如何安装、运行和恢复运行环境，这些请分别参阅 [AI-DLC 工作流](/zh/guides/ai-dlc-workflow/)、[管理后台服务](/zh/guides/daemon-operations/)、[中断与恢复会话](/zh/guides/session-recovery/)，以及[智能体平台](/zh/reference/agents/)参考页。
 
+## Hermes 自动化
+
+[Hermes](/zh/reference/agents/hermes/) 通过原生钩子注入签到和规范上下文，在提案提交、任务提交验收、最终任务验收后添加审查提醒。主智能体使用 `delegate_task`，附加 `[chorus-reviewer:proposal]`、`[chorus-reviewer:task]` 或 `[chorus-reviewer:code]` 标记并加载对应技能。被标记的子智能体可以读取和发布结论，不能运行终端命令、编辑文件或再次委派。网关命令审批通过 Chorus 评论交给所有者，使用 `approvals.mode manual` 和 `security.approval.transport chorus`。交互会话使用配置的 `builtin` 回退。这与下文的 Claude 后台服务无终端约束不同。
+
 ## 评审子智能体
 
 插件在流水线的三个节点上加入了独立的质量关口。在每个节点，一个 `PostToolUse` 钩子会触发，并注入一条提醒，提示**主智能体**去派生一个专门的**只读评审子智能体**。评审子智能体**不会自动启动**，由主智能体派生它，按运行时提供的方式等待完成，再读取本轮裁定评论。完成的评审会发布 `PASS`、`PASS WITH NOTES` 或 `FAIL` 的裁定：

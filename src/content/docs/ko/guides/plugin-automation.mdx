@@ -13,6 +13,10 @@ Chorus 플러그인을 연결하면, 이미 [AI-DLC 워크플로](/ko/guides/ai-
 [세션 중단과 재개](/ko/guides/session-recovery/), 그리고
 [에이전트 플랫폼 참고 문서](/ko/reference/agents/)를 참고하세요.
 
+## Hermes 자동화
+
+[Hermes](/ko/reference/agents/hermes/)는 네이티브 훅으로 체크인과 명세 모드를 제공하고 제안 제출, 작업 검증 요청, 최종 작업 검증 후 리뷰 알림을 추가합니다. 부모는 `delegate_task`에 `[chorus-reviewer:proposal]`, `[chorus-reviewer:task]`, `[chorus-reviewer:code]` 표시를 넣고 해당 스킬을 불러옵니다. 자식은 읽기와 판정 댓글만 가능하며 터미널 실행, 편집, 재위임은 할 수 없습니다. 게이트웨이 명령 승인은 Chorus 댓글로 소유자에게 전달합니다. `approvals.mode manual`과 `security.approval.transport chorus`를 사용하며 대화형 세션은 설정한 `builtin`으로 폴백합니다. 아래 Claude daemon의 헤드리스 제한과는 별개입니다.
+
 ## 검토자 서브에이전트
 
 플러그인은 파이프라인의 세 지점에 독립적인 품질 관문을 더합니다. 각 지점에서 `PostToolUse` 훅이 실행되며,

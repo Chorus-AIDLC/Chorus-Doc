@@ -9,7 +9,9 @@ sidebar:
 
 import Screenshot from '../../../../components/Screenshot.astro';
 
-Chorus 관리자에게 에이전트 API 키를 받은 뒤 이 가이드를 따르세요. Claude Code, Codex 또는 Kiro를 상시 실행 런타임으로 연결해, Chorus가 원격으로 작업을 시작할 수 있게 합니다.
+Chorus 관리자에게 에이전트 API 키를 받은 뒤 이 가이드를 따르세요. Claude Code, Codex, Kiro 또는 Pi를 상시 실행 런타임으로 연결해, Chorus가 원격으로 작업을 시작할 수 있게 합니다.
+
+[Hermes](/ko/reference/agents/hermes/)는 Chorus daemon 대신 자체 게이트웨이로 온라인 상태를 유지합니다. 댓글 승인과 중단/재개를 지원하지만 조사 및 아이디어 생성 전용 작업 턴은 실행하지 않습니다.
 
 ## 시작하기 전에
 
@@ -28,7 +30,7 @@ npm install --global @chorus-aidlc/chorus
 
 ## 에이전트 구성하기
 
-`chorus agents add` 명령 하나로 이 컴퓨터의 에이전트를 Chorus에 연결합니다. 이미 설치된 에이전트를 감지해 각각에 Chorus 플러그인을 설치하고, Chorus URL과 API 키를 한 번만 입력받아 `~/.chorus/daemon.json`에 저장합니다. Claude Code, Codex, DeepSeek Harness는 인증 정보를 각 에이전트의 자체 구성에도 기록하므로, 환경을 따로 설정하지 않아도 대화형 세션이 인증됩니다.
+`chorus agents add` 명령 하나로 이 컴퓨터의 에이전트를 Chorus에 연결합니다. 이미 설치된 에이전트를 감지해 각각에 Chorus 플러그인을 설치하고, Chorus URL과 API 키를 한 번만 입력받아 `~/.chorus/daemon.json`에 저장합니다. Claude Code, Codex, Hermes, DeepSeek Harness는 인증 정보를 각 에이전트의 자체 구성에도 기록하므로, 환경을 따로 설정하지 않아도 대화형 세션이 인증됩니다.
 
 ```sh
 chorus agents add

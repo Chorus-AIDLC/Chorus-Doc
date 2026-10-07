@@ -10,6 +10,8 @@ reference for those commands: when to run each, the permissions its API key need
 what it produces. It does not re-explain the pipeline itself — for that, read
 [The AI-DLC workflow](/guides/ai-dlc-workflow/) and the per-stage guides linked below.
 
+In [Hermes](/reference/agents/hermes/), load the namespaced skills with `skill_view("chorus:idea")`, `skill_view("chorus:develop")`, or `skill_view("chorus:yolo")`. All stages and three reviewer skills are bundled. These are skill loads, not Claude slash commands or a promise that every Chorus UI operation can wake the Hermes gateway.
+
 ## Invocation differs by runtime
 
 Claude Code exposes the commands as slash commands under the `chorus` namespace. Codex

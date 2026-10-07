@@ -14,6 +14,10 @@ Chorus プラグインを接続すると、[AI-DLC ワークフロー](/ja/guide
 [セッションを中断して再開する](/ja/guides/session-recovery/)、そして
 [エージェントプラットフォーム](/ja/reference/agents/)を参照してください。
 
+## Hermes の自動化
+
+[Hermes](/ja/reference/agents/hermes/) はネイティブフックでチェックインと仕様モードを注入し、提案送信、タスク検証依頼、最終タスク検証後にレビューを促します。親は `delegate_task` に `[chorus-reviewer:proposal]`、`[chorus-reviewer:task]`、`[chorus-reviewer:code]` のマーカーを付け、対応スキルを読み込みます。子は読み取りと判定コメントのみ可能で、端末実行、編集、再委派はできません。ゲートウェイのコマンド承認は Chorus コメントで所有者に送ります。`approvals.mode manual` と `security.approval.transport chorus` を使い、対話セッションは設定した `builtin` にフォールバックします。以下の Claude daemon のヘッドレス制限とは別です。
+
 ## レビュー担当サブエージェント
 
 プラグインは、パイプラインの 3 つの節目に独立した品質ゲートを加えます。各節目で `PostToolUse` フックが

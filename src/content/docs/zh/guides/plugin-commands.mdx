@@ -9,6 +9,8 @@ Chorus 插件为 AI-DLC 流水线的每个阶段提供一个命令。本页是�
 何时运行、其 API 密钥需要哪些权限，以及会产出什么。本页不重复讲解流水线本身，相关内容
 请阅读[AI-DLC 工作流](/zh/guides/ai-dlc-workflow/)以及下文链接的各阶段指南。
 
+[Hermes](/zh/reference/agents/hermes/) 使用 `skill_view("chorus:idea")`、`skill_view("chorus:develop")` 或 `skill_view("chorus:yolo")` 加载命名空间技能，包含全部阶段和三类审查技能。这不是 Claude 斜杠命令，也不代表所有 Chorus 界面操作都能唤醒 Hermes 网关。
+
 ## 不同运行时的调用方式不同
 
 Claude Code 将这些命令以 `chorus` 命名空间下的斜杠命令暴露；Codex 则以 `$` 前缀暴露同一批

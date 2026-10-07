@@ -76,7 +76,7 @@ chorus agents add --agents claude,codex \
   --url https://chorus.example.com --api-key cho_xxx
 ```
 
-에이전트 추가나 인증 정보 갱신을 위해 설정을 다시 실행할 수 있습니다. Claude Code, Codex, Kiro, Pi, OpenCode, OpenClaw, DeepSeek Harness(dsh)를 지원합니다. Pi 안정 버전 `>=0.99.0 <2.0.0`에는 네이티브 MCP, `0.84.4–0.98.x`에는 `pi-mcp-adapter@5.0.0`을 선택하고 `chorus-pi`를 설치합니다. Pi가 없거나 미지원 또는 버전 불명이면 안내를 제공하며 무조건 MCP 설정 완료를 보고하지 않습니다. [Pi](/ko/reference/agents/pi/)를 참고하세요.
+에이전트 추가나 인증 정보 갱신을 위해 설정을 다시 실행할 수 있습니다. Claude Code, Codex, Kiro, Pi, OpenCode, OpenClaw, Hermes, DeepSeek Harness(dsh)를 지원합니다. Pi 안정 버전 `>=0.99.0 <2.0.0`에는 네이티브 MCP, `0.84.4–0.98.x`에는 `pi-mcp-adapter@5.0.0`을 선택하고 `chorus-pi`를 설치합니다. Pi가 없거나 미지원 또는 버전 불명이면 안내를 제공하며 무조건 MCP 설정 완료를 보고하지 않습니다. [Pi](/ko/reference/agents/pi/)를 참고하세요.
 
 유용한 플래그(`chorus agents add --help`가 전부 나열합니다):
 
@@ -101,6 +101,12 @@ chorus agents remove <name|uuid>  # remove one (match by name or UUID)
 `CHORUS_AGENT_PROFILE` 환경 변수에 쓸 수 있는 유효한 값입니다.
 
 Codex App Server 재시작은 `--yes`로 허가되지 않습니다. 인증 정보와 MCP 구성에 성공한 뒤 대화형 터미널에서만 별도의 중단 경고와 동의 질문을 표시합니다. [Codex](/ko/reference/agents/codex/)를 참고하세요.
+
+## Hermes 설정(0.22.0)
+
+`chorus agents add --agents hermes --hermes-cwd /path/to/repo`는 CLI 릴리스 태그에서 `chorus`와 `chorus-mcp`를 설치하고 `$HERMES_HOME/.env`, 저장소, 미설정 승인 옵션을 구성합니다. `--hermes-cwd <path>`가 우선하며 생략하면 기존 디렉터리나 현재 Git 저장소를 사용합니다. 태그가 없으면 실패합니다.
+
+Hermes는 Chorus daemon에서 `offline`으로 등록됩니다. `chorus upgrade --plugins`와 `chorus agents run --type hermes`는 지원하지 않습니다. CLI 업데이트 후 `chorus agents add --agents hermes`로 둘 다 다시 설치하고 `hermes gateway restart`를 실행합니다. 릴리스 태그 설치, 원격 MCP, 스킬, 소유자 승인은 [Hermes Agent](/ko/reference/agents/hermes/)를 참조하세요.
 
 ## 에이전트 실행하기 — `chorus agents run`
 
@@ -199,7 +205,7 @@ chorus mcp list                                   # list the tools this agent ma
 ## 인증 정보는 어디로 가는가
 
 `chorus agents add`는 검증된 인증 정보를 항상 `~/.chorus/daemon.json`에 씁니다(권한 `0600`, 키는 절대
-출력되지 않음). 세 에이전트에 대해서는 대화형 세션이 수동 내보내기 없이 인증하도록 그 에이전트
+출력되지 않음). 네 에이전트에 대해서는 대화형 세션이 수동 내보내기 없이 인증하도록 그 에이전트
 자신의 구성에도 인증 정보를 기록합니다.
 
 | 에이전트 | 추가 인증 정보 저장소 |
@@ -207,6 +213,7 @@ chorus mcp list                                   # list the tools this agent ma
 | Claude Code | `~/.claude/settings.json`의 `env` 블록(`CLAUDE_CONFIG_DIR`를 따름). |
 | Codex | `~/.codex/.env`(`CODEX_HOME`을 따름). Codex는 keyless `config.toml` 항목을 통해 환경 변수에서 키를 읽습니다. |
 | DeepSeek Harness | `$DSH_HOME/.env`. |
+| Hermes | `$HERMES_HOME/.env`(기본 `~/.hermes/.env`, 모드 `0600`). 원격 MCP 설정에는 키 자리표시자를 저장합니다. |
 
 Kiro, OpenCode, OpenClaw는 자신의 설치된 구성에서, 또는 데몬이 깨운 Kiro의 경우에는 데몬이 깨울 때마다
 내보내는 환경 변수에서 인증 정보를 읽습니다.

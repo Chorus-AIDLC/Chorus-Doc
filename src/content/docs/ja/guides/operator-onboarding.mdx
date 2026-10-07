@@ -9,7 +9,9 @@ sidebar:
 
 import Screenshot from '../../../../components/Screenshot.astro';
 
-Chorus の管理者からエージェントの API キーを受け取った後に、このガイドを使ってください。Claude Code、Codex、Kiro を、Chorus からリモートで作業を始められる常駐ランタイムとして接続します。
+Chorus の管理者からエージェントの API キーを受け取った後に、このガイドを使ってください。Claude Code、Codex、Kiro、Pi を、Chorus からリモートで作業を始められる常駐ランタイムとして接続します。
+
+[Hermes](/ja/reference/agents/hermes/) は Chorus daemon ではなく自前のゲートウェイでオンラインを維持します。コメント承認と中断・再開に対応しますが、調査とアイデア作成の専用操作ターンは実行しません。
 
 ## 始める前に
 
@@ -28,7 +30,7 @@ npm install --global @chorus-aidlc/chorus
 
 ## エージェントを設定する
 
-`chorus agents add` は、このマシンのエージェントを 1 つのコマンドで Chorus に接続します。すでにインストールしているエージェントを検出し、それぞれの Chorus プラグインをインストールし、Chorus の URL と API キーを `~/.chorus/daemon.json` に一度だけ保存します。Claude Code、Codex、DeepSeek Harness については、認証情報をそのエージェント自身の設定にも書き込むため、対話型のセッションでも、環境変数を手動で設定しなくても認証されます。
+`chorus agents add` は、このマシンのエージェントを 1 つのコマンドで Chorus に接続します。すでにインストールしているエージェントを検出し、それぞれの Chorus プラグインをインストールし、Chorus の URL と API キーを `~/.chorus/daemon.json` に一度だけ保存します。Claude Code、Codex、Hermes、DeepSeek Harness については、認証情報をそのエージェント自身の設定にも書き込むため、対話型のセッションでも、環境変数を手動で設定しなくても認証されます。
 
 ```sh
 chorus agents add

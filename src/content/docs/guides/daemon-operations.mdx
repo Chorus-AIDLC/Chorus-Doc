@@ -10,6 +10,8 @@ sidebar:
 Use this guide after you have verified a foreground daemon connection. The commands apply
 to the supported always-on backends: Claude Code, Codex, Kiro, and Pi.
 
+[Hermes](/reference/agents/hermes/) stays online through its own gateway, not the Chorus daemon. It supports comment-based command approvals and interrupt/resume; research and idea-creation operation turns are not supported by its gateway.
+
 ## Upgrade daemon backends to 0.20.0
 
 Update the Chorus CLI using [the upgrade command](/reference/cli/#upgrade-the-cli-and-plugins),
@@ -381,3 +383,50 @@ Use both command-line and web status:
 Logs can contain paths, prompts, and command output. Remove sensitive values before
 sharing them. For failures, continue with
 [Troubleshoot agent connections](/guides/troubleshooting/).
+
+## Claude background-agent wait limit (0.22.0)
+
+Claude daemon wakes now default to waiting **60 minutes after the main turn ends** for
+unfinished background agents. This is a post-turn waiting ceiling, not a time limit for
+the entire wake, and not the interrupt grace period. Interactive Claude sessions are not
+changed. Update the Chorus CLI and Claude plugin, then restart the daemon for new wakes.
+
+- `CLAUDE_CODE_PRINT_BG_WAIT_CEILING_MS`: Native Claude value, passed through unchanged when explicitly set. Highest priority, including `0` or an empty string.
+- `CHORUS_CLAUDE_BG_WAIT_CEILING_MS`: Used only when the native variable is absent. A non-negative safe integer in milliseconds; whitespace is trimmed.
+- Default: `3600000` ms (60 minutes) when the native variable is absent and the Chorus override is unset or invalid. A nonempty invalid Chorus override logs a warning; empty or whitespace uses the default.
+
+Priority is **native → Chorus override → 3600000**. Explicit `0` requests indefinite
+waiting and can leave a stuck child holding the wake open forever. An empty native value
+is still passed through; do not use it to request the default, because Claude may treat
+it as unset and restore its own shorter limit. Remove the native variable entirely to
+use the Chorus setting. Native-value validation and interpretation belong to Claude.
+
+Set the Chorus override in the intended agent's `env` object in
+`~/.chorus/daemon.json`, for example:
+
+```json
+{
+  "env": {
+    "CHORUS_CLAUDE_BG_WAIT_CEILING_MS": "3600000"
+  }
+}
+```
+
+Alternatively configure the daemon service's environment; a login-shell export does not
+reach an already running service. Restart with `chorus daemon restart`. Check for an
+inherited native value before expecting the Chorus override to take effect.
+
+The parent agent must collect completion or explicitly stop its background children
+before ending its turn. Increasing the ceiling does not replace this responsibility.
+If Claude reports `Background tasks still running after …s; terminating.`, Chorus
+records an abnormal wake even when the raw process exit is zero, and attempts to post
+an explanation on the triggering idea or task. Explicit interrupt/shutdown remains an
+interruption, not a crash. No task status is repaired automatically and no new automatic
+retry is added. Inspect partial work before resuming; if the comment cannot be posted,
+the failure remains in the wake diagnostics.
+
+**Do not confuse backend limits:** `CHORUS_DSH_TIMEOUT_MS` bounds the **whole dsh wake**,
+with a default of `1800000` ms (30 minutes). It accepts positive safe integers; `0` or
+invalid values fall back to that default, not infinite waiting. Claude's post-turn setting
+above does not apply to Codex, Pi, Kiro, or Hermes. Background-child lifetime in other
+runtimes must not be inferred from Claude's behavior.

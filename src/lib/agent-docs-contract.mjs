@@ -59,9 +59,9 @@ export const AGENT_SUPPORT_MATRIX = Object.freeze([
       mcpTools: capability(true, ['packages/chorus-pi/README.md']),
       chorusSkills: capability(true, ['packages/chorus-pi/skills/chorus/SKILL.md']),
       lifecycleHooks: capability(true, ['packages/chorus-pi/extensions/chorus.ts']),
-      daemonWake: capability(false, ['cli/daemon-agent.mjs'], 'Pi is not a Chorus CLI daemon backend.'),
-      remoteControl: capability(false, ['cli/daemon-agent.mjs']),
-      sessionRecovery: capability(false, ['cli/daemon-agent.mjs']),
+      daemonWake: capability(true, ['cli/pi-spawner.mjs']),
+      remoteControl: capability(true, ['cli/pi-spawner.mjs', 'cli/waker.mjs']),
+      sessionRecovery: capability(true, ['cli/pi-spawner.mjs']),
     }),
   }),
   Object.freeze({
@@ -79,6 +79,27 @@ export const AGENT_SUPPORT_MATRIX = Object.freeze([
       daemonWake: capability(true, ['packages/openclaw-plugin/src/wake.ts']),
       remoteControl: capability(true, ['packages/openclaw-plugin/src/control-handler.ts']),
       sessionRecovery: capability(true, ['packages/openclaw-plugin/src/__tests__/daemon-loop.e2e.test.ts']),
+    }),
+  }),
+  Object.freeze({
+    id: 'hermes',
+    name: 'Hermes Agent',
+    support: SUPPORT_LEVELS.FIRST_PARTY,
+    capabilities: Object.freeze({
+      mcpTools: capability(true, ['packages/chorus-hermes/chorus-mcp/mcp.json']),
+      chorusSkills: capability(true, ['packages/chorus-hermes/chorus/skills/chorus/SKILL.md']),
+      lifecycleHooks: capability(true, ['packages/chorus-hermes/chorus/chorus_hermes/hooks.py']),
+      daemonWake: capability(
+        false,
+        ['cli/init/agent-type-map.mjs'],
+        'Remote wakes use the Hermes gateway, not the Chorus daemon.',
+      ),
+      remoteControl: capability(true, ['packages/chorus-hermes/chorus/chorus_hermes/router.py']),
+      sessionRecovery: capability(
+        true,
+        ['packages/chorus-hermes/chorus/chorus_hermes/router.py'],
+        'Requires a Chorus server with Hermes continuation-turn support.',
+      ),
     }),
   }),
   Object.freeze({
