@@ -76,6 +76,16 @@ In standalone mode the container:
 For production, especially with multiple replicas, wire the app to an external PostgreSQL and
 Redis. Create a `docker-compose.yml`:
 
+:::danger[Existing PostgreSQL 16 volumes must be migrated first]
+This example, like the repository's own `docker-compose.yml`, uses `postgres:17-alpine`.
+PostgreSQL 17 **cannot open a PostgreSQL 16 data volume**, so do not just change the image and
+restart against an existing PG16 volume, and never run `docker compose down -v` to clear the
+error. Keep the source on PostgreSQL 16 and migrate it into a new volume first, either with the
+repository's offline helper `deploy/self-host/migrate-pg16-to-17.sh` or with a `pg_dump` /
+`pg_restore` into a fresh PostgreSQL 17 volume. See
+[PostgreSQL 17 and existing PostgreSQL 16 volumes](/guides/deploy-local/#postgresql-17-and-existing-postgresql-16-volumes).
+:::
+
 ```yaml
 services:
   app:
@@ -114,7 +124,7 @@ services:
       retries: 5
 
   db:
-    image: postgres:16-alpine
+    image: postgres:17-alpine
     environment:
       POSTGRES_USER: chorus
       POSTGRES_PASSWORD: chorus
@@ -309,6 +319,8 @@ Chorus cannot issue its own sign-in sessions.
 
 ## Next steps
 
+- **[Self-host on a local machine](/guides/deploy-local/)** — the `install.sh` local setup with
+  PostgreSQL 17, optional LAN HTTPS or Cloudflare Tunnel, and the PG16 to PG17 migration.
 - **[Deploy in production](/guides/deploy-production/)** — running from the global npm package
   and the full AWS CDK walkthrough.
 - **[Operate a self-hosted Chorus](/guides/deploy-operations/)** — first-login bootstrap, deployment-side

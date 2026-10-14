@@ -1,13 +1,13 @@
 ---
 title: 管理后台服务
-description: 为 Claude Code、Codex、Kiro 或 Pi 配置工作目录，并让智能体稳定在线。
+description: 为 Claude Code、Codex、TRAE CLI、Kiro 或 Pi 配置工作目录，并让智能体稳定在线。
 docsLocale: zh
 route: /zh/guides/daemon-operations/
 sidebar:
   order: 10
 ---
 
-请先确认后台服务在前台能够正常连接，再使用本指南。这些命令适用于受支持的常驻运行后端：Claude Code、Codex、Kiro 和 Pi。
+请先确认后台服务在前台能够正常连接，再使用本指南。这些命令适用于受支持的常驻运行后端：Claude Code、Codex、TRAE CLI、Kiro 和 Pi。
 
 [Hermes](/zh/reference/agents/hermes/) 通过自己的网关保持在线，不使用 Chorus 后台服务。支持评论审批命令和中断/恢复；网关不执行调研和创建想法的专用操作轮次。
 
@@ -15,7 +15,7 @@ sidebar:
 
 通过[升级命令](/zh/reference/cli/#升级-cli-与插件)更新 Chorus CLI，并在不影响进行中工作的时机重启后台服务。宿主 CLI 需要单独更新。后台服务首次开始工作前，请核对对应后端的要求：
 
-- [Codex App Server](/zh/reference/agents/codex/#0200-的-daemon-行为)：已在 codex-cli 0.157.1 上验证；后台服务的 `args` 只接受模型参数和允许的配置覆盖。使用 `--chorus-only` 时，请在 Codex 配置中确认所需 MCP 工具已获授权。
+- [Codex App Server](/zh/reference/agents/codex/#0200-的-daemon-行为)：已在 codex-cli 0.157.1 上验证；后台服务的 `args` 只接受模型参数和允许的配置覆盖。在 Chorus 0.22.2 及更高版本中使用 `--chorus-only` 时，只要声明了 `[mcp_servers.chorus]`，后台服务就会预先批准 Chorus MCP 服务器（参见 [`--chorus-only` 的强制范围](#--chorus-only-的强制范围)）。
 - [Claude Code stream-json](/zh/reference/agents/claude-code/#0200-的-daemon-行为)：已在 Claude Code 2.1.283 和 2.1.284 上验证；中断会优先通过协议发送，后台运行时的提问必须通过 Chorus 评论或澄清流程进行。
 - [Pi RPC](/zh/reference/agents/pi/#0200-的-daemon-行为)：需要 Pi 0.85.0 或更新版本（已在 0.85.1 上验证）；`--plugins` 会更新 Chorus 相关包，但不会升级 Pi 本身。
 
@@ -45,6 +45,16 @@ chorus daemon --browse-root /home/demo/workspace
 只注册允许智能体读取和修改的目录。远程启动的智能体拥有运行后台服务的用户所具有的文件系统和工具权限。
 :::
 
+## `--chorus-only` 的强制范围
+
+从 Chorus 0.22.2 开始，`--chorus-only` 会移除工具，而不只是自动批准 Chorus 工具。对于 Claude Code，如果无法确认限制已生效，唤醒会被终止。
+
+- **Claude Code**：每次唤醒都会传入 `--tools "mcp__chorus__*,Task,Agent"` 和 `--strict-mcp-config`。被唤醒的智能体只保留本后台服务的 Chorus MCP 工具和子智能体派发（`Task` / `Agent`）。Bash、文件编辑等内置工具会被移除，你自己的 MCP 服务器不会被加载，`Edit`、`Write` 和 `NotebookEdit` 也会按名称被拒绝。每次唤醒时，后台服务都会将 Claude Code 启动（init）帧中的工具列表与该允许列表进行比对。如果出现任何其他工具，后台服务会强制终止整个进程树，此后不再转发任何输出，并记录一次失败的唤醒，其中会列出泄漏的工具。如果 Claude Code 没有报告工具列表，后台服务会记录一条警告，说明无法验证该限制，唤醒继续进行。
+- **Codex 和 TRAE CLI**：回合在只读沙箱中运行，并关闭审批。当后端配置中声明了 `[mcp_servers.chorus]` 时，后台服务只会为该线程预先批准 Chorus MCP 服务器，因此 Chorus 工具可以正常使用。其他 MCP 服务器、shell 命令和文件修改仍会被拒绝。如果没有该条目，后台服务会记录一条警告，唤醒将在没有 Chorus MCP 工具的情况下运行。
+- **`--yolo`** 保持不变：被唤醒的智能体获得完整的本地工具集。
+
+违规时会显示为一个 **Agent 唤醒失败**回合。参见[排查智能体连接故障](/zh/guides/troubleshooting/#智能体尚未回复回合就失败了)。
+
 ## 配置 `daemon.json`
 
 后台服务的设置都读自 `~/.chorus/daemon.json`。常见的单智能体场景下，它是一个扁平的 JSON 对象，同时保存智能体凭据和运行选项；若要用一个后台服务同时服务多个智能体，则改为在 `agents` 数组中逐一列出，参见[在一个后台服务中运行多个智能体](#在一个后台服务中运行多个智能体)。无论哪种形式，该文件都以 `0600` 权限（仅所有者可读写）原子写入，因此写入过程中崩溃也不会留下被截断的文件。可用 `CHORUS_DAEMON_CONFIG_PATH` 指定其他文件。使用覆盖路径时，请为 CLI 与后台服务一致地设置该变量；在 shell 中导出它不会改变已运行的服务。
@@ -59,7 +69,7 @@ chorus daemon --browse-root /home/demo/workspace
 | `agentName` | string | 已认证的智能体名称（仅供参考）。 |
 | `cwds` | string[] | 本后台服务所服务的工作目录。每个路径都是一个独立的在线连接。 |
 | `browseRoots` | string[] | 向远程工作目录发现开放的根目录。浏览根目录不会创建连接。 |
-| `agent` | string | 要唤醒的本地运行后端：`"claude-code"`、`"codex"`、`"kiro"`、`"pi"` 或 `"dsh"`。 |
+| `agent` | string | 要唤醒的本地运行后端：`"claude-code"`、`"codex"`、`"trae"`、`"kiro"`、`"pi"` 或 `"dsh"`。 |
 | `sigintTimeoutMs` | number | 中断后强制终止前的宽限时间（毫秒）；Claude Code、Codex 和 Pi 会先发送协议中断。默认 `10000`。 |
 | `agents` | object[] | *可选。* 用一个后台服务服务多个独立智能体；每个条目可覆盖共享运行默认值，但不会继承 `args` 和 `env`。参见[在一个后台服务中运行多个智能体](#在一个后台服务中运行多个智能体)。 |
 
@@ -134,7 +144,7 @@ chorus daemon --browse-root /home/demo/workspace
 | --- | --- |
 | `apiKey`（必填） | 该智能体的 `cho_` 密钥，决定其身份。 |
 | `url` | Chorus 服务器（可按智能体不同，例如不同的服务器或工作区）。 |
-| `agentType` | `claude-code`、`codex`、`kiro` 或 `pi`（后端可以混用）。 |
+| `agentType` | `claude-code`、`codex`、`trae`、`kiro` 或 `pi`（后端可以混用）。 |
 | `cwds` | 该智能体服务的工作目录（每个一个连接）。 |
 | `permissionMode` | `yolo` 或 `chorus`。 |
 | `maxConcurrency` | 该智能体自己的唤醒并发上限（默认 `4`）。 |
@@ -170,7 +180,7 @@ chorus daemon --browse-root /home/demo/workspace
 - **受保护的控制项**：持久化参数不能更改已知的会话/恢复、提示词、传输/输出、工作目录、托管 MCP 或权限控制。帮助、版本以及其他只输出信息就退出的选项也被禁止，单独的 `--` 和标准输入标记 `-` 同样不允许。所有 `CHORUS_*` 环境变量名以及嵌套 Claude 上下文变量 `CLAUDECODE` / `CLAUDE_CODE_ENTRYPOINT` 均保留，不区分大小写；配置这些名称会报错，而不是被静默删除。请改用专用的 Chorus 设置或显式前台透传。
 - **Windows 命令包装器**：通过 `.cmd`/`.bat` 启动时，配置中的空参数，以及含空白、引号或命令元字符的参数会被拒绝。需要这些值时请用原生可执行文件；通过包装器的显式前台透传不保证 shell 安全。
 
-`env` 中可能包含明文的模型提供方凭据。请保护文件（POSIX 上用 `chmod 600 ~/.chorus/daemon.json`），切勿提交密钥。Chorus 的校验和启动消息不会显示配置值，但子程序或操作系统层面的检查仍可能暴露它们；Chorus 不提供加密或密钥库。若设置 `CODEX_HOME` 或 `PI_CODING_AGENT_DIR` 等自定义目录，也需在其中配置 Chorus 集成。
+`env` 中可能包含明文的模型提供方凭据。请保护文件（POSIX 上用 `chmod 600 ~/.chorus/daemon.json`），切勿提交密钥。Chorus 的校验和启动消息不会显示配置值，但子程序或操作系统层面的检查仍可能暴露它们；Chorus 不提供加密或密钥库。若设置 `CODEX_HOME`、`TRAE_HOME` 或 `PI_CODING_AGENT_DIR` 等自定义目录，也需在其中配置 Chorus 集成。
 
 **应用更改**：运行 `chorus daemon restart`。后台服务在启动时读取这些设置，而非每次唤醒时；编辑文件既不会改变运行中的子进程，也不会影响重启前的后续唤醒。每次新的 `chorus agents run` 都会重读配置，但不影响已运行的子进程。删除 `args`/`env` 即可恢复未自定义的行为。
 
@@ -192,7 +202,8 @@ chorus daemon --browse-root /home/demo/workspace
 
 - **Claude Code**：自动。后台服务会为每次唤醒写入一份携带该智能体 URL 和密钥的 MCP 配置。无需额外配置。
 - **Kiro**：自动，通过环境变量。已安装的 `mcp.json` 引用 `${CHORUS_URL}` 和 `${env:CHORUS_API_KEY}`，后台服务会在每次唤醒时导出它们，因此每个 Kiro 智能体都用自己的密钥认证。
-- **Codex**：自动，通过环境变量。`chorus agents add` 会把 Codex 配置为不内置密钥：它把 `CHORUS_URL` / `CHORUS_API_KEY` / `CHORUS_AGENT_PROFILE` 写入 `~/.codex/.env`（Codex 在启动时加载它），并在 `config.toml` 中设置 `bearer_token_env_var = "CHORUS_API_KEY"`，因此 Codex 从环境变量读取密钥，而不是从配置文件中读取。后台服务会在每次唤醒时注入各智能体自己的密钥，因此一个后台服务中的多个 Codex 智能体各自以自己的身份认证。
+- **Codex**：自动，通过环境变量。`chorus agents add` 会把 Codex 配置为不内置密钥：它把 `CHORUS_URL` / `CHORUS_API_KEY` / `CHORUS_AGENT_PROFILE` 写入 `~/.codex/.env`（Codex 在启动时加载它），并在 `config.toml` 中设置 `bearer_token_env_var = "CHORUS_API_KEY"`，因此 Codex 从环境变量读取密钥，而不是从配置文件中读取。后台服务会在每次唤醒时导出各智能体自己的密钥，但 Codex 的 `CODEX_HOME/.env` 会**覆盖**导出的值。请为每个 Codex 后台服务智能体分配独立的 `CODEX_HOME`（在该智能体的 `env` 中设置）；否则共用同一目录的所有智能体被唤醒时，都会使用该 `.env` 中保存的身份。
+- **TRAE CLI**（Chorus 0.22.2 及更高版本）：与 Codex 一样通过环境变量。`chorus agents add --agents trae` 会在 `$TRAE_HOME/traecli.toml` 中写入不含密钥的 `[mcp_servers.chorus]`（`bearer_token_env_var = "CHORUS_API_KEY"`），并把凭据写入 `$TRAE_HOME/.env`（默认 `~/.trae`）。traecli 启动时加载该 `.env`，它会**覆盖**后台服务导出的 `CHORUS_*` 值。请为每个 TRAE 后台服务智能体分配独立的 `TRAE_HOME`（在该智能体的 `env` 中设置）；否则共用同一目录的所有智能体被唤醒时，都会使用该 `.env` 中保存的身份。参见 [TRAE CLI](/zh/reference/agents/trae/)。
 - **Pi**：自动，通过环境变量。后台服务会在每次唤醒时把各智能体自己的 `CHORUS_URL` / `CHORUS_API_KEY` / `CHORUS_AGENT_PROFILE` 导出到被唤醒的 Pi 会话中，由 `chorus-pi` 扩展读取，因此每个 Pi 智能体都用自己的密钥认证。
 
 ## 安装 Linux 服务
@@ -271,6 +282,11 @@ chorus daemon -d --agent codex --cwd /home/demo/workspace --chorus-only
 4. 发起一个小型测试会话，确认它指向预期的目录。
 
 日志可能包含路径、提示词和命令输出，分享前请删除敏感值。遇到故障时，请继续阅读[排查智能体连接故障](/zh/guides/troubleshooting/)。
+
+## 失败的唤醒与提及恢复
+
+- **凭据脱敏**（Chorus 0.22.2 及更高版本）：在保存失败唤醒的错误详情之前，后台服务会把已知凭据替换为 `[redacted]`：包括智能体的 Chorus 密钥，以及类似凭据的环境变量值（名称形如 `*_API_KEY`、`*_TOKEN`、`*_SECRET` 或 `*_PASSWORD`）。这也包括在保留的输出尾部起始处被截成两半的密钥；只有短于四个字符的片段会原样保留。脱敏只覆盖已知凭据。分享详情前，请检查并删除其他敏感文本，例如路径、提示词、URL 和命令输出。
+- **提及恢复**（Chorus 0.22.1 及更高版本）：后台服务会持久保存每次唤醒的上下文。如果事件到达后获取或路由评论或提及失败，即使 SSE 连接保持正常，后台服务也会以有上限的退避方式重试，并在服务器恢复可达时将该唤醒排队一次。无需发送聊天消息，也无需重启后台服务。每次唤醒的状态都会记录在触发它的那个回合上，因此之后的聊天消息与原始评论各自保留自己的回合和对话记录。
 
 ## Claude 后台子智能体等待上限（0.22.0）
 

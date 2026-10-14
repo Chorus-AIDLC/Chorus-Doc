@@ -8,7 +8,7 @@ sidebar:
 ---
 
 Use this guide after you have verified a foreground daemon connection. The commands apply
-to the supported always-on backends: Claude Code, Codex, Kiro, and Pi.
+to the supported always-on backends: Claude Code, Codex, TRAE CLI, Kiro, and Pi.
 
 [Hermes](/reference/agents/hermes/) stays online through its own gateway, not the Chorus daemon. It supports comment-based command approvals and interrupt/resume; research and idea-creation operation turns are not supported by its gateway.
 
@@ -20,7 +20,8 @@ Check these backend-specific requirements before the daemon first starts work:
 
 - [Codex App Server](/reference/agents/codex/#daemon-behavior-in-0200): verified with
   codex-cli 0.157.1; daemon `args` accept only model options and permitted config overrides.
-  In `--chorus-only` mode, verify the required MCP tool allowances in Codex configuration.
+  In `--chorus-only` mode on Chorus 0.22.2 and later, the daemon pre-approves the Chorus MCP
+  server when `[mcp_servers.chorus]` is declared (see [What `--chorus-only` enforces](#what---chorus-only-enforces)).
 - [Claude Code stream-json](/reference/agents/claude-code/#daemon-behavior-in-0200): verified
   with Claude Code 2.1.283 and 2.1.284; interruption first uses the protocol, and background
   questions must use Chorus comments or elaboration.
@@ -53,6 +54,30 @@ Register only directories the agent is allowed to read and modify. A remotely st
 agent receives the filesystem and tool permissions of the user running the daemon.
 :::
 
+## What `--chorus-only` enforces
+
+From Chorus 0.22.2, `--chorus-only` removes tools instead of only auto-approving Chorus
+tools. A restriction that cannot be confirmed for Claude Code stops the wake.
+
+- **Claude Code** — every wake passes `--tools "mcp__chorus__*,Task,Agent"` and
+  `--strict-mcp-config`. The woken agent keeps only this daemon's Chorus MCP tools and
+  sub-agent dispatch (`Task` / `Agent`). Built-in tools such as Bash and file edits are
+  removed, your own MCP servers are not loaded, and `Edit`, `Write`, and `NotebookEdit` are
+  also denied by name. On every wake, the daemon checks the tool list in Claude Code's
+  startup (init) frame against that allowlist. If any other tool is present, the daemon
+  force-kills the process tree, forwards no output from that point on, and records a failed
+  wake that names the leaked tools. If Claude Code reports no tool list, the daemon logs a
+  warning that the restriction could not be verified, and the wake continues.
+- **Codex and TRAE CLI** — the turn runs in a read-only sandbox with approvals turned off.
+  When `[mcp_servers.chorus]` is declared in the backend's config, the daemon pre-approves
+  only the Chorus MCP server for that thread, so Chorus tools work. Other MCP servers, shell
+  commands, and file changes stay refused. Without that entry, the daemon logs a warning and
+  the wake runs without Chorus MCP tools.
+- **`--yolo`** is unchanged: the woken agent gets its full local toolset.
+
+A violation looks like an **Agent wake failed** turn. See
+[Troubleshoot agent connections](/guides/troubleshooting/#a-turn-fails-before-the-agent-replies).
+
 ## Configure `daemon.json`
 
 The daemon reads its settings from `~/.chorus/daemon.json`. In the common single-agent case
@@ -74,7 +99,7 @@ shell does not change an already-running service.
 | `agentName` | string | Authenticated agent name (informational). |
 | `cwds` | string[] | Working directories this daemon serves. Each path is one independent online connection. |
 | `browseRoots` | string[] | Roots exposed to remote working-directory discovery. A browse root does not create a connection. |
-| `agent` | string | Local backend to wake: `"claude-code"`, `"codex"`, `"kiro"`, `"pi"`, or `"dsh"`. |
+| `agent` | string | Local backend to wake: `"claude-code"`, `"codex"`, `"trae"`, `"kiro"`, `"pi"`, or `"dsh"`. |
 | `sigintTimeoutMs` | number | How long (ms) to wait after an interrupt before forcing the process to stop; Claude Code, Codex, and Pi send a protocol interrupt first. Default `10000`. |
 | `agents` | object[] | *Optional.* Serve several independent agents from one daemon; each entry can override shared runtime defaults, but `args` and `env` are never inherited. See [Run several agents in one daemon](#run-several-agents-in-one-daemon). |
 
@@ -172,7 +197,7 @@ agent — existing single-agent installs run unchanged.
 | --- | --- |
 | `apiKey` *(required)* | The agent's `cho_` key — determines its identity. |
 | `url` | Chorus server (may differ per agent — a different server or workspace). |
-| `agentType` | `claude-code`, `codex`, `kiro`, or `pi` (backends may be mixed). |
+| `agentType` | `claude-code`, `codex`, `trae`, `kiro`, or `pi` (backends may be mixed). |
 | `cwds` | Working directories this agent serves (one connection each). |
 | `permissionMode` | `yolo` or `chorus`. |
 | `maxConcurrency` | This agent's own wake-concurrency cap (default `4`). |
@@ -235,7 +260,7 @@ backend; there are no separate `model` or `thinking` fields. Both daemon wakes a
 (`chmod 600 ~/.chorus/daemon.json` on POSIX) and never commit secrets. Chorus omits configured
 values from validation and launch messages, but the child program or OS inspection may expose
 them; there is no encryption or vault.
-If you set a custom home such as `CODEX_HOME` or `PI_CODING_AGENT_DIR`, configure the Chorus
+If you set a custom home such as `CODEX_HOME`, `TRAE_HOME`, or `PI_CODING_AGENT_DIR`, configure the Chorus
 integration there too.
 
 **Apply changes:** run `chorus daemon restart`. The daemon reads these settings at startup,
@@ -278,8 +303,17 @@ depends on the backend:
   storing the key in its config: it writes `CHORUS_URL` / `CHORUS_API_KEY` /
   `CHORUS_AGENT_PROFILE` into `~/.codex/.env` (which Codex loads at startup) and sets
   `bearer_token_env_var = "CHORUS_API_KEY"` in `config.toml`, so Codex reads its key from the
-  environment rather than from the file. The daemon injects each agent's own key per wake, so
-  several Codex agents in one daemon each authenticate as themselves.
+  environment rather than from the file. The daemon exports each agent's own key per wake,
+  but Codex's `CODEX_HOME/.env` **overrides** the exported values. Give each Codex daemon agent
+  its own `CODEX_HOME` (set it in the agent's `env`); otherwise every agent sharing the home
+  wakes as the identity stored in its `.env`.
+- **TRAE CLI** (Chorus 0.22.2 and later) — via the environment, like Codex.
+  `chorus agents add --agents trae` writes a keyless `[mcp_servers.chorus]`
+  (`bearer_token_env_var = "CHORUS_API_KEY"`) into `$TRAE_HOME/traecli.toml` and the
+  credentials into `$TRAE_HOME/.env` (default `~/.trae`). traecli loads that `.env` at startup,
+  and it **overrides** the `CHORUS_*` values the daemon exports. Give each TRAE daemon agent its
+  own `TRAE_HOME` (set it in the agent's `env`); otherwise every agent sharing the home wakes as
+  the identity stored in its `.env`. See [TRAE CLI](/reference/agents/trae/).
 - **Pi** — automatic, via the environment. The daemon exports each agent's `CHORUS_URL` /
   `CHORUS_API_KEY` / `CHORUS_AGENT_PROFILE` into the woken Pi session, which the `chorus-pi`
   extension reads, so each Pi agent authenticates with its own key.
@@ -383,6 +417,22 @@ Use both command-line and web status:
 Logs can contain paths, prompts, and command output. Remove sensitive values before
 sharing them. For failures, continue with
 [Troubleshoot agent connections](/guides/troubleshooting/).
+
+## Failed wakes and mention recovery
+
+- **Credential redaction** (Chorus 0.22.2 and later) — before a failed wake's error details
+  are saved, the daemon replaces known credentials with `[redacted]`: the agent's Chorus key
+  and credential-like environment values (names such as `*_API_KEY`, `*_TOKEN`, `*_SECRET`,
+  or `*_PASSWORD`). This includes a key cut in half where the retained output tail begins;
+  only a fragment shorter than four characters is left as is. Redaction covers known
+  credentials only. Review and redact other sensitive text, such as paths, prompts, URLs, and
+  command output, before you share the details.
+- **Mention recovery** (Chorus 0.22.1 and later) — the daemon persists the context of each
+  wake. If fetching or routing a comment or mention fails after the event arrives, the daemon
+  retries with bounded backoff even while the SSE connection stays healthy, and queues the
+  wake once when the server is reachable again. No chat message or daemon restart is needed.
+  Each wake's status is recorded on the exact turn that triggered it, so a later chat
+  message and the original comment keep their own turns and transcripts.
 
 ## Claude background-agent wait limit (0.22.0)
 

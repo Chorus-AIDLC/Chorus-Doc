@@ -52,12 +52,12 @@ without this command, install the new release first with `npm install --global @
 ### What `--plugins` refreshes
 
 It reads `~/.chorus/daemon.json` and refreshes entries whose type is explicitly set to Claude
-Code, Codex, Kiro, or Pi, including those with daemon waking disabled. Each entry's `env`, `PATH`,
+Code, Codex, TRAE CLI, Kiro, or Pi, including those with daemon waking disabled. Each entry's `env`, `PATH`,
 and custom config home determine the target. Shared destinations are updated once;
 distinct homes are handled separately. The command currently reads only the default file,
 not the path set in `CHORUS_DAEMON_CONFIG_PATH`.
 
-- **Claude Code and Codex:** refresh the Chorus plugin using the host's plugin mechanism.
+- **Claude Code, Codex, and TRAE CLI:** refresh the Chorus plugin using the host's plugin mechanism.
 - **Kiro:** refresh Chorus templates from the entry's configured Chorus instance. Upgrade
   that server first so it serves the new templates. Conflicting instance URLs for one shared
   destination are reported as incomplete.
@@ -91,7 +91,7 @@ Active sessions and the daemon are not restarted automatically.
 `chorus agents add` is the one command that connects a machine's coding agents to Chorus.
 It detects the agents you already have installed, installs each one's Chorus plugin through
 that agent's own plugin mechanism, and captures your Chorus URL and agent key once into
-`~/.chorus/daemon.json`. For Claude Code, Codex, Hermes, and DeepSeek Harness it also writes the
+`~/.chorus/daemon.json`. For Claude Code, Codex, TRAE CLI, Hermes, and DeepSeek Harness it also writes the
 credential into that agent's own configuration, so interactive sessions authenticate with no
 manual environment setup (see [Where the credential goes](#where-the-credential-goes)).
 
@@ -102,22 +102,51 @@ chorus agents add --agents claude,codex \
   --url https://chorus.example.com --api-key cho_xxx
 ```
 
-Setup can be rerun to add agents or refresh credentials. Supported agents are Claude Code, Codex, Kiro, Pi, OpenCode, OpenClaw, Hermes, and DeepSeek Harness (dsh). Pi setup selects native MCP for stable `>=0.99.0 <2.0.0` or `pi-mcp-adapter@5.0.0` for `0.84.4–0.98.x`, alongside `chorus-pi`. Missing, unsupported, or uncertain Pi versions receive guidance rather than an unconditional MCP-complete claim. See [Pi](/reference/agents/pi/).
+Setup can be rerun to add agents or refresh credentials. Supported agents are Claude Code, Codex, TRAE CLI (trae), Kiro, Pi, OpenCode, OpenClaw, Hermes, and DeepSeek Harness (dsh). Pi setup selects native MCP for stable `>=0.99.0 <2.0.0` or `pi-mcp-adapter@5.0.0` for `0.84.4–0.98.x`, alongside `chorus-pi`. Missing, unsupported, or uncertain Pi versions receive guidance rather than an unconditional MCP-complete claim. See [Pi](/reference/agents/pi/).
 
 Useful flags (`chorus agents add --help` lists them all):
 
 - `--agents <a,b>` / `--all` — which agents to configure.
 - `--url` / `--api-key` — supply the credential non-interactively (env: `CHORUS_URL` / `CHORUS_API_KEY`).
-- `--update-installed` — refresh existing installations. For Pi, this runs `pi update --extensions`;
-  simply repeating `pi install` does not update an already-installed package.
 - `--dsh-profile <name>` — the DeepSeek Harness profile to install the bundle into.
 - `--daemon-wake <a,b>` / `--daemon-wake-all` — opt the named (or every) wakeable agent into
-  daemon waking. Wakeable agents (Claude Code, Codex, Kiro, Pi) are added *parked* by default —
+  daemon waking. Wakeable agents (Claude Code, Codex, TRAE CLI, Kiro, Pi) are added *parked* by default —
   reachable by `chorus mcp` but not woken by the daemon until opted in here or at the
-  per-agent TTY prompt.
+  per-agent TTY prompt. From Chorus 0.22.2 this also works for an agent that is already
+  configured; see [Re-run setup for a configured agent](#re-run-setup-for-a-configured-agent).
 - `--daemon-autostart` — also install and enable the daemon boot service (Linux systemd / macOS launchd).
 - `--no-linger` — skip Linux systemd lingering setup or repair; it does not disable an existing setting. See [daemon operations](/guides/daemon-operations/).
 - `-y, --yes` — skip confirmations (implied when not a TTY, where you must pass `--agents` or `--all`).
+
+### Refresh installed plugins
+
+When a selected agent already has its Chorus plugin installed, an interactive run asks once:
+`Update installed Chorus plugins to the latest available versions? [y/N]`. With `--yes`, or
+in a non-TTY run, setup updates without asking. If you answer no, a complete existing
+installation is left as it is. For Pi, an update refreshes only the eligible Chorus packages
+with a targeted `pi update --extension <source>`; it never updates every extension or Pi
+itself. `chorus upgrade --plugins` always refreshes the configured plugins without asking.
+
+### Re-run setup for a configured agent
+
+From Chorus 0.22.2, re-running `chorus agents add` with a key that is already configured
+applies the settings you explicitly requested to the existing entry in
+`~/.chorus/daemon.json`. For example, `chorus agents add --daemon-wake claude` turns on
+daemon waking for an agent you added earlier. The summary reports one outcome per agent:
+
+- `seeded` — the requested settings were applied; the line names the updated fields
+  (`daemonWake`, `cwds`).
+- `skipped` — nothing was requested, or the settings already had the requested value.
+- `failed` — a setting was requested but could not be applied. The command exits with a
+  nonzero code and suggests editing `~/.chorus/daemon.json`, or removing and re-adding the
+  agent.
+
+Only an explicit request changes `daemonWake`: `--daemon-wake`, `--daemon-wake-all`, or your
+answer at the per-agent prompt. A non-TTY run without those flags never switches off an
+earlier opt-in. An existing agent's `cwds` are kept unless you choose directories at the
+interactive working-directory prompt; a default or inherited directory is not applied to it.
+If no selected agent ends up enabled for waking, setup prints how to enable it and suggests
+`chorus agents` to check the current state (`wake:off` marks an opted-out agent).
 
 List and remove configured agents:
 
@@ -129,7 +158,7 @@ chorus agents remove <name|uuid>  # remove one (match by name or UUID)
 `chorus agents` never prints an API key. A listed name or UUID is a valid value for
 `chorus mcp --agent` or the `CHORUS_AGENT_PROFILE` environment variable.
 
-For Codex, `--yes` never authorizes an App Server restart. Successful credential/MCP setup offers a separate interruption warning and consent prompt only in an interactive terminal. See [Codex](/reference/agents/codex/).
+For Codex and TRAE CLI, `--yes` never authorizes an App Server restart. Successful credential/MCP setup offers a separate interruption warning and consent prompt only in an interactive terminal. See [Codex](/reference/agents/codex/) and [TRAE CLI](/reference/agents/trae/).
 
 ## Hermes setup (0.22.0)
 
@@ -156,7 +185,7 @@ chorus agents run --name work --type codex -- resume # override the backend, the
 - **What's injected** (into the launched process only — never your shell, never printed):
   `CHORUS_URL`, `CHORUS_API_KEY`, and `CHORUS_AGENT_PROFILE`.
 - **Which binary** — defaults to the agent's stored backend; `--type` overrides it. Types map to
-  `claude`, `codex`, `kiro-cli`, `pi`, `opencode`, `openclaw`, and `dsh`. Agents
+  `claude`, `codex`, `kiro-cli`, `pi`, `traecli`, `opencode`, `openclaw`, and `dsh`. Agents
   added as OpenCode / OpenClaw / DeepSeek Harness are stored as `offline` (the daemon will not
   auto-wake them), so pass `--type` explicitly to launch those.
 - **Passthrough** — everything after `--` goes to the agent verbatim, so its full flag surface is
@@ -191,6 +220,7 @@ the configured option and its value:
 | --- | --- |
 | `claude-code` / `claude` | `--model`, `--effort` |
 | `codex` | `--model` / `-m` / config key `model`; config key `model_reasoning_effort` |
+| `trae` | Same as `codex` |
 | `kiro` | `--model`, `--effort` |
 | `pi` | `--model`, `--thinking`, `--provider` |
 | `opencode` | `--model` / `-m` |
@@ -209,8 +239,8 @@ chorus agents run --name pi-worker -- --model anthropic/claude-sonnet-4-6 --thin
 chorus agents run --name codex-worker -- exec --model gpt-5.4 -c model_reasoning_effort=high
 ```
 
-**Subcommands:** persistent args go after the deepest recognized command: Codex `exec`,
-`exec resume`, or `resume`; Kiro `chat`; OpenClaw `agent`. Put the explicit override in that
+**Subcommands:** persistent args go after the deepest recognized command: Codex and TRAE CLI
+`exec`, `exec resume`, or `resume`; Kiro `chat`; OpenClaw `agent`. Put the explicit override in that
 same scope: `exec --model chosen`, not `--model chosen exec`. A model option placed before
 the subcommand does not replace the subcommand's configured model; Codex `-c`/`--config`
 keys apply across scopes. Without a recognized command, configured args are placed first. Other command paths are not
@@ -232,7 +262,7 @@ inferred; omit incompatible persistent args and use native passthrough for those
 - All explicit tokens are still forwarded unchanged; checking backend flag and version
   compatibility is up to you. For Windows `.cmd`/`.bat` limits, see the daemon guide.
 
-The Codex daemon further limits persistent args to model options and permitted `-c` /
+The Codex and TRAE CLI daemons further limit persistent args to model options and permitted `-c` /
 `--config` overrides. Other flags fail before the daemon wakes the agent, even if they work
 in a foreground session. See
 [Codex daemon configuration](/reference/agents/codex/#model-options-and-session-continuity).
@@ -281,6 +311,7 @@ configuration so interactive sessions authenticate without any manual export:
 | --- | --- |
 | Claude Code | The `env` block of `~/.claude/settings.json` (honors `CLAUDE_CONFIG_DIR`). |
 | Codex | `~/.codex/.env` (honors `CODEX_HOME`); Codex reads its key from the environment through a keyless `config.toml` entry. |
+| TRAE CLI | `~/.trae/.env` (honors `TRAE_HOME`); traecli reads its key from the environment through a keyless `traecli.toml` entry. |
 | DeepSeek Harness | `$DSH_HOME/.env`. |
 | Hermes | `$HERMES_HOME/.env` (default `~/.hermes/.env`, mode `0600`); remote MCP configuration stores a key placeholder. |
 

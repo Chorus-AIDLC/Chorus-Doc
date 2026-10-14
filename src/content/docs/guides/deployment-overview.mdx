@@ -9,8 +9,8 @@ sidebar:
 
 This page introduces the supported ways to run and self-host Chorus, lists what each form
 needs, and helps you pick one. Once you have chosen, the [Docker](/guides/deploy-docker/),
-[production](/guides/deploy-production/), and [operations](/guides/deploy-operations/) guides
-take you the rest of the way.
+[local self-host](/guides/deploy-local/), [production](/guides/deploy-production/), and
+[operations](/guides/deploy-operations/) guides take you the rest of the way.
 
 ## Deployment forms
 
@@ -32,10 +32,19 @@ You can also run the local form in Docker as a **standalone container**: the sam
 database, with its data kept in a Docker volume. See
 [Standalone (embedded database)](/guides/deploy-docker/#standalone-embedded-database).
 
+### Self-hosted on one host
+
+A long-running instance on your own Linux or macOS host, with a real **PostgreSQL 17** database
+in Docker Compose instead of the embedded one. Chorus 0.22.2 and later set it up with
+`bash install.sh --target local`: the installer pulls or builds the app image, writes protected
+account configuration, and saves a wrapper for repeatable redeployments. The app is reachable from
+your LAN over HTTP, with optional self-signed LAN HTTPS or a Cloudflare Named Tunnel. It is a
+single-instance setup without Redis. See [Self-host on a local machine](/guides/deploy-local/).
+
 ### Production
 
-A shared installation for a team, backed by an **external PostgreSQL 16** database that you
-manage and back up, and served by one or more application instances. **Redis 7** is optional
+A shared installation for a team, backed by an **external PostgreSQL** database that you
+manage and back up (the repository's Compose files default to PostgreSQL 17), and served by one or more application instances. **Redis 7** is optional
 for a single instance and **required** when you run more than one, because instances propagate
 live updates (Server-Sent Events) to each other through Redis. Without Redis, Chorus falls back
 to in-memory eventing, which only works for a single instance.
@@ -51,7 +60,10 @@ stack (see [Deploy in production](/guides/deploy-production/)).
 - **Port `8637`** — the application listens here. Publish or proxy this port to reach the UI and
   the MCP endpoint.
 - **Database** — nothing to provision for the local form (embedded PGlite). For production, an
-  external **PostgreSQL 16** database reachable over a connection string.
+  external **PostgreSQL** database reachable over a connection string. The repository's Compose
+  files and the self-host stack default to **PostgreSQL 17**; an existing PostgreSQL 16 data
+  volume must be migrated before you switch (see
+  [Self-host on a local machine](/guides/deploy-local/#postgresql-17-and-existing-postgresql-16-volumes)).
 - **Cache** — none required for a single instance. For multi-instance production, a **Redis 7**
   endpoint for cross-instance event propagation.
 
@@ -61,13 +73,17 @@ stack (see [Deploy in production](/guides/deploy-production/)).
 | --- | --- | --- | --- |
 | Try Chorus or work solo on one machine | Local single-machine | Embedded PGlite | None |
 | Run a shared instance with the least moving parts | Local form in a standalone container | Embedded PGlite (in a volume) | None |
-| Run a shared, resilient, or multi-instance install | Production (Docker, npm, or AWS CDK) | External PostgreSQL 16 | Redis 7 (required for 2+ instances) |
+| Run a long-lived instance on your own host, reachable from your LAN | [Self-hosted on one host](/guides/deploy-local/) (`install.sh --target local`) | PostgreSQL 17 (in Compose) | None |
+| Run a shared, resilient, or multi-instance install | Production (Docker, npm, or AWS CDK) | External PostgreSQL (17 by default) | Redis 7 (required for 2+ instances) |
 
 ## Continue
 
 - **[Deploy with Docker](/guides/deploy-docker/)** — the published `chorusaidlc/chorus-app`
   image: standalone and production Compose files, a `docker run` example, the full
   environment-variable reference, and startup behaviour.
+- **[Self-host on a local machine](/guides/deploy-local/)** — `install.sh` local setup, the
+  redeploy wrapper, optional self-signed LAN HTTPS or Cloudflare Tunnel, and the PostgreSQL 16 to
+  17 migration.
 - **[Deploy in production](/guides/deploy-production/)** — running against your own PostgreSQL
   and Redis, multi-instance requirements, and the full AWS CDK walkthrough.
 - **[Operate a self-hosted Chorus](/guides/deploy-operations/)** — first-login bootstrap, deployment-side

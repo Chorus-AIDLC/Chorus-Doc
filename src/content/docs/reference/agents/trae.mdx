@@ -1,0 +1,215 @@
+---
+title: TRAE CLI
+description: Connect TRAE CLI (traecli) to Chorus through the shared Codex plugin package and make it available for remote work.
+docsLocale: en
+route: /reference/agents/trae/
+---
+
+TRAE CLI (`traecli`) has a first-party Chorus integration in **Chorus 0.22.2 and later**.
+TRAE CLI is a fork of Codex, so Chorus reuses the **Codex plugin package** and the Codex App
+Server transport for daemon wakes. There is no separate TRAE plugin to install. TRAE CLI is
+also a supported Chorus daemon backend.
+
+The minimum tested version is **traecli 0.209.1**. Earlier versions are unverified.
+
+## Prerequisites
+
+- `traecli` installed and on `PATH`. Check the version with `traecli --version`.
+- TRAE CLI logged in (`traecli login`, or start `traecli` once and finish the login flow).
+  Chorus does not handle TRAE authentication.
+- A reachable Chorus URL and an agent key. Create the key by following
+  [Prepare agent access](/guides/administrator-setup/).
+
+All TRAE paths below honor `TRAE_HOME` and fall back to `~/.trae`. Chorus reads `TRAE_HOME`
+only, not `TRAECLI_HOME`.
+
+## Install the integration
+
+Install the `chorus` CLI, then configure TRAE CLI:
+
+```bash
+npm install --global @chorus-aidlc/chorus
+chorus agents add --agents trae
+```
+
+Enter the Chorus URL and agent key when prompted, or export `CHORUS_URL` and
+`CHORUS_API_KEY` first. The command is idempotent and safe to re-run. It:
+
+1. Checks that `traecli` is installed.
+2. Registers the `chorus-plugins` marketplace through TRAE's own plugin CLI
+   (`traecli plugin marketplace add …`). An already registered marketplace is not added
+   again. When you refresh an existing installation, it runs
+   `traecli plugin marketplace upgrade chorus-plugins`.
+3. Installs the Codex plugin package with `traecli plugin install chorus@chorus-plugins --yes`.
+   This copies the plugin into `$TRAE_HOME/plugins/cache/chorus-plugins/chorus/<version>/` and
+   adds `[marketplaces.chorus-plugins]` and `[plugins."chorus@chorus-plugins"]` to
+   `$TRAE_HOME/traecli.toml`. The original `traecli.toml` is backed up before it changes.
+4. Saves your Chorus credentials in `~/.chorus/daemon.json` with agent type `trae`.
+5. Writes `CHORUS_URL`, `CHORUS_API_KEY`, and `CHORUS_AGENT_PROFILE` into `$TRAE_HOME/.env`
+   (mode `0600`, other entries preserved). traecli loads this file at startup, so plugin hooks,
+   shell-tool `chorus` calls, and native MCP all get your identity with no manual export.
+6. Writes a **keyless** `[mcp_servers.chorus]` block into `$TRAE_HOME/traecli.toml`:
+
+   ```toml
+   [mcp_servers.chorus]
+   url = "https://chorus.example.com/api/mcp"
+   bearer_token_env_var = "CHORUS_API_KEY"
+   ```
+
+   traecli turns the named variable from `$TRAE_HOME/.env` into the
+   `Authorization: Bearer <key>` header. The key is never stored in `traecli.toml`.
+
+For a non-interactive install (CI or a sandbox):
+
+```bash
+chorus agents add --agents trae \
+  --url https://chorus.example.com \
+  --api-key cho_REDACTED --yes
+```
+
+The in-app setup wizard at **Settings → Setup Guide** has a **TRAE CLI** tab with the same
+steps.
+
+### `.env` overrides the shell
+
+Like Codex, traecli lets `$TRAE_HOME/.env` **override** a conflicting value exported in your
+shell or by a parent process:
+
+- To switch identity, re-run `chorus agents add --agents trae` (on a terminal it asks before
+  repointing an existing profile) or edit `$TRAE_HOME/.env`. Exporting a different
+  `CHORUS_API_KEY` has no effect.
+- If several Chorus agents use the TRAE backend in one daemon, give **each agent its own
+  `TRAE_HOME`**. Set `TRAE_HOME` in that agent's `env` in `~/.chorus/daemon.json`, and run
+  `chorus agents add --agents trae` once with that `TRAE_HOME` exported. Otherwise every agent
+  that shares one home wakes as the identity stored in its `.env`.
+
+### Apply configuration to a running App Server
+
+If a TRAE App Server daemon is already running, an interactive run asks before restarting it
+with `traecli app-server daemon restart`, so it picks up the new environment. The prompt
+defaults to **No**, because a restart can interrupt other TRAE CLI sessions.
+
+- Non-interactive runs, `--yes`, and `CHORUS_DAEMON_HEADLESS=1` never restart it.
+- If no App Server daemon is running, setup does not start one. Unlike Codex,
+  `traecli app-server daemon version` exits with an error when no daemon is running, so setup
+  reports the restart as deferred ("daemon state could not be determined").
+
+## Trust the Chorus hooks
+
+The plugin ships Chorus lifecycle hooks: a `SessionStart` check-in plus `PostToolUse`
+reviewer nudges after `chorus_pm_submit_proposal`, `chorus_submit_for_verify`, and
+`chorus_admin_verify_task`. **traecli runs plugin hooks only after you trust them.** Open
+`traecli` and accept the hook-trust review for the `chorus@chorus-plugins` hooks. Until you do,
+there is no automatic check-in and no reviewer reminder. Repeat the review whenever a plugin
+update changes the hook definitions.
+
+TRAE CLI and Codex run the same hook scripts. Each script detects TRAE when the plugin is
+installed under `$TRAE_HOME/plugins/` and then uses TRAE wording, for example sub-agents
+started with the `Agent` tool instead of Codex's `spawn_agent`. Set
+`CHORUS_HOOK_RUNTIME=trae` or `CHORUS_HOOK_RUNTIME=codex` to force the detection.
+
+## Enable remote start
+
+Skip this section if you only use Chorus from an interactive TRAE CLI session. Otherwise,
+follow [Connect an agent runtime](/guides/operator-onboarding/) and select `trae` as the
+backend. Verify the connection in the foreground before using
+[Operate the Chorus daemon](/guides/daemon-operations/) to keep it online.
+
+```bash
+chorus daemon --agent trae
+```
+
+You can also make TRAE CLI the default with `{ "agent": "trae" }` in `~/.chorus/daemon.json`,
+or set `"agentType": "trae"` on one entry of `agents[]`.
+
+## Daemon behavior
+
+Each wake launches one isolated `traecli app-server --listen stdio://` process. It uses the
+same App Server implementation as the [Codex backend](/reference/agents/codex/): the same
+thread resume, interruption, cleanup, and permission-mode mapping. Differences from Codex:
+
+- **Binary and home:** the binary is `traecli` (override it with `CHORUS_TRAE_PATH`), the home
+  is `TRAE_HOME` (default `~/.trae`), and the config file is `traecli.toml`.
+- **Separate local records:** thread IDs and usage are stored in `~/.chorus/trae-sessions.json`
+  and `~/.chorus/trae-usage.json`, separate from Codex, so a thread is never resumed on the
+  wrong backend.
+- **Reporting:** wake errors and daemon connections report `trae` as their source and client
+  type. **Settings → Agents** labels the connection **TRAE CLI**.
+- **Arguments:** per-agent `args` follow the Codex rules: model selection (`-m`) and permitted
+  `-c key=value` settings, with the same protected keys. TRAE CLI also blocks the
+  `permission_mode` config key and adds its own protected controls, such as `--permission-mode`, `--worktree`, and `--session-id`; the daemon applies
+  the permission posture over the protocol instead.
+- **Hooks:** if the hooks are untrusted, a woken TRAE process still runs but skips the
+  `SessionStart` check-in.
+
+For a foreground launch with the agent's Chorus connection injected, run
+`chorus agents run --name <agent> --type trae`.
+
+### Restricted mode (`--chorus-only`)
+
+`--chorus-only` keeps the TRAE sandbox read-only with interactive approvals disabled. A
+read-only sandbox normally gates every MCP tool on approval, which would refuse Chorus tools
+too. So when `traecli.toml` declares `[mcp_servers.chorus]`, the daemon pre-approves exactly
+one MCP server, the Chorus one, for the woken thread only:
+
+```json
+"config": { "mcp_servers.chorus.default_tools_approval_mode": "approve" }
+```
+
+- The sandbox stays read-only, so writes and other side-effecting commands are still blocked.
+  Tools of other MCP servers, and shell, file-change, and permission approvals, are still
+  refused.
+- The override is never written to your config file, and YOLO mode does not send it. Without a
+  declared `[mcp_servers.chorus]` table it is omitted. Only the plain `[mcp_servers.chorus]`
+  table header is detected, not inline-table or dotted-key forms.
+- Every tool of the server named `chorus` is pre-approved, including write and admin tools.
+  What the woken agent can change in Chorus is bounded only by its key's permissions, so give a
+  restricted daemon a key with only the permissions it needs.
+- The daemon trusts whatever `[mcp_servers.chorus]` points at. Keep that entry pointed at your
+  Chorus MCP endpoint, as `chorus agents add` writes it.
+
+## Verify the connection
+
+Open `traecli` and ask it to `check in to chorus`. TRAE calls `chorus_checkin()` through the MCP
+server and reports your agent identity and permissions. To list MCP servers, run
+`traecli mcp list`.
+
+The Chorus workflow skills (`$chorus`, `$develop`, `$proposal`, `$yolo`, and others) come from
+the same plugin as Codex. The skills describe sub-agents with Codex's `spawn_agent` tool, but
+TRAE CLI's sub-agent tool is `Agent`.
+
+For daemon mode, open **Settings → Agents** in Chorus and confirm that the expected host and
+working directory are online.
+
+## Upgrade and remove
+
+- `chorus upgrade --plugins` refreshes the Chorus plugin for configured `trae` entries in
+  `~/.chorus/daemon.json`, honoring each entry's `TRAE_HOME`. See
+  [the CLI reference](/reference/cli/#upgrade-the-cli-and-plugins).
+- Re-running `chorus agents add --agents trae` when the plugin is already installed asks
+  `Update installed Chorus plugins to the latest available versions? [y/N]`. Answering `y`
+  upgrades the marketplace and reinstalls the plugin; the default (No) keeps the installed
+  plugin. With `--yes` or in a non-interactive run, it updates without asking. Either way, the
+  run also refreshes the `$TRAE_HOME/.env` credential.
+- `chorus agents remove <name|uuid>` removes the agent from `~/.chorus/daemon.json` only. Any
+  `CHORUS_*` values in `~/.trae/.env`, the keyless `[mcp_servers.chorus]` block, and the
+  `chorus@chorus-plugins` plugin entry in `~/.trae/traecli.toml` are left in place; clear them
+  manually if needed.
+
+## Common issues
+
+- **`traecli` is not found:** install TRAE CLI and make sure `traecli` is on `PATH`, or set
+  `CHORUS_TRAE_PATH`.
+- **No Chorus tools, or `401 Unauthorized`:** `$TRAE_HOME/.env` is missing the key, the key was
+  revoked, or an App Server daemon is still running with an old environment. Re-run
+  `chorus agents add --agents trae` and let it restart the App Server, or run
+  `traecli app-server daemon restart` yourself once work is saved.
+- **Hooks never fire:** trust the Chorus hooks and check that `chorus@chorus-plugins` is
+  enabled in `$TRAE_HOME/traecli.toml`.
+- **Wrong agent identity in daemon wakes:** several TRAE agents share one `TRAE_HOME`. Give
+  each agent its own home.
+- **Marketplace upgrade reports "is not configured as a Git marketplace":** this is expected
+  for a local-path marketplace source (`CHORUS_MARKETPLACE_SOURCE_TRAE`). Setup treats it as a
+  no-op and reinstalls the plugin.
+- **Daemon is offline:** run `chorus daemon status`, then see
+  [Troubleshoot agent connections](/guides/troubleshooting/).

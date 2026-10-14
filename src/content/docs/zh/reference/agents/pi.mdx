@@ -94,7 +94,7 @@ pi mcp list
 
 ### 升级与迁移已有适配器
 
-`chorus upgrade --plugins` 与 `chorus init --update-installed` 只更新符合条件的 Chorus 组件，不更新所有扩展或 Pi 本身。旧版保留已验证的适配器 `5.0.0` 固定版本，不追随 latest。其他适配器约束及 Chorus 固定版本或范围也会保留，可能导致配置或最新版本刷新未完成。
+`chorus upgrade --plugins` 以及在 `chorus agents add` 中接受的插件更新只更新符合条件的 Chorus 组件，不更新所有扩展或 Pi 本身。旧版保留已验证的适配器 `5.0.0` 固定版本，不追随 latest。其他适配器约束及 Chorus 固定版本或范围也会保留，可能导致配置或最新版本刷新未完成。
 
 在原生宿主上，Chorus 只对已有适配器或 `-builtin:mcp` 扩展过滤器发出警告。若选择原生 MCP，请检查全局 `~/.pi/agent/settings.json`（遵循 `PI_CODING_AGENT_DIR`）与项目 `.pi/settings.json`，仅在原配置作用域移除适配器和该过滤器，保留其他设置。`pi remove npm:pi-mcp-adapter` 用于全局 npm 安装，不适用于项目级条目。重启 Pi 后验证实际工具，写入配置本身并不证明连接已恢复。
 
@@ -125,7 +125,14 @@ pi install npm:@chorus-aidlc/chorus-pi
 - **3 个只读评审子智能体**：`chorus-proposal-reviewer`、`chorus-task-reviewer`、
   `chorus-code-reviewer`，从包内目录发现（无需复制），通过 `subagent` 工具派生；
   它们发布一条 `VERDICT` 评论后停止。使用社区的 `pi-subagents` 包时，调用中直接点名的 Chorus 评审
-  子智能体和 worker 一律在后台运行（即使调用要求 `async: false`），因为该包的前台子进程无法访问 Chorus 工具。
+  子智能体和 worker 一律在后台运行（即使调用要求 `async: false`），扩展会把它们固定在后台运行路径上。
+- **子智能体的按角色划分 Chorus 工具**（Chorus 0.22.1 及以上）：每个评审子智能体只通过自己的
+  `chorus_review` 工具访问 Chorus（查询、签到和评论操作）；内置的 `chorus-worker` 使用 `chorus_work`，
+  在此基础上增加任务认领、释放、更新、汇报、自检、提交验证，以及会话签入/签出操作。两者在原生 MCP
+  和旧版适配器宿主上都能使用，无需任何 MCP 网关工具，也无需修改配置。两种角色都不允许管理操作、
+  创建实体或创建与关闭会话。调用 `chorus_review({ action: "discover" })` 或
+  `chorus_work({ action: "discover" })` 可列出允许的操作。这是工具策略，不是沙箱：`bash`、网络访问和
+  继承的凭据都不受隔离。
 - **Pi 官方的 `subagent` 工具**，内置于 `extensions/subagent/`（Pi 的参考实现），无需任何第三方
   子智能体包。它同时**与社区的 `pi-subagents` 包（nicobailon）共存**：两者都注册名为 `subagent`
   的工具，因此需通过 `settings.packages` 过滤器排除内置的那一个；`chorus-pi` 的会话生命周期既支持
@@ -194,6 +201,6 @@ npm install -g "@earendil-works/pi-coding-agent@>=0.85.0 <2.0.0"       # 升级 
 - **技能或评审智能体未加载**：确认已安装 `chorus-pi` 并重启 Pi。评审智能体随包提供，无需手动复制或另装子智能体包。
 - **连接未授权**：检查启动 shell 的 `CHORUS_URL`、`CHORUS_API_KEY`，然后重启 Pi。不要把真实密钥写入共享配置。
 - **工具名称不同**：先发现实际工具，不要猜测。原生 MCP 使用 `mcp__chorus__chorus_checkin` 等名称，旧版直接工具常用 `chorus_chorus_checkin`。`toolPrefix: "none"` 只改变旧版名称，不启用直接工具。
-- **旧插件的工作流提醒或原生评审异常**：升级 Chorus 至 0.21.1 或更新版本。该版本修复 Pi/dsh 在不同 MCP 前缀下的工作流提醒及 Pi 原生 MCP 评审兼容性。评审智能体除发布结论外仍保持只读。
+- **评审子智能体或 worker 无法访问 Chorus 工具**：升级 Chorus 至 0.22.1 或更新版本。该版本在原生 MCP 和适配器宿主上恢复了按角色划分的 `chorus_review` 与 `chorus_work` 工具。如果你把内置的智能体文件复制到了其他位置，请更新其中的 `subagentOnlyExtensions` 提供者路径。不同 MCP 前缀下的工作流提醒需要 0.21.1 或更新版本。评审智能体除发布结论外仍保持只读。
 
 通用连接问题见[排查智能体连接故障](/zh/guides/troubleshooting/)。

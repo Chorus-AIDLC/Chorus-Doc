@@ -97,7 +97,7 @@ pi mcp list
 
 ### 기존 어댑터 업그레이드와 마이그레이션
 
-`chorus upgrade --plugins`와 `chorus init --update-installed`는 대상 Chorus 구성 요소만 갱신하며 모든 확장이나 Pi 자체를 업그레이드하지 않습니다. 이전 어댑터는 검증된 `5.0.0` 고정을 유지하며 latest로 바꾸지 않습니다. 다른 어댑터 제약과 Chorus 버전 고정·범위도 보존하므로 설정 또는 최신 버전 갱신이 미완료로 남을 수 있습니다.
+`chorus upgrade --plugins`와 `chorus agents add`에서 수락한 플러그인 업데이트는 대상 Chorus 구성 요소만 갱신하며 모든 확장이나 Pi 자체를 업그레이드하지 않습니다. 이전 어댑터는 검증된 `5.0.0` 고정을 유지하며 latest로 바꾸지 않습니다. 다른 어댑터 제약과 Chorus 버전 고정·범위도 보존하므로 설정 또는 최신 버전 갱신이 미완료로 남을 수 있습니다.
 
 네이티브 호스트에서는 기존 어댑터나 `-builtin:mcp` 확장 필터에 경고만 표시합니다. 네이티브 MCP로 전환하려면 전역 `~/.pi/agent/settings.json`(`PI_CODING_AGENT_DIR` 적용)과 프로젝트 `.pi/settings.json`을 확인하세요. 구성한 범위에서만 어댑터와 해당 필터를 제거하고 나머지 설정은 유지하세요. `pi remove npm:pi-mcp-adapter`는 전역 npm 설치용이며 프로젝트 항목을 제거하는 명령이 아닙니다. Pi를 재시작하고 실제 MCP 도구를 확인하세요. 구성 파일을 쓰는 것만으로 연결이 복구되지는 않습니다.
 
@@ -132,8 +132,15 @@ Pi를 재시작하고 `/mcp`를 확인한 뒤 Pi에 `chorus_checkin` 호출을 �
 - **3개의 읽기 전용 검토용 서브에이전트** — `chorus-proposal-reviewer`, `chorus-task-reviewer`,
   `chorus-code-reviewer` — 패키지 상대 경로로 검색되며(복사 없음) `subagent` 도구를
   통해 생성됩니다. 이들은 `VERDICT` 댓글을 남기고 멈춥니다. 커뮤니티 `pi-subagents` 패키지를 쓸 때,
-  호출에서 직접 지정한 Chorus 검토자와 작업자는 그 호출이 `async: false`를 요청하더라도 백그라운드에서 실행됩니다. 그 환경의
-  포그라운드 자식은 Chorus 도구에 접근할 수 없기 때문입니다.
+  호출에서 직접 지정한 Chorus 검토자와 작업자는 그 호출이 `async: false`를 요청하더라도 백그라운드에서 실행됩니다. 확장이
+  이들을 백그라운드 실행 경로에 고정하기 때문입니다.
+- **서브에이전트용 역할별 Chorus 도구**(Chorus 0.22.1 이상) — 각 검토자는 자신의 `chorus_review` 도구(조회,
+  체크인, 댓글 작업)를 통해서만 Chorus에 접근하고, 번들된 `chorus-worker`는 `chorus_work`를 사용합니다.
+  `chorus_work`에는 작업 가져가기, 해제, 업데이트, 보고, 자체 점검, 검증 제출, 세션 체크인/체크아웃 작업이 더해집니다.
+  둘 다 네이티브 MCP와 레거시 어댑터 호스트에서 동작하며, MCP 게이트웨이 도구나 설정 변경이 필요 없습니다. 두 역할
+  모두 관리 작업, 엔티티 생성, 세션 생성과 종료는 허용하지 않습니다. `chorus_review({ action: "discover" })` 또는
+  `chorus_work({ action: "discover" })`를 호출하면 허용된 작업 목록을 볼 수 있습니다. 이것은 도구 정책일 뿐 샌드박스가
+  아닙니다. `bash`, 네트워크 접근, 상속된 자격 증명은 격리되지 않습니다.
 - **Pi의 공식 `subagent` 도구**, `extensions/subagent/`에 번들됨(Pi의 참조 패턴) — 서드파티
   서브에이전트 패키지가 필요 없습니다. 또한 커뮤니티 **`pi-subagents` 패키지(nicobailon)와
   공존**합니다. 둘 다 `subagent`라는 도구를 등록하므로 `settings.packages` 필터로 번들된 것을
@@ -208,6 +215,6 @@ npm install -g "@earendil-works/pi-coding-agent@>=0.85.0 <2.0.0"       # pi 자�
 - **스킬이나 검토 에이전트가 없음**: `chorus-pi` 설치를 확인하고 Pi를 재시작하세요. 검토 에이전트는 포함되어 있으므로 수동 복사나 별도 패키지가 필요하지 않습니다.
 - **연결 인증 실패**: 시작 셸의 `CHORUS_URL`과 `CHORUS_API_KEY`를 확인한 뒤 Pi를 재시작하세요. 공유 구성에 실제 키를 넣지 마세요.
 - **도구 이름이 다름**: 추측하지 말고 검색된 스키마를 확인하세요. 네이티브 MCP는 `mcp__chorus__chorus_checkin` 같은 이름을, 이전 직접 도구는 보통 `chorus_chorus_checkin`을 사용합니다. `toolPrefix: "none"`은 이전 도구의 이름만 바꿉니다.
-- **이전 플러그인의 워크플로 알림이나 네이티브 검토 실패**: Chorus 0.21.1 이상으로 업그레이드하세요. 이 릴리스는 MCP 접두사별 Pi/dsh 알림과 Pi 네이티브 MCP 검토 호환성을 수정합니다. 검토 에이전트는 판정 게시 외에는 읽기 전용입니다.
+- **검토자나 작업자가 Chorus 도구에 접근하지 못함**: Chorus 0.22.1 이상으로 업그레이드하세요. 이 릴리스는 네이티브 MCP와 어댑터 호스트 모두에서 역할별 `chorus_review`와 `chorus_work` 도구를 복원합니다. 번들된 에이전트 파일을 다른 위치로 복사했다면 그 파일의 `subagentOnlyExtensions` 제공자 경로를 업데이트하세요. MCP 접두사별 워크플로 알림에는 0.21.1 이상이 필요합니다. 검토 에이전트는 판정 게시 외에는 읽기 전용입니다.
 
 일반 연결 문제는 [에이전트 연결 문제 해결](/ko/guides/troubleshooting/)을 참고하세요.

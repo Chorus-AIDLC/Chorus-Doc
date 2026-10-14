@@ -84,6 +84,12 @@ To upgrade:
    the new container image for a Docker deployment.
 3. Restart Chorus. Migrations apply automatically on boot, then the app starts.
 
+For an installation set up with `install.sh --target local`, steps 2 and 3 are one command: run
+the saved wrapper `bash ./default_deploy_local.sh` (after updating `CHORUS_IMAGE` in the private
+env for a pull-mode install). Upgrading Chorus never upgrades the PostgreSQL major version; moving
+an existing PostgreSQL 16 volume to 17 is a separate offline migration. See
+[Self-host on a local machine](/guides/deploy-local/#redeploy-with-the-saved-wrapper).
+
 :::caution[Back up before upgrading]
 Always back up the database (or the data volume for embedded/volume-backed storage) before
 upgrading. Migrations run automatically and can change the schema; a backup is your only

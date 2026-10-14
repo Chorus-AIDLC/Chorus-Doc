@@ -144,6 +144,7 @@ export default defineConfig({
                 { slug: 'reference/agents' },
                 { slug: 'reference/agents/claude-code' },
                 { slug: 'reference/agents/codex' },
+                { slug: 'reference/agents/trae' },
                 { slug: 'reference/agents/kiro' },
                 { slug: 'reference/agents/openclaw' },
                 { slug: 'reference/agents/hermes' },
@@ -214,6 +215,7 @@ export default defineConfig({
           items: [
             { slug: 'guides/deployment-overview' },
             { slug: 'guides/deploy-docker' },
+            { slug: 'guides/deploy-local' },
             { slug: 'guides/deploy-production' },
             { slug: 'guides/deploy-operations' },
           ],

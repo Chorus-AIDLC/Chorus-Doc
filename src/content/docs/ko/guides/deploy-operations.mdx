@@ -65,6 +65,8 @@ Chorus는 시작 시 보류 중인 데이터베이스 마이그레이션을 자�
 2. 새 버전을 가져옵니다. npm 패키지는 `npm update -g @chorus-aidlc/chorus`, Docker 배포는 새 컨테이너 이미지를 가져옵니다(pull).
 3. Chorus를 재시작합니다. 마이그레이션은 부팅 시 자동으로 적용되고, 그런 다음 앱이 시작됩니다.
 
+`install.sh --target local`로 설정한 설치에서는 2단계와 3단계가 하나의 명령입니다. 저장된 래퍼 `bash ./default_deploy_local.sh`를 실행하세요(pull 모드 설치는 먼저 비공개 env의 `CHORUS_IMAGE`를 수정). Chorus 업그레이드는 PostgreSQL 메이저 버전을 올리지 않으며, 기존 PostgreSQL 16 볼륨을 17로 옮기는 것은 별도의 오프라인 마이그레이션입니다. [로컬 머신에 셀프 호스팅](/ko/guides/deploy-local/#저장된-래퍼로-재배포하기)을 참고하세요.
+
 :::caution[업그레이드 전에 백업하세요]
 업그레이드 전에는 항상 데이터베이스(내장/볼륨 기반 스토리지면 데이터 볼륨)를 백업하세요. 마이그레이션은 자동으로 실행되며 스키마를 바꿀 수 있으므로, 안전하게 롤백할 수 있는 지점은 백업뿐입니다. 사용 중인 구성에 맞춰 표준 [PostgreSQL 백업 문서](https://www.postgresql.org/docs/current/backup.html)를 따르세요.
 :::

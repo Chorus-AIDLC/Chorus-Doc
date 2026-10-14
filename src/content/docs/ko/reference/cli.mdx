@@ -45,9 +45,9 @@ chorus update --plugins    # upgrade의 별칭
 
 ### `--plugins`의 업데이트 범위
 
-`~/.chorus/daemon.json`을 읽어 유형이 Claude Code, Codex, Kiro, Pi로 명시된 항목을 갱신합니다. 데몬 깨우기가 꺼진 항목도 포함됩니다. 갱신 대상은 각 항목의 `env`, `PATH`, 사용자 지정 설정 홈으로 정해집니다. 여러 항목이 공유하는 대상은 한 번만 업데이트하고, 서로 다른 홈은 따로 처리합니다. 현재는 기본 파일만 읽으며 `CHORUS_DAEMON_CONFIG_PATH`에 지정한 경로는 읽지 않습니다.
+`~/.chorus/daemon.json`을 읽어 유형이 Claude Code, Codex, TRAE CLI, Kiro, Pi로 명시된 항목을 갱신합니다. 데몬 깨우기가 꺼진 항목도 포함됩니다. 갱신 대상은 각 항목의 `env`, `PATH`, 사용자 지정 설정 홈으로 정해집니다. 여러 항목이 공유하는 대상은 한 번만 업데이트하고, 서로 다른 홈은 따로 처리합니다. 현재는 기본 파일만 읽으며 `CHORUS_DAEMON_CONFIG_PATH`에 지정한 경로는 읽지 않습니다.
 
-- **Claude Code와 Codex**: 호스트의 플러그인 기능으로 Chorus 플러그인을 갱신합니다.
+- **Claude Code, Codex, TRAE CLI**: 호스트의 플러그인 기능으로 Chorus 플러그인을 갱신합니다.
 - **Kiro**: 항목에 설정된 Chorus 인스턴스에서 템플릿을 가져옵니다. 새 템플릿을 받으려면 해당 서버를 먼저 업그레이드하세요. 하나의 공유 대상에 서로 다른 인스턴스 URL이 지정되어 있으면 미완료로 보고합니다.
 - **Pi**: 안정 버전 `>=0.99.0 <2.0.0`은 네이티브 MCP를 사용하며 대상 `@chorus-aidlc/chorus-pi`만 업데이트합니다. `0.84.4–0.98.x`는 검증된 `pi-mcp-adapter@5.0.0` 고정을 유지합니다. 다른 어댑터 제약과 Chorus 고정·범위·태그도 보존하므로 설정 또는 최신 버전 갱신이 미완료일 수 있습니다. 모든 확장이나 Pi 자체를 갱신하거나 기존 어댑터를 자동 제거하지 않습니다. [Pi 설정과 마이그레이션](/ko/reference/agents/pi/)을 참고하세요.
 
@@ -66,7 +66,7 @@ npm 설치는 진행 상황을 출력하며 설치 시간 제한이 없습니다
 `chorus agents add`는 컴퓨터의 코딩 에이전트를 Chorus에 연결하는 하나의 명령입니다. 이미 설치되어
 있는 에이전트를 감지하고, 각 에이전트의 자체 플러그인 방식으로 Chorus 플러그인을 설치하며,
 Chorus URL과 에이전트 키를 한 번 받아 `~/.chorus/daemon.json`에 저장합니다. Claude Code, Codex,
-DeepSeek Harness의 경우에는 인증 정보를 그 에이전트 자신의 구성에도 쓰므로, 대화형 세션이 수동 환경
+TRAE CLI, DeepSeek Harness의 경우에는 인증 정보를 그 에이전트 자신의 구성에도 쓰므로, 대화형 세션이 수동 환경
 설정 없이 인증합니다([인증 정보는 어디로 가는가](#인증-정보는-어디로-가는가) 참조).
 
 ```sh
@@ -76,19 +76,45 @@ chorus agents add --agents claude,codex \
   --url https://chorus.example.com --api-key cho_xxx
 ```
 
-에이전트 추가나 인증 정보 갱신을 위해 설정을 다시 실행할 수 있습니다. Claude Code, Codex, Kiro, Pi, OpenCode, OpenClaw, Hermes, DeepSeek Harness(dsh)를 지원합니다. Pi 안정 버전 `>=0.99.0 <2.0.0`에는 네이티브 MCP, `0.84.4–0.98.x`에는 `pi-mcp-adapter@5.0.0`을 선택하고 `chorus-pi`를 설치합니다. Pi가 없거나 미지원 또는 버전 불명이면 안내를 제공하며 무조건 MCP 설정 완료를 보고하지 않습니다. [Pi](/ko/reference/agents/pi/)를 참고하세요.
+에이전트 추가나 인증 정보 갱신을 위해 설정을 다시 실행할 수 있습니다. Claude Code, Codex, TRAE CLI(trae), Kiro, Pi, OpenCode, OpenClaw, Hermes, DeepSeek Harness(dsh)를 지원합니다. Pi 안정 버전 `>=0.99.0 <2.0.0`에는 네이티브 MCP, `0.84.4–0.98.x`에는 `pi-mcp-adapter@5.0.0`을 선택하고 `chorus-pi`를 설치합니다. Pi가 없거나 미지원 또는 버전 불명이면 안내를 제공하며 무조건 MCP 설정 완료를 보고하지 않습니다. [Pi](/ko/reference/agents/pi/)를 참고하세요.
 
 유용한 플래그(`chorus agents add --help`가 전부 나열합니다):
 
 - `--agents <a,b>` / `--all` — 구성할 에이전트.
 - `--url` / `--api-key` — 인증 정보를 비대화형으로 제공(환경 변수: `CHORUS_URL` / `CHORUS_API_KEY`).
-- `--update-installed` — 기존 설치를 갱신합니다. Pi는 `pi update --extensions`를 실행합니다.
-  `pi install`만 반복해서는 이미 설치된 패키지가 업데이트되지 않습니다.
 - `--dsh-profile <name>` — 번들을 설치할 DeepSeek Harness 프로필.
-- `--daemon-wake <a,b>` / `--daemon-wake-all` — 지정한(또는 깨울 수 있는 모든) 에이전트를 데몬 깨우기 대상으로 선택합니다. 깨울 수 있는 에이전트(Claude Code, Codex, Kiro, Pi)는 기본적으로 "파킹" 상태로 추가됩니다. `chorus mcp`로는 접근할 수 있지만, 여기서 명시적으로 선택하거나 TTY의 에이전트별 프롬프트에서 선택하기 전까지는 데몬이 깨우지 않습니다.
+- `--daemon-wake <a,b>` / `--daemon-wake-all` — 지정한(또는 깨울 수 있는 모든) 에이전트를 데몬 깨우기 대상으로 선택합니다. 깨울 수 있는 에이전트(Claude Code, Codex, TRAE CLI, Kiro, Pi)는 기본적으로 "파킹" 상태로 추가됩니다. `chorus mcp`로는 접근할 수 있지만, 여기서 명시적으로 선택하거나 TTY의 에이전트별 프롬프트에서 선택하기 전까지는 데몬이 깨우지 않습니다. Chorus 0.22.2부터는 이미 구성된 에이전트에도 동작합니다. [구성된 에이전트에 대해 설정 다시 실행하기](#구성된-에이전트에-대해-설정-다시-실행하기)를 참고하세요.
 - `--daemon-autostart` — 데몬 부팅 서비스도 함께 설치·활성화(Linux systemd / macOS launchd).
 - `--no-linger`: Linux systemd lingering 설정이나 복구를 건너뛰며 기존 설정은 끄지 않습니다. [데몬 운영](/ko/guides/daemon-operations/)을 참고하세요.
 - `-y, --yes` — 확인 건너뛰기(TTY가 아니면 암묵적으로 적용되며, 이때는 `--agents` 또는 `--all`을 전달해야 합니다).
+
+### 설치된 플러그인 새로 고치기
+
+선택한 에이전트에 Chorus 플러그인이 이미 설치되어 있으면 대화형 실행에서 한 번 묻습니다.
+`Update installed Chorus plugins to the latest available versions? [y/N]`. `--yes`를 지정하거나
+TTY가 아닌 환경에서 실행하면 묻지 않고 업데이트합니다. 아니요라고 답하면 완전한 기존 설치는
+그대로 둡니다. Pi의 경우 업데이트는 대상을 지정한 `pi update --extension <source>`로 해당하는
+Chorus 패키지만 갱신하며, 모든 확장이나 Pi 자체는 업데이트하지 않습니다. `chorus upgrade --plugins`는
+묻지 않고 항상 구성된 플러그인을 갱신합니다.
+
+### 구성된 에이전트에 대해 설정 다시 실행하기
+
+Chorus 0.22.2부터 이미 구성된 키로 `chorus agents add`를 다시 실행하면, 명시적으로 요청한 설정을
+`~/.chorus/daemon.json`의 기존 항목에 적용합니다. 예를 들어 `chorus agents add --daemon-wake claude`는
+이전에 추가한 에이전트의 데몬 깨우기를 켭니다. 요약에는 에이전트마다 결과가 하나씩 표시됩니다.
+
+- `seeded` — 요청한 설정이 적용되었습니다. 해당 줄에 갱신된 필드(`daemonWake`, `cwds`)가
+  표시됩니다.
+- `skipped` — 요청한 것이 없거나 설정이 이미 요청한 값이었습니다.
+- `failed` — 설정을 요청했지만 적용할 수 없었습니다. 명령은 0이 아닌 코드로 종료되며,
+  `~/.chorus/daemon.json`을 편집하거나 에이전트를 제거한 뒤 다시 추가하도록 제안합니다.
+
+`daemonWake`는 명시적인 요청, 즉 `--daemon-wake`, `--daemon-wake-all`, 또는 에이전트별 프롬프트에 대한
+답으로만 바뀝니다. 이 플래그 없이 TTY가 아닌 환경에서 실행하면 이전의 선택이 꺼지지 않습니다. 기존
+에이전트의 `cwds`는 대화형 작업 디렉터리 프롬프트에서 디렉터리를 고르지 않는 한 유지되며, 기본값이나
+상속된 디렉터리는 적용되지 않습니다. 선택한 에이전트 중 깨우기가 활성화된 에이전트가 하나도 없으면,
+설정은 활성화 방법을 출력하고 현재 상태를 확인하도록 `chorus agents`를 제안합니다(`wake:off`는
+선택 해제된 에이전트를 나타냅니다).
 
 구성된 에이전트를 나열하고 제거합니다.
 
@@ -100,7 +126,7 @@ chorus agents remove <name|uuid>  # remove one (match by name or UUID)
 `chorus agents`는 API 키를 절대 출력하지 않습니다. 나열된 이름이나 UUID는 `chorus mcp --agent` 또는
 `CHORUS_AGENT_PROFILE` 환경 변수에 쓸 수 있는 유효한 값입니다.
 
-Codex App Server 재시작은 `--yes`로 허가되지 않습니다. 인증 정보와 MCP 구성에 성공한 뒤 대화형 터미널에서만 별도의 중단 경고와 동의 질문을 표시합니다. [Codex](/ko/reference/agents/codex/)를 참고하세요.
+Codex 및 TRAE CLI App Server 재시작은 `--yes`로 허가되지 않습니다. 인증 정보와 MCP 구성에 성공한 뒤 대화형 터미널에서만 별도의 중단 경고와 동의 질문을 표시합니다. [Codex](/ko/reference/agents/codex/)와 [TRAE CLI](/ko/reference/agents/trae/)를 참고하세요.
 
 ## Hermes 설정(0.22.0)
 
@@ -126,7 +152,7 @@ chorus agents run --name work --type codex -- resume # 백엔드를 재정의하
 - **무엇이 주입되는가**(실행되는 프로세스에만 주입되며, 셸에는 들어가지 않고 출력되지도 않습니다):
   `CHORUS_URL`, `CHORUS_API_KEY`, `CHORUS_AGENT_PROFILE`.
 - **어느 바이너리인가** — 기본값은 에이전트에 저장된 백엔드이고 `--type`으로 재정의합니다. 종류는 각각
-  `claude`, `codex`, `kiro-cli`, `pi`, `opencode`, `openclaw`, `dsh`에 매핑됩니다.
+  `claude`, `codex`, `kiro-cli`, `pi`, `traecli`, `opencode`, `openclaw`, `dsh`에 매핑됩니다.
   OpenCode / OpenClaw / DeepSeek Harness로 추가한 에이전트는 `offline`로 저장되므로(데몬이 자동으로
   깨우지 않음), 실행하려면 `--type`을 명시하세요.
 - **패스스루** — `--` 뒤의 모든 것은 에이전트에 그대로 전달되어 에이전트의 모든 플래그를 쓸 수 있습니다.
@@ -146,6 +172,7 @@ chorus agents run --name work --type codex -- resume # 백엔드를 재정의하
 | --- | --- |
 | `claude-code` / `claude` | `--model`, `--effort` |
 | `codex` | `--model` / `-m` / 구성 키 `model`; 구성 키 `model_reasoning_effort` |
+| `trae` | `codex`와 같음 |
 | `kiro` | `--model`, `--effort` |
 | `pi` | `--model`, `--thinking`, `--provider` |
 | `opencode` | `--model` / `-m` |
@@ -159,7 +186,7 @@ chorus agents run --name pi-worker -- --model anthropic/claude-sonnet-4-6 --thin
 chorus agents run --name codex-worker -- exec --model gpt-5.4 -c model_reasoning_effort=high
 ```
 
-**하위 명령**: 영구 인수는 인식한 가장 깊은 명령 뒤에 삽입됩니다. 대상은 Codex의 `exec`, `exec resume`, `resume`, Kiro의 `chat`, OpenClaw의 `agent`입니다. 명시적 재정의도 같은 범위에 두세요. `--model chosen exec`가 아니라 `exec --model chosen`을 사용합니다. 하위 명령 앞에 둔 모델 옵션은 하위 명령에 구성된 모델을 대체하지 않습니다. Codex `-c`/`--config` 키는 범위와 관계없이 적용됩니다. 인식한 명령이 없으면 구성 인수를 맨 앞에 둡니다. 다른 명령 경로는 추론하지 않으므로, 그런 경로에서는 호환되지 않는 영구 인수를 빼고 네이티브 패스스루를 사용하세요.
+**하위 명령**: 영구 인수는 인식한 가장 깊은 명령 뒤에 삽입됩니다. 대상은 Codex와 TRAE CLI의 `exec`, `exec resume`, `resume`, Kiro의 `chat`, OpenClaw의 `agent`입니다. 명시적 재정의도 같은 범위에 두세요. `--model chosen exec`가 아니라 `exec --model chosen`을 사용합니다. 하위 명령 앞에 둔 모델 옵션은 하위 명령에 구성된 모델을 대체하지 않습니다. Codex `-c`/`--config` 키는 범위와 관계없이 적용됩니다. 인식한 명령이 없으면 구성 인수를 맨 앞에 둡니다. 다른 명령 경로는 추론하지 않으므로, 그런 경로에서는 호환되지 않는 영구 인수를 빼고 네이티브 패스스루를 사용하세요.
 
 **알 수 없는 옵션**:
 
@@ -169,7 +196,7 @@ chorus agents run --name codex-worker -- exec --model gpt-5.4 -c model_reasoning
 - 명령 탐색은 위치 인수로 된 프롬프트, 알 수 없는 명령, 모호한 옵션에서 멈추며, 알려진 옵션의 값은 건너뜁니다.
 - 명시적 토큰은 모두 그대로 전달되므로 백엔드 플래그와 버전 호환성은 직접 확인하세요. Windows `.cmd`/`.bat` 제한은 데몬 가이드를 참고하세요.
 
-Codex 데몬은 영구 인수를 모델 옵션과 허용된 `-c` / `--config` 설정으로 더 제한합니다. 다른 플래그는 포그라운드 세션에서는 동작하더라도, 데몬이 에이전트를 깨우기 전에 오류가 발생합니다. [Codex 데몬 설정](/ko/reference/agents/codex/#모델-옵션과-세션-연속성)을 참고하세요.
+Codex 및 TRAE CLI 데몬은 영구 인수를 모델 옵션과 허용된 `-c` / `--config` 설정으로 더 제한합니다. 다른 플래그는 포그라운드 세션에서는 동작하더라도, 데몬이 에이전트를 깨우기 전에 오류가 발생합니다. [Codex 데몬 설정](/ko/reference/agents/codex/#모델-옵션과-세션-연속성)을 참고하세요.
 
 ## 셸에서 MCP 도구 호출하기 — `chorus mcp`
 
@@ -212,6 +239,7 @@ chorus mcp list                                   # list the tools this agent ma
 | --- | --- |
 | Claude Code | `~/.claude/settings.json`의 `env` 블록(`CLAUDE_CONFIG_DIR`를 따름). |
 | Codex | `~/.codex/.env`(`CODEX_HOME`을 따름). Codex는 keyless `config.toml` 항목을 통해 환경 변수에서 키를 읽습니다. |
+| TRAE CLI | `~/.trae/.env`(`TRAE_HOME`을 따름). traecli는 keyless `traecli.toml` 항목을 통해 환경 변수에서 키를 읽습니다. |
 | DeepSeek Harness | `$DSH_HOME/.env`. |
 | Hermes | `$HERMES_HOME/.env`(기본 `~/.hermes/.env`, 모드 `0600`). 원격 MCP 설정에는 키 자리표시자를 저장합니다. |
 

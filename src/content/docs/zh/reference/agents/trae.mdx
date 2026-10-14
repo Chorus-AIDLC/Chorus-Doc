@@ -1,0 +1,132 @@
+---
+title: TRAE CLI
+description: 通过共用的 Codex 插件包把 TRAE CLI（traecli）连接到 Chorus，并可选择让它接受远程工作。
+docsLocale: zh
+route: /zh/reference/agents/trae/
+---
+
+**Chorus 0.22.2 及更高版本**为 TRAE CLI（`traecli`）提供官方 Chorus 集成。TRAE CLI 是 Codex 的分支，因此 Chorus 复用 **Codex 插件包**，后台服务唤醒也沿用 Codex App Server 传输。不需要另外安装 TRAE 专用插件。TRAE CLI 也是受支持的 Chorus 后台服务后端。
+
+最低已测试版本为 **traecli 0.209.1**，更早的版本未经验证。
+
+## 前提条件
+
+- 已安装 `traecli` 且位于 `PATH` 中。用 `traecli --version` 查看版本。
+- TRAE CLI 已登录（运行 `traecli login`，或启动一次 `traecli` 并完成登录流程）。Chorus 不负责 TRAE 的身份认证。
+- 一个可访问的 Chorus 地址和一个智能体密钥。请按照[为智能体创建访问权限](/zh/guides/administrator-setup/)创建密钥。
+
+下文所有 TRAE 路径都遵循 `TRAE_HOME`，未设置时使用 `~/.trae`。Chorus 只读取 `TRAE_HOME`，不读取 `TRAECLI_HOME`。
+
+## 安装集成
+
+先安装 `chorus` 命令行工具，再配置 TRAE CLI：
+
+```bash
+npm install --global @chorus-aidlc/chorus
+chorus agents add --agents trae
+```
+
+在提示时输入 Chorus 地址和智能体密钥，也可以事先导出 `CHORUS_URL` 和 `CHORUS_API_KEY`。该命令是幂等的，可以放心重复运行。它会：
+
+1. 检查是否已安装 `traecli`。
+2. 通过 TRAE 自带的插件命令（`traecli plugin marketplace add …`）注册 `chorus-plugins` 插件市场。已注册的市场不会重复添加。刷新已有安装时，会运行 `traecli plugin marketplace upgrade chorus-plugins`。
+3. 用 `traecli plugin install chorus@chorus-plugins --yes` 安装 Codex 插件包。插件会被复制到 `$TRAE_HOME/plugins/cache/chorus-plugins/chorus/<version>/`，并在 `$TRAE_HOME/traecli.toml` 中添加 `[marketplaces.chorus-plugins]` 和 `[plugins."chorus@chorus-plugins"]`。修改前会先备份原来的 `traecli.toml`。
+4. 把 Chorus 凭据保存到 `~/.chorus/daemon.json`，智能体类型为 `trae`。
+5. 把 `CHORUS_URL`、`CHORUS_API_KEY` 和 `CHORUS_AGENT_PROFILE` 写入 `$TRAE_HOME/.env`（权限 `0600`，保留其他条目）。traecli 启动时会加载该文件，因此插件钩子、Shell 工具中的 `chorus` 调用和原生 MCP 都能获得你的身份，无需手动导出。
+6. 在 `$TRAE_HOME/traecli.toml` 中写入一个**不含密钥**的 `[mcp_servers.chorus]` 配置块：
+
+   ```toml
+   [mcp_servers.chorus]
+   url = "https://chorus.example.com/api/mcp"
+   bearer_token_env_var = "CHORUS_API_KEY"
+   ```
+
+   traecli 会把 `$TRAE_HOME/.env` 中这个变量的值转换为 `Authorization: Bearer <key>` 请求头。密钥从不写入 `traecli.toml`。
+
+非交互安装（CI 或沙箱）：
+
+```bash
+chorus agents add --agents trae \
+  --url https://chorus.example.com \
+  --api-key cho_REDACTED --yes
+```
+
+应用内的 **Settings → Setup Guide** 向导也有 **TRAE CLI** 标签页，步骤相同。
+
+### `.env` 优先于 Shell 环境
+
+与 Codex 一样，traecli 会让 `$TRAE_HOME/.env` **覆盖** Shell 或父进程导出的同名变量：
+
+- 要切换身份，请重新运行 `chorus agents add --agents trae`（在终端中，它会在改指已有配置前先询问），或直接编辑 `$TRAE_HOME/.env`。导出另一个 `CHORUS_API_KEY` 不会生效。
+- 如果一个后台服务中有多个 Chorus 智能体使用 TRAE 后端，请为**每个智能体分配独立的 `TRAE_HOME`**：在 `~/.chorus/daemon.json` 中该智能体的 `env` 里设置 `TRAE_HOME`，并在导出这个 `TRAE_HOME` 后运行一次 `chorus agents add --agents trae`。否则，共用同一目录的所有智能体被唤醒时，都会使用该目录 `.env` 中保存的身份。
+
+### 让运行中的 App Server 使用新配置
+
+如果 TRAE App Server 守护进程已在运行，交互式配置会先询问，再用 `traecli app-server daemon restart` 重启它，使其加载新环境。由于重启可能中断其他 TRAE CLI 会话，提示默认选择**否**。
+
+- 非交互运行、`--yes` 和 `CHORUS_DAEMON_HEADLESS=1` 都不会重启它。
+- 没有运行中的 App Server 守护进程时，配置不会启动新的守护进程。与 Codex 不同，没有守护进程时 `traecli app-server daemon version` 会以错误退出，因此配置会把重启报告为延后（“daemon state could not be determined”）。
+
+## 信任 Chorus 钩子
+
+插件附带 Chorus 生命周期钩子：`SessionStart` 签到，以及在 `chorus_pm_submit_proposal`、`chorus_submit_for_verify` 和 `chorus_admin_verify_task` 之后触发的 `PostToolUse` 评审提醒。**traecli 只有在你信任插件钩子之后才会运行它们**。请打开 `traecli`，在钩子信任审查中接受 `chorus@chorus-plugins` 的钩子。在此之前，既不会自动签到，也不会出现评审提醒。插件更新改变钩子定义时，需要重新审查。
+
+TRAE CLI 与 Codex 运行同一套钩子脚本。脚本检测到插件安装在 `$TRAE_HOME/plugins/` 下时，会改用 TRAE 的表述，例如用 `Agent` 工具而不是 Codex 的 `spawn_agent` 启动子智能体。设置 `CHORUS_HOOK_RUNTIME=trae` 或 `CHORUS_HOOK_RUNTIME=codex` 可以强制指定检测结果。
+
+## 启用远程启动
+
+如果只在交互式 TRAE CLI 会话中使用 Chorus，可以跳过这一节。否则，请按照[连接智能体运行环境](/zh/guides/operator-onboarding/)选择 `trae` 作为运行后端。先在前台确认连接无误，再按照[管理后台服务](/zh/guides/daemon-operations/)让它保持在线。
+
+```bash
+chorus daemon --agent trae
+```
+
+也可以在 `~/.chorus/daemon.json` 中写入 `{ "agent": "trae" }` 把 TRAE CLI 设为默认后端，或在 `agents[]` 的某一项上设置 `"agentType": "trae"`。
+
+## 后台服务行为
+
+每次唤醒都会启动一个独立的 `traecli app-server --listen stdio://` 进程。它与 [Codex 后端](/zh/reference/agents/codex/)使用同一套 App Server 实现：线程恢复、中断、清理和权限模式映射都相同。与 Codex 的区别：
+
+- **可执行文件与目录**：可执行文件为 `traecli`（可用 `CHORUS_TRAE_PATH` 覆盖），主目录为 `TRAE_HOME`（默认 `~/.trae`），配置文件为 `traecli.toml`。
+- **独立的本地记录**：线程 ID 和用量分别保存在 `~/.chorus/trae-sessions.json` 和 `~/.chorus/trae-usage.json`，与 Codex 分开，因此线程不会在错误的后端上恢复。
+- **上报信息**：唤醒错误和后台服务连接都以 `trae` 作为来源和客户端类型。**Settings → Agents** 中该连接显示为 **TRAE CLI**。
+- **参数**：每个智能体的 `args` 遵循 Codex 的规则：模型选择（`-m`）和允许的 `-c key=value` 设置，受保护的配置键也相同。TRAE CLI 还禁止使用 `permission_mode` 配置键，并另有自己的受保护控制项，例如 `--permission-mode`、`--worktree` 和 `--session-id`；权限姿态由后台服务通过协议设置。
+- **钩子**：如果钩子未被信任，唤醒的 TRAE 进程仍会运行，但会跳过 `SessionStart` 签到。
+
+要在前台启动并注入该智能体的 Chorus 连接，请运行 `chorus agents run --name <agent> --type trae`。
+
+### 受限模式（`--chorus-only`）
+
+`--chorus-only` 让 TRAE 沙箱保持只读，并禁用交互式审批。只读沙箱原本会要求每个 MCP 工具都经过审批，这样 Chorus 工具也会被拒绝。因此，当 `traecli.toml` 声明了 `[mcp_servers.chorus]` 时，后台服务只为被唤醒的线程预先批准唯一一个 MCP 服务器，即 Chorus 服务器：
+
+```json
+"config": { "mcp_servers.chorus.default_tools_approval_mode": "approve" }
+```
+
+- 沙箱仍然只读，写入和其他有副作用的命令依旧被阻止。其他 MCP 服务器的工具，以及 Shell、文件修改和权限审批，仍会被拒绝。
+- 该覆盖项从不写入你的配置文件，YOLO 模式也不会发送它。没有声明 `[mcp_servers.chorus]` 表时不会发送。只识别普通的 `[mcp_servers.chorus]` 表头，不识别内联表或点号键写法。
+- 名为 `chorus` 的服务器的所有工具都会被预先批准，包括写入和管理类工具。被唤醒的智能体能在 Chorus 中改动什么，只受其密钥权限限制，因此请为受限后台服务使用只具备必要权限的密钥。
+- 后台服务信任 `[mcp_servers.chorus]` 指向的任何地址。请让该条目保持指向你的 Chorus MCP 端点，即 `chorus agents add` 写入的值。
+
+## 验证连接
+
+打开 `traecli`，让它 `check in to chorus`。TRAE 会通过 MCP 服务器调用 `chorus_checkin()`，并报告你的智能体身份和权限。要列出 MCP 服务器，请运行 `traecli mcp list`。
+
+Chorus 工作流技能（`$chorus`、`$develop`、`$proposal`、`$yolo` 等）来自与 Codex 相同的插件。技能中用 Codex 的 `spawn_agent` 工具描述子智能体，但 TRAE CLI 的子智能体工具是 `Agent`。
+
+使用后台服务时，请在 Chorus 中打开 **Settings → Agents**，确认预期的主机和工作目录处于在线状态。
+
+## 升级与移除
+
+- `chorus upgrade --plugins` 会为 `~/.chorus/daemon.json` 中已配置的 `trae` 条目刷新 Chorus 插件，并遵循每个条目的 `TRAE_HOME`。参见 [CLI 参考](/zh/reference/cli/#升级-cli-与插件)。
+- 插件已安装时，重新运行 `chorus agents add --agents trae` 会询问 `Update installed Chorus plugins to the latest available versions? [y/N]`。回答 `y` 会升级插件市场并重新安装插件；默认（否）保留已安装的插件。使用 `--yes` 或在非交互环境中运行时，会直接更新而不询问。无论哪种情况，该命令都会刷新 `$TRAE_HOME/.env` 中的凭据。
+- `chorus agents remove <name|uuid>` 只会从 `~/.chorus/daemon.json` 中删除该智能体。`~/.trae/.env` 中的 `CHORUS_*` 值、不含密钥的 `[mcp_servers.chorus]` 配置块以及 `~/.trae/traecli.toml` 中的 `chorus@chorus-plugins` 插件条目都会保留；如有需要请手动清除。
+
+## 常见问题
+
+- **找不到 `traecli`**：安装 TRAE CLI 并确保 `traecli` 位于 `PATH` 中，或设置 `CHORUS_TRAE_PATH`。
+- **没有 Chorus 工具，或出现 `401 Unauthorized`**：`$TRAE_HOME/.env` 缺少密钥、密钥已被吊销，或 App Server 守护进程仍在使用旧环境运行。请重新运行 `chorus agents add --agents trae` 并允许它重启 App Server，或在保存工作后自行运行 `traecli app-server daemon restart`。
+- **钩子从不触发**：信任 Chorus 钩子，并确认 `$TRAE_HOME/traecli.toml` 中已启用 `chorus@chorus-plugins`。
+- **后台服务唤醒时身份不对**：多个 TRAE 智能体共用了同一个 `TRAE_HOME`。请为每个智能体分配独立目录。
+- **插件市场升级报告“is not configured as a Git marketplace”**：使用本地路径作为市场来源（`CHORUS_MARKETPLACE_SOURCE_TRAE`）时属于预期情况。配置会将其视为无操作，并重新安装插件。
+- **后台服务离线**：运行 `chorus daemon status`，然后参阅[排查智能体连接故障](/zh/guides/troubleshooting/)。

@@ -39,6 +39,27 @@ export const AGENT_SUPPORT_MATRIX = Object.freeze([
     }),
   }),
   Object.freeze({
+    id: 'trae',
+    name: 'TRAE CLI',
+    support: SUPPORT_LEVELS.FIRST_PARTY,
+    capabilities: Object.freeze({
+      mcpTools: capability(true, ['cli/init/codex-mcp-config.mjs', 'docs/CONNECT_TRAE.md']),
+      chorusSkills: capability(
+        true,
+        ['plugins/chorus/skills/chorus/SKILL.md'],
+        'Shares the Codex plugin package.',
+      ),
+      lifecycleHooks: capability(
+        true,
+        ['plugins/chorus/hooks/hook-runtime.sh'],
+        'Runs only after the hooks are trusted in traecli.',
+      ),
+      daemonWake: capability(true, ['cli/codex-family.mjs', 'cli/__tests__/trae-spawner.test.mjs']),
+      remoteControl: capability(true, ['cli/waker.mjs', 'cli/spawner-select.mjs']),
+      sessionRecovery: capability(true, ['cli/trae-session-map.mjs']),
+    }),
+  }),
+  Object.freeze({
     id: 'kiro',
     name: 'Kiro',
     support: SUPPORT_LEVELS.FIRST_PARTY,

@@ -25,11 +25,12 @@ const proseOnly = (content) =>
 const assertMatch = (content, pattern, file, contract) =>
   assert.match(content, pattern, `${sourceLabel(file)}: ${contract}`);
 
-const expectedIds = ['claude-code', 'codex', 'kiro', 'pi', 'openclaw', 'hermes', 'opencode', 'generic-mcp'];
+const expectedIds = ['claude-code', 'codex', 'trae', 'kiro', 'pi', 'openclaw', 'hermes', 'opencode', 'generic-mcp'];
 assert.deepEqual(AGENT_SUPPORT_MATRIX.map(({ id }) => id), expectedIds);
 assert.deepEqual(
   AGENT_SUPPORT_MATRIX.map(({ support }) => support),
   [
+    SUPPORT_LEVELS.FIRST_PARTY,
     SUPPORT_LEVELS.FIRST_PARTY,
     SUPPORT_LEVELS.FIRST_PARTY,
     SUPPORT_LEVELS.FIRST_PARTY,
@@ -116,7 +117,7 @@ for (const file of documentationFiles.filter((file) => file.includes('/zh/'))) {
   assert.doesNotMatch(content, chineseMixedTerms, `${sourceLabel(file)}: translate workflow terms in Chinese prose`);
 }
 
-const daemonPlatforms = ['claude-code', 'codex', 'kiro'];
+const daemonPlatforms = ['claude-code', 'codex', 'trae', 'kiro'];
 for (const id of daemonPlatforms) {
   for (const locale of ['', 'zh/']) {
     const file = path.join(contentRoot, `${locale}reference/agents/${id}.mdx`);
@@ -169,11 +170,29 @@ for (const locale of ['', 'zh/', 'ja/', 'ko/']) {
   }
 }
 
+for (const locale of ['', 'zh/', 'ja/', 'ko/']) {
+  const file = path.join(contentRoot, `${locale}reference/agents/trae.mdx`);
+  const content = await readFile(file, 'utf8');
+  for (const token of [
+    '0.22.2', 'traecli 0.209.1', 'chorus agents add --agents trae',
+    'traecli plugin install chorus@chorus-plugins --yes', 'traecli plugin marketplace upgrade chorus-plugins',
+    '[mcp_servers.chorus]', 'bearer_token_env_var = "CHORUS_API_KEY"', '$TRAE_HOME/.env', '0600',
+    'traecli app-server daemon restart', 'CHORUS_DAEMON_HEADLESS=1', 'chorus daemon --agent trae',
+    '"agentType": "trae"', 'traecli app-server --listen stdio://', 'CHORUS_TRAE_PATH',
+    '~/.chorus/trae-sessions.json', 'mcp_servers.chorus.default_tools_approval_mode',
+    'chorus agents run --name <agent> --type trae',
+  ]) {
+    assert.ok(content.includes(token), `${sourceLabel(file)}: missing TRAE contract ${token}`);
+  }
+  assertMatch(content, new RegExp(`/${locale}guides/operator-onboarding/`), file, 'localized operator link');
+}
+
 const hermes = AGENT_SUPPORT_MATRIX.find(({ id }) => id === 'hermes');
 assert.equal(hermes.capabilities.daemonWake.supported, false);
 assert.equal(hermes.capabilities.remoteControl.supported, true);
 assert.equal(hermes.capabilities.sessionRecovery.supported, true);
 assert.equal(AGENT_SUPPORT_MATRIX.find(({ id }) => id === 'pi').capabilities.daemonWake.supported, true);
+assert.equal(AGENT_SUPPORT_MATRIX.find(({ id }) => id === 'trae').capabilities.daemonWake.supported, true);
 
 const [matrixEnglish, matrixChinese] = await Promise.all([
   readFile(path.join(contentRoot, 'reference/agents/index.mdx'), 'utf8'),

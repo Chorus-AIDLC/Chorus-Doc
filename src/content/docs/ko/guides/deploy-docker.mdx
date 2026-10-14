@@ -67,6 +67,10 @@ docker compose -f docker-compose.local.yml up -d
 
 프로덕션 환경, 특히 여러 레플리카를 둘 때는 앱을 외부 PostgreSQL과 Redis에 연결하세요. `docker-compose.yml`을 만듭니다.
 
+:::danger[기존 PostgreSQL 16 볼륨은 먼저 마이그레이션해야 함]
+이 예시는 저장소 자체의 `docker-compose.yml`과 마찬가지로 `postgres:17-alpine`을 사용합니다. PostgreSQL 17은 **PostgreSQL 16 데이터 볼륨을 열 수 없으므로**, 이미지만 바꿔 기존 PG16 볼륨으로 재시작하지 마세요. 오류를 없애려고 `docker compose down -v`를 실행해서도 안 됩니다. 원본은 PostgreSQL 16에 그대로 두고 먼저 새 볼륨으로 마이그레이션하세요. 저장소의 오프라인 헬퍼 `deploy/self-host/migrate-pg16-to-17.sh`를 쓰거나, `pg_dump` / `pg_restore`로 새 PostgreSQL 17 볼륨에 복원합니다. [PostgreSQL 17과 기존 PostgreSQL 16 볼륨](/ko/guides/deploy-local/#postgresql-17과-기존-postgresql-16-볼륨)을 참고하세요.
+:::
+
 ```yaml
 services:
   app:
@@ -105,7 +109,7 @@ services:
       retries: 5
 
   db:
-    image: postgres:16-alpine
+    image: postgres:17-alpine
     environment:
       POSTGRES_USER: chorus
       POSTGRES_PASSWORD: chorus
@@ -300,6 +304,8 @@ docker run -d \
 
 ## 다음 단계
 
+- **[로컬 머신에 셀프 호스팅](/ko/guides/deploy-local/)**: PostgreSQL 17을 쓰는 `install.sh` 로컬 설정,
+  선택적 LAN HTTPS 또는 Cloudflare Tunnel, 그리고 PG16 → PG17 마이그레이션.
 - **[프로덕션 배포](/ko/guides/deploy-production/)**: 글로벌 npm 패키지에서 실행하기와
   전체 AWS CDK 안내.
 - **[셀프 호스팅 Chorus 운영하기](/ko/guides/deploy-operations/)**: 첫 로그인 부트스트랩, 배포 측 인증, 그리고

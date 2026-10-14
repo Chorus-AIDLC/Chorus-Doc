@@ -46,9 +46,9 @@ chorus update --plugins    # upgrade の別名
 
 ### `--plugins` の更新対象
 
-`~/.chorus/daemon.json` を読み、種別が Claude Code、Codex、Kiro、Pi と明示されたエージェント設定を処理します。デーモン起動が無効な設定も対象です。各設定の `env`、`PATH`、独自の設定ホームから更新先を決めます。共有の更新先は一度だけ、異なるホームは個別に処理します。現時点では既定のファイルだけを読み、`CHORUS_DAEMON_CONFIG_PATH` は参照しません。
+`~/.chorus/daemon.json` を読み、種別が Claude Code、Codex、TRAE CLI、Kiro、Pi と明示されたエージェント設定を処理します。デーモン起動が無効な設定も対象です。各設定の `env`、`PATH`、独自の設定ホームから更新先を決めます。共有の更新先は一度だけ、異なるホームは個別に処理します。現時点では既定のファイルだけを読み、`CHORUS_DAEMON_CONFIG_PATH` は参照しません。
 
-- **Claude Code と Codex**：ホストのプラグイン機構で Chorus プラグインを更新します。
+- **Claude Code、Codex、TRAE CLI**：ホストのプラグイン機構で Chorus プラグインを更新します。
 - **Kiro**：設定された Chorus インスタンスからテンプレートを取得します。新版テンプレートを取得するには、先にそのサーバーを更新してください。一つの共有の更新先に異なるインスタンス URL が指定されている場合は、未完了として報告されます。
 - **Pi**：安定版 `>=0.99.0 <2.0.0` はネイティブ MCP を使い、対象の `@chorus-aidlc/chorus-pi` のみ更新します。`0.84.4–0.98.x` は検証済み `pi-mcp-adapter@5.0.0` の固定を保持します。他のアダプター制約や Chorus の固定版・範囲・タグも保持するため、設定や最新版への更新が未完了になる場合があります。全拡張や Pi 本体の更新、既存アダプターの自動削除は行いません。[Pi の設定と移行](/ja/reference/agents/pi/)を参照してください。
 
@@ -65,7 +65,7 @@ npm のインストールは進捗を表示し、インストールのタイム�
 `chorus agents add` は、マシンのコーディングエージェントを Chorus に接続する唯一のコマンドです。
 すでにインストールしているエージェントを検出し、それぞれの Chorus プラグインをそのエージェント自身の
 プラグイン機構を通じてインストールし、Chorus の URL と API キーを一度だけ
-`~/.chorus/daemon.json` に取り込みます。Claude Code、Codex、Hermes、DeepSeek Harness については、認証情報を
+`~/.chorus/daemon.json` に取り込みます。Claude Code、Codex、TRAE CLI、Hermes、DeepSeek Harness については、認証情報を
 そのエージェント自身の設定にも書き込むため、対話的なセッションが手動の環境設定なしで認証されます
 （[認証情報の保存先](#認証情報の保存先)を参照）。
 
@@ -76,19 +76,31 @@ chorus agents add --agents claude,codex \
   --url https://chorus.example.com --api-key cho_xxx
 ```
 
-設定はエージェント追加や認証情報更新のために再実行できます。Claude Code、Codex、Kiro、Pi、OpenCode、OpenClaw、Hermes、DeepSeek Harness（dsh）に対応します。Pi 安定版 `>=0.99.0 <2.0.0` はネイティブ MCP、`0.84.4–0.98.x` は `pi-mcp-adapter@5.0.0` を選び、`chorus-pi` もインストールします。Pi が未導入、非対応、バージョン不明の場合は案内を表示し、一律に MCP 設定完了とは報告しません。[Pi](/ja/reference/agents/pi/)を参照してください。
+設定はエージェント追加や認証情報更新のために再実行できます。Claude Code、Codex、TRAE CLI（trae）、Kiro、Pi、OpenCode、OpenClaw、Hermes、DeepSeek Harness（dsh）に対応します。Pi 安定版 `>=0.99.0 <2.0.0` はネイティブ MCP、`0.84.4–0.98.x` は `pi-mcp-adapter@5.0.0` を選び、`chorus-pi` もインストールします。Pi が未導入、非対応、バージョン不明の場合は案内を表示し、一律に MCP 設定完了とは報告しません。[Pi](/ja/reference/agents/pi/)を参照してください。
 
 主なフラグ（全フラグは `chorus agents add --help` で確認できます）。
 
 - `--agents <a,b>` / `--all` — どのエージェントを設定するか。
 - `--url` / `--api-key` — 認証情報を非対話的に指定します（環境変数：`CHORUS_URL` / `CHORUS_API_KEY`）。
-- `--update-installed` — 既存のインストールを更新します。Pi では `pi update --extensions` を実行します。
-  `pi install` の繰り返しだけではインストール済みパッケージは更新されません。
 - `--dsh-profile <name>` — バンドルをインストールする DeepSeek Harness のプロファイル。
-- `--daemon-wake <a,b>` / `--daemon-wake-all` — 指定したエージェント（または起動できるすべてのエージェント）をデーモンの起動対象にします。起動できるエージェント（Claude Code、Codex、Kiro、Pi）は既定で「パーク」状態で追加されます。`chorus mcp` からは到達できますが、ここで明示的に選ぶ（または TTY で各エージェントのプロンプトに答える）まではデーモンに起動されません。
+- `--daemon-wake <a,b>` / `--daemon-wake-all` — 指定したエージェント（または起動できるすべてのエージェント）をデーモンの起動対象にします。起動できるエージェント（Claude Code、Codex、TRAE CLI、Kiro、Pi）は既定で「パーク」状態で追加されます。`chorus mcp` からは到達できますが、ここで明示的に選ぶ（または TTY で各エージェントのプロンプトに答える）まではデーモンに起動されません。Chorus 0.22.2 からは、すでに設定済みのエージェントにも使えます。[設定済みエージェントのセットアップを再実行する](#設定済みエージェントのセットアップを再実行する)を参照してください。
 - `--daemon-autostart` — デーモンの起動サービスもインストールして有効化します（Linux systemd / macOS launchd）。
 - `--no-linger`：Linux systemd lingering の設定・修復を省略します。既存設定は無効にしません。[デーモン運用](/ja/guides/daemon-operations/)を参照してください。
 - `-y, --yes` — 確認をスキップします（TTY でないときは暗黙的に有効になり、その場合は `--agents` または `--all` を渡す必要があります）。
+
+### インストール済みプラグインを更新する
+
+選択したエージェントに Chorus プラグインがすでにインストールされている場合、対話的な実行では一度だけ `Update installed Chorus plugins to the latest available versions? [y/N]` と確認されます。`--yes` を指定した場合や TTY でない実行では、確認せずに更新します。「いいえ」と答えた場合、完全な既存のインストールはそのまま残されます。Pi では、対象となる Chorus パッケージだけを `pi update --extension <source>` で個別に更新し、すべての拡張機能や Pi 本体を更新することはありません。`chorus upgrade --plugins` は確認せずに、設定済みのプラグインを常に更新します。
+
+### 設定済みエージェントのセットアップを再実行する
+
+Chorus 0.22.2 から、すでに設定済みのキーで `chorus agents add` を再実行すると、明示的に要求した設定が `~/.chorus/daemon.json` の既存のエントリに適用されます。たとえば `chorus agents add --daemon-wake claude` は、以前に追加したエージェントのデーモン起動を有効にします。サマリーにはエージェントごとに 1 つの結果が表示されます。
+
+- `seeded` — 要求した設定が適用されました。行には更新されたフィールド（`daemonWake`、`cwds`）が示されます。
+- `skipped` — 何も要求されていないか、設定がすでに要求どおりの値でした。
+- `failed` — 設定が要求されたものの、適用できませんでした。コマンドは 0 以外の終了コードで終了し、`~/.chorus/daemon.json` を編集するか、エージェントを削除して追加し直すよう提案します。
+
+`daemonWake` を変えるのは明示的な要求だけです。つまり `--daemon-wake`、`--daemon-wake-all`、または各エージェントのプロンプトへの回答です。これらのフラグを付けない TTY 以外での実行が、以前のオプトインを無効にすることはありません。既存エージェントの `cwds` は、対話式の作業ディレクトリのプロンプトでディレクトリを選ばない限り保持され、既定のディレクトリや継承されたディレクトリが適用されることはありません。選択したどのエージェントも最終的にデーモン起動の対象にならなかった場合、セットアップは有効にする方法を表示し、現在の状態を確認するために `chorus agents` を提案します（`wake:off` はオプトアウトしたエージェントを示します）。
 
 設定済みのエージェントを一覧・削除します。
 
@@ -100,7 +112,7 @@ chorus agents remove <name|uuid>  # remove one (match by name or UUID)
 `chorus agents` は API キーを決して出力しません。一覧に表示された名前または UUID は、
 `chorus mcp --agent` や `CHORUS_AGENT_PROFILE` 環境変数の有効な値です。
 
-Codex の App Server 再起動は `--yes` では許可されません。認証情報と MCP 設定に成功した後、対話型端末だけで中断の警告と個別確認を表示します。[Codex](/ja/reference/agents/codex/)を参照してください。
+Codex と TRAE CLI の App Server 再起動は `--yes` では許可されません。認証情報と MCP 設定に成功した後、対話型端末だけで中断の警告と個別確認を表示します。[Codex](/ja/reference/agents/codex/)と[TRAE CLI](/ja/reference/agents/trae/)を参照してください。
 
 ## Hermes の設定（0.22.0）
 
@@ -127,7 +139,7 @@ chorus agents run --name work --type codex -- resume # バックエンドを上�
 - **何が注入されるか**（起動されたプロセスにのみ注入され、シェルには入らず、出力もされません）：
   `CHORUS_URL`、`CHORUS_API_KEY`、`CHORUS_AGENT_PROFILE`。
 - **どのバイナリか** — 既定はエージェントに保存されたバックエンドで、`--type` で上書きできます。
-  種類はそれぞれ `claude`、`codex`、`kiro-cli`、`pi`、`opencode`、`openclaw`、`dsh` に
+  種類はそれぞれ `claude`、`codex`、`kiro-cli`、`pi`、`traecli`、`opencode`、`openclaw`、`dsh` に
   対応します。OpenCode / OpenClaw / DeepSeek Harness として追加したエージェントは `offline` として
   保存される（デーモンが自動起動しない）ため、起動するには `--type` を明示してください。
 - **透過渡し** — `--` の後のすべてはそのままエージェントへ渡されるため、すべてのフラグが利用できます。
@@ -147,6 +159,7 @@ chorus agents run --name work --type codex -- resume # バックエンドを上�
 | --- | --- |
 | `claude-code` / `claude` | `--model`、`--effort` |
 | `codex` | `--model` / `-m` / 設定キー `model`、設定キー `model_reasoning_effort` |
+| `trae` | `codex` と同じ |
 | `kiro` | `--model`、`--effort` |
 | `pi` | `--model`、`--thinking`、`--provider` |
 | `opencode` | `--model` / `-m` |
@@ -160,11 +173,11 @@ chorus agents run --name pi-worker -- --model anthropic/claude-sonnet-4-6 --thin
 chorus agents run --name codex-worker -- exec --model gpt-5.4 -c model_reasoning_effort=high
 ```
 
-**サブコマンド**：永続引数は最も深い認識済みコマンドの後に入ります。対象は Codex の `exec`、`exec resume`、`resume`、Kiro の `chat`、OpenClaw の `agent` です。明示的な上書きも同じスコープに置いてください。`--model chosen exec` ではなく `exec --model chosen` とします。サブコマンドより前に置いたモデル指定は、サブコマンドの設定済みモデルを置き換えません。Codex の `-c`/`--config` キーはスコープをまたいで適用されます。認識されたコマンドがなければ、設定引数を先頭に置きます。その他のコマンドパスは推測しないため、そのようなパスでは互換性のない永続引数を外し、ネイティブの引数渡しを使ってください。
+**サブコマンド**：永続引数は最も深い認識済みコマンドの後に入ります。対象は Codex と TRAE CLI の `exec`、`exec resume`、`resume`、Kiro の `chat`、OpenClaw の `agent` です。明示的な上書きも同じスコープに置いてください。`--model chosen exec` ではなく `exec --model chosen` とします。サブコマンドより前に置いたモデル指定は、サブコマンドの設定済みモデルを置き換えません。Codex の `-c`/`--config` キーはスコープをまたいで適用されます。認識されたコマンドがなければ、設定引数を先頭に置きます。その他のコマンドパスは推測しないため、そのようなパスでは互換性のない永続引数を外し、ネイティブの引数渡しを使ってください。
 
 **未知のオプション**：永続 `args` は通常の未知フラグを受け付けますが、次の要素が値かプロンプトかは推測できません。バックエンドが対応していれば `["--future=value"]` を使い、`["--future", "value"]` は避けてください。既知のオプションには必要な値を指定します。未知のオプションや繰り返し可能なオプションは、選択スコープ内で順序が保たれます（設定済みのものが先、明示したものが後）。一般的な後勝ちは保証されません。曖昧な明示オプション（インライン値のない未知のオプション）があると、Chorus はそれ以降の上書きを探しません。既知の上書きをその前に置くか、対応するインライン値を使ってください。外側の Chorus 区切りを除去した後、エージェント引数内の最初の単独 `--` でも解析を停止します。コマンド探索は位置引数のプロンプト、未知コマンド、曖昧なオプションで止まり、既知のオプション値を飛ばします。明示的な引数はすべてそのまま転送されるため、バックエンドのフラグやバージョンとの互換性は自分で確認してください。Windows `.cmd`/`.bat` の制限はデーモンガイドを参照してください。
 
-Codex デーモンでは、永続引数がさらにモデル指定と許可された `-c` / `--config` の上書きに限定されます。それ以外のフラグは、フォアグラウンドのセッションで動作するものであっても、デーモンがエージェントを起動する前にエラーになります。[Codex デーモンの設定](/ja/reference/agents/codex/#モデル設定とセッションの継続)を参照してください。
+Codex と TRAE CLI のデーモンでは、永続引数がさらにモデル指定と許可された `-c` / `--config` の上書きに限定されます。それ以外のフラグは、フォアグラウンドのセッションで動作するものであっても、デーモンがエージェントを起動する前にエラーになります。[Codex デーモンの設定](/ja/reference/agents/codex/#モデル設定とセッションの継続)を参照してください。
 
 ## シェルから MCP ツールを呼び出す — `chorus mcp`
 
@@ -208,6 +221,7 @@ chorus mcp list                                   # list the tools this agent ma
 | --- | --- |
 | Claude Code | `~/.claude/settings.json` の `env` ブロック（`CLAUDE_CONFIG_DIR` に従う）。 |
 | Codex | `~/.codex/.env`（`CODEX_HOME` に従う）。Codex はキーレスの `config.toml` エントリを通じて、環境変数からキーを読みます。 |
+| TRAE CLI | `~/.trae/.env`（`TRAE_HOME` に従う）。traecli はキーレスの `traecli.toml` エントリを通じて、環境変数からキーを読みます。 |
 | DeepSeek Harness | `$DSH_HOME/.env`。 |
 | Hermes | `$HERMES_HOME/.env`（既定は `~/.hermes/.env`、モード `0600`）。リモート MCP 設定はキーのプレースホルダーを保存します。 |
 

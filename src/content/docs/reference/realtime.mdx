@@ -1,6 +1,6 @@
 ---
 title: Realtime events & notifications
-description: How the browser UI updates live over Server-Sent Events, and how agents receive the same work through the notification REST API.
+description: How the browser UI and the agent daemon receive live events over Server-Sent Events, how the daemon recovers missed work, and the notification REST API.
 docsLocale: en
 route: /reference/realtime/
 sidebar:
@@ -9,10 +9,11 @@ sidebar:
 
 Chorus keeps every open browser in sync with what people and agents are doing. When
 something changes — a task moves, an idea is claimed, a proposal is approved — the change is
-broadcast over Server-Sent Events (SSE) and the affected pages refresh themselves. Agents
-do not consume that stream; they receive the same work through notifications. This page
-documents both paths: the SSE endpoints and their event shape, and the notification REST
-API that agents (and browser clients) call.
+broadcast over Server-Sent Events (SSE) and the affected pages refresh themselves. The agent
+daemon listens on SSE too: its notification stream is how a wakeable agent learns about new
+work. This page documents the SSE endpoints and their event shape, how the daemon
+authenticates and recovers work it missed, and the notification REST API that agents without
+a daemon (and browser clients) call.
 
 ## How live updates flow
 
@@ -34,15 +35,16 @@ changed record itself.
 
 ## SSE endpoints
 
-Two endpoints stream events to the browser. Both are `GET`, both authenticate from the
-request's cookies, and neither response is ever cached.
+Two endpoints stream events. Both are `GET`, both accept either a browser session cookie or
+an `Authorization: Bearer` API key (see [How agents receive events](#how-agents-receive-events)),
+and neither response is ever cached.
 
 <div class="table-scroll" role="region" aria-label="SSE endpoints" tabindex="0">
 
   | Endpoint | Streams |
   | --- | --- |
   | `GET /api/events?projectUuid=<uuid>` | Entity change events, filtered to your workspace and — when `projectUuid` is supplied — to that one project. |
-  | `GET /api/events/notifications` | Notification events for the authenticated user, so the in-app notification indicator updates live. |
+  | `GET /api/events/notifications` | Notification events for the authenticated caller, so the in-app notification indicator updates live. The agent daemon subscribes to this stream as its primary wake channel. |
 
 </div>
 
@@ -84,20 +86,86 @@ event per created task — into a single refresh. The connection is closed while
 hidden and reopened, with a refresh, when it becomes visible again; it closes for good when
 you leave the page.
 
-## Agents do not use SSE
+## How agents receive events
 
-:::caution[SSE is browser-only]
-The SSE endpoints are authenticated by **browser cookies** — `EventSource` cannot send a
-custom `Authorization` header, so it cannot carry an agent API key. **Agents do not consume
-SSE.** An agent receives its work through the [`chorus_get_notifications`](#notification-rest-api)
-MCP tool and the `/api/notifications` REST endpoints below. Agent actions still emit
-change events, so browser users watching the same project see an agent's work appear live —
-the flow is one-directional: agent acts, humans watch.
-:::
+Agents act through MCP tools or the REST API, and every change they make emits a change
+event, so browser users watching the same project see an agent's work appear live. Agents
+also **consume** SSE: the project change stream (`GET /api/events`) is read only by
+browsers, but the [agent daemon](/guides/daemon-operations/) subscribes to the notification
+stream `GET /api/events/notifications`, and that stream is its primary wake channel.
+
+### Two ways to authenticate
+
+Both SSE endpoints check for a Bearer token first and fall back to cookies:
+
+<div class="table-scroll" role="region" aria-label="SSE clients and authentication" tabindex="0">
+
+  | Client | Transport | Authentication |
+  | --- | --- | --- |
+  | Browser | `EventSource` | Session cookie, sent automatically. |
+  | Agent daemon | `fetch` reading a streamed response | `Authorization: Bearer cho_…` plus `Accept: text/event-stream`. |
+
+</div>
+
+`EventSource` cannot set custom request headers, which is why the browser relies on its
+cookie. That limit applies only to `EventSource`: the daemon is a Node process reading the
+stream with `fetch`, so it sends its agent API key like any other request.
+
+### Pending-turns recovery
+
+`GET /api/daemon/pending-turns?connectionUuid=<uuid>`, called with the agent's Bearer key,
+returns the turns that are still `pending` (not yet started) for sessions that belong to that
+daemon connection. It is a **recovery path, not a replacement** for SSE: every turn is stored
+when it is created, so a wake whose SSE delivery was lost can still be found and run.
+
+The daemon reads it at three moments:
+
+1. **On registration.** Each time the SSE handshake confirms the connection (including after
+   a reconnect), the daemon immediately sweeps for pending turns.
+2. **Every 30 seconds while connected.** The periodic sweep recovers a lost delivery even on
+   a connection that never dropped.
+3. **On a `deliver_turn` ping.** A live ping triggers a targeted read of just the announced
+   turn.
+
+Recovery and the SSE connection work together:
+
+- **Silent partition.** If the stream receives nothing for 75 seconds (no events and none of
+  the server's 30-second heartbeats), the daemon aborts the connection and reconnects.
+- **During a reconnect** recovery pauses, and resumes with a sweep as soon as the new
+  connection is registered.
+
+```text
+daemon → GET /api/events/notifications (Bearer cho_…)
+server → connection registered
+daemon → GET /api/daemon/pending-turns          (sweep on registration)
+daemon → GET /api/daemon/pending-turns          (every 30s)
+server → new notification / deliver_turn        (primary path)
+         … no bytes for 75s → abort, pause recovery, reconnect …
+daemon → GET /api/events/notifications          (reconnect)
+server → connection registered
+daemon → GET /api/daemon/pending-turns          (catch-up sweep)
+```
+
+### Duplicate handling
+
+Each daemon connection keeps one in-memory record of the turns and notifications it has
+already accepted, shared by the live stream and the recovery reads. Within one daemon
+process, a turn that arrives through both paths is dispatched once, whichever path sees it
+first. That record survives SSE reconnects but **not a daemon restart**, and an entry is
+released when starting the turn is rejected or cancelled, so the turn can be retried.
+Separately, the server only lets an unclaimed `pending` turn start running. None of this is
+an end-to-end exactly-once guarantee.
+
+### Agents without a daemon
+
+An MCP agent that is not running under the daemon does not hold an SSE connection. It
+receives its work through the [`chorus_get_notifications`](#notification-rest-api) MCP tool
+and the `/api/notifications` REST endpoints below.
 
 ## Notification REST API
 
-Notifications are the durable, poll-and-act path that both agents and browser clients use.
+Notifications are the durable, poll-and-act path for browser clients and for agents that are
+not running under the daemon.
 The recipient is derived from the auth context: a request authenticated as a user reads
 that user's notifications, and a request authenticated with an agent API key reads that
 agent's — the same routes serve both, with no recipient parameter.

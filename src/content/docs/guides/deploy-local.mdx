@@ -1,0 +1,490 @@
+---
+title: Self-host on a local machine
+description: Run Chorus and PostgreSQL 17 on one Linux or macOS host with install.sh, redeploy it with the saved wrapper, and optionally add self-signed LAN HTTPS or a Cloudflare Tunnel.
+docsLocale: en
+route: /guides/deploy-local/
+sidebar:
+  order: 21
+---
+
+This guide sets up a **single-host self-hosted Chorus**: one application container and one
+PostgreSQL 17 container, started with Docker Compose from the `deploy/self-host/` directory of
+the [Chorus repository](https://github.com/Chorus-AIDLC/Chorus). The `install.sh` local setup
+(Chorus 0.22.2 and later) prepares the image, writes protected configuration, and saves a
+wrapper script for later redeployments. You can add a self-signed HTTPS endpoint for your
+LAN, or publish the stack through a Cloudflare Named Tunnel that you create yourself.
+
+The full upstream reference is `docs/SELF_HOST.md` in the repository (Chinese:
+`docs/SELF_HOST.zh.md`). This page condenses it into the steps most installations need.
+
+## When to choose this path
+
+| You want… | Use |
+| --- | --- |
+| To try Chorus alone, with no Docker | The npm package with embedded PGlite: [Get started](/guides/getting-started/) |
+| A long-running instance on your own Linux or macOS host, reachable from your LAN, backed by a real PostgreSQL | **This guide** |
+| Your own Compose files around the published image | [Deploy with Docker](/guides/deploy-docker/) |
+| Several instances, managed PostgreSQL and Redis, or AWS | [Deploy in production](/guides/deploy-production/) |
+
+This is a single-instance setup. Redis is deliberately disabled (`REDIS_URL` is empty), so live
+updates use in-memory delivery, which only works with one app container.
+
+## Prerequisites
+
+- A Linux host with Docker Engine, or macOS with Docker Desktop running Linux containers.
+  Docker Compose v2 with support for `up --wait`. Check with `docker version` and
+  `docker compose version`.
+- Bash 3.2 or newer, OpenSSL (or LibreSSL), and curl. The optional scripted login check uses
+  `jq`. The server does **not** need Node.js, pnpm, or the AWS CLI.
+- A checkout of the Chorus repository that contains `deploy/self-host/`.
+- On macOS, start Docker Desktop first and allow it to share the checkout and your private
+  configuration and backup paths.
+- Network access to your image registry (and, for Tunnel mode, to Cloudflare).
+
+:::caution[Docker access and LAN exposure]
+Permission to use Docker is effectively root access to the host; protect the host and its
+Docker socket. Local mode publishes the app on `0.0.0.0` so other LAN devices can reach it.
+Allow that port only from trusted networks and never from the public Internet. Docker-published
+ports can bypass UFW rules, so enforce restrictions with Docker-aware firewall rules or an
+upstream firewall. PostgreSQL is never published; it stays internal at `db:5432`.
+:::
+
+## What the stack contains
+
+| File in `deploy/self-host/` | Role |
+| --- | --- |
+| `compose.yml` | Base stack: services `app` and `db` (`postgres:17-alpine` by default), named volumes `app-data` and `db-data`, health checks, `restart: unless-stopped`. Publishes no ports. |
+| `compose.local.yml` | Local mode: publishes `0.0.0.0:${CHORUS_PORT}:8637`, sets `NEXTAUTH_URL=http://localhost:${CHORUS_PORT}` and `COOKIE_SECURE=false`. |
+| `compose.lan-https.yml` | Optional add-on: an Nginx service `lan-https` that terminates self-signed TLS and forwards to `http://app:8637`. |
+| `nginx.lan-https.conf` | The Nginx configuration mounted read-only into `lan-https`. |
+| `compose.tunnel.yml` | Optional alternative to local mode: a `cloudflared` service and `COOKIE_SECURE=true`. |
+| `install-local.sh` | Fresh local setup, run through `install.sh --target local`. |
+| `deploy-local.sh` | Repeatable redeployment, called by the saved wrapper. |
+| `migrate-pg16-to-17.sh` | Offline PostgreSQL 16 to 17 migration helper. |
+| `.env.example` | Template listing every setting the Compose files read. |
+
+## Install with `install.sh`
+
+From the root of the checkout, run the installer and choose the local target:
+
+```bash
+bash install.sh --target local
+```
+
+Running `bash install.sh` without `--target` asks for **aws** or **local** first; AWS stays the
+default. On a terminal, local setup then asks for:
+
+1. **Image source**: `pull` (default) downloads an existing release image, `build` compiles the
+   current checkout with its `Dockerfile` (`production` target).
+2. For `pull`, the **image tag or digest**, for example `chorusaidlc/chorus-app:vX.Y.Z`. An
+   implicit tag or `latest` is rejected. Build mode tags the image `chorus-local:<project>` by
+   default (`chorus-local:chorus-local`).
+3. The **ordinary login** email and password, and a separate **super admin** email and
+   password. Password input is hidden and asked twice.
+4. **Also enable self-signed LAN HTTPS? [y/N]**. The default is no; see
+   [Optional LAN HTTPS](#optional-self-signed-lan-https).
+
+Both passwords must be a single line of at least 8 bytes; the super admin password may be at
+most 72 bytes because of bcrypt. You never generate the bcrypt hash yourself: the installer
+pulls the helper image `httpd:2.4-alpine` and hashes the password with `htpasswd` (cost 12) in a
+throwaway container with no network, passing the password over stdin rather than as an
+argument.
+
+### Non-interactive install
+
+For scripted setups, put each password on one line in its own file **outside the checkout**
+(directory mode `0700`, file mode `0600`). The installer rejects symlinks and files inside the
+checkout. Choose one of the two forms:
+
+```bash
+# Pull an existing release image
+bash install.sh --target local --image-source pull \
+  --image chorusaidlc/chorus-app:vX.Y.Z --project chorus-local \
+  --email owner@example.com --admin-email admin@example.com \
+  --password-file /absolute/private/path/login-password \
+  --admin-password-file /absolute/private/path/admin-password \
+  --port 18637 --non-interactive
+```
+
+```bash
+# Build the current checkout into chorus-local:chorus-local
+bash install.sh --target local --image-source build \
+  --project chorus-local --email owner@example.com --admin-email admin@example.com \
+  --password-file /absolute/private/path/login-password \
+  --admin-password-file /absolute/private/path/admin-password \
+  --port 18637 --non-interactive
+```
+
+Add `--dry-run` (and omit both password-file options) to print the plan without hashing,
+calling Docker, or writing files. On a non-terminal input the installer never waits for
+answers, and missing required values fail. Run `bash install.sh --help` for the option summary.
+
+| Option | Environment equivalent | Default |
+| --- | --- | --- |
+| `--target local` | `CHORUS_INSTALL_TARGET=local` | `aws` |
+| `--image-source pull\|build` | `CHORUS_IMAGE_SOURCE` | `pull` |
+| `--image` | `CHORUS_IMAGE` | Required for pull; `chorus-local:<project>` for build |
+| `--project` | `CHORUS_LOCAL_PROJECT` | `chorus-local` |
+| `--port` | `CHORUS_PORT` | `18637` |
+| `--email`, `--admin-email` | `DEFAULT_USER`, `SUPER_ADMIN_EMAIL` | none |
+| `--password-file`, `--admin-password-file` | `DEFAULT_PASSWORD`, `SUPER_ADMIN_PASSWORD` | none |
+| `--non-interactive`, `--dry-run` | `CHORUS_INSTALL_NONINTERACTIVE=1`, `CHORUS_INSTALL_DRY_RUN=1` | off |
+
+Command-line options override environment values, and password files take precedence over the
+password variables. There is no option that takes a raw password on the command line.
+
+### What setup creates
+
+| Path | Contents |
+| --- | --- |
+| `~/.config/chorus-self-host/<project>/` | New private directory, mode `0700`. |
+| `…/<project>/env` | Mode `0600`. Image references (`CHORUS_IMAGE`, `POSTGRES_IMAGE=postgres:17-alpine`), a random `POSTGRES_PASSWORD`, `DEFAULT_USER` and the ordinary `DEFAULT_PASSWORD` **in plaintext**, `CHORUS_PORT`, `SUPER_ADMIN_EMAIL`, and only the bcrypt `SUPER_ADMIN_PASSWORD_HASH`. Treat it as a secret. |
+| `…/<project>/lan-tls/`, `…/<project>/lan-https.yml` | Only when LAN HTTPS is selected. |
+| `default_deploy_local.sh` in the checkout | Mode `0700`, secret-free redeploy wrapper. `CHORUS_DEPLOY_CONFIG` selects another path; its parent directory must exist. |
+
+Setup is for **new** installations only. If the private directory, the wrapper file, or any
+Docker container, volume, or network for the project already exists, the installer refuses and
+changes nothing; it never rotates passwords or reuses a database. A failed startup leaves the
+new project's containers and configuration in place for inspection.
+
+`NEXTAUTH_SECRET` is left empty, so the app generates its signing key in `/app/data/.secret`
+inside the `app-data` volume. Keep that volume: losing it signs everyone out.
+
+## Open Chorus and sign in
+
+When setup finishes it prints the URLs, the location of the private env file, the redeploy
+command, and a project-scoped `docker compose … stop` command.
+
+- On the host: `http://localhost:18637` (or your `--port`).
+- From another LAN device: `http://<host-LAN-IP>:18637`. Use the host's real address, not
+  `0.0.0.0`.
+- Sign in with the ordinary login you chose. The **`/admin` panel** uses the separate super
+  admin account.
+
+The built-in email/password login is a bootstrap and demo path, not team SSO. For a team,
+configure OIDC per company in the admin panel; see
+[Operate a self-hosted Chorus](/guides/deploy-operations/). Plain LAN HTTP does not encrypt
+credentials or sessions, and browsers withhold the Web Crypto API that the OIDC client needs
+for PKCE on insecure HTTP origins, so OIDC needs HTTPS.
+
+## Redeploy with the saved wrapper
+
+For an existing installation, **run its saved wrapper instead of setup**:
+
+```bash
+bash ./default_deploy_local.sh --dry-run
+bash ./default_deploy_local.sh
+```
+
+The wrapper accepts only `--dry-run` and calls `deploy/self-host/deploy-local.sh` with the saved
+project, private directory, and image source. Each run:
+
+- Rebuilds the current checkout (build mode) or pulls the saved `CHORUS_IMAGE` (pull mode).
+  To move a pull-mode instance to a new release, edit `CHORUS_IMAGE` in the private env first.
+- Pulls the saved `POSTGRES_IMAGE` **only if it is missing locally**. This is never a database
+  major-version upgrade.
+- Adds the private overrides `https.yml`, `pg17.yml`, and `lan-https.yml` when they exist in the
+  private directory, and pulls the `lan-https` image when that add-on is present.
+- Runs `docker compose … up -d --pull never --wait`. It reuses the same project, volumes, and
+  credentials. It never runs `down`, removes volumes, or rotates credentials.
+
+`--dry-run` validates the saved image references and lists the Compose files it would use,
+without calling Docker. Other private overrides (for example an `oidc-only.yml`) are **not**
+discovered automatically; apply them with an explicit Compose command each time.
+
+:::caution[Back up before deploying new code]
+App startup applies Prisma migrations, and an older image does not undo them. Back up the
+database and the `app-data` volume before redeploying a new version; see
+[Back up](#back-up-and-restore) below.
+:::
+
+### Run Compose commands by hand
+
+For logs, stops, or restarts, use the same project, env file, and Compose files as the wrapper.
+In Bash:
+
+```bash
+REPO=/absolute/path/to/Chorus
+PROJECT=chorus-local
+ENV_FILE="$HOME/.config/chorus-self-host/$PROJECT/env"
+dc() {
+  docker compose --project-name "$PROJECT" --env-file "$ENV_FILE" \
+    -f "$REPO/deploy/self-host/compose.yml" \
+    -f "$REPO/deploy/self-host/compose.local.yml" "$@"
+}
+dc ps
+dc logs --tail 100 app db
+```
+
+Append `-f "$HOME/.config/chorus-self-host/$PROJECT/lan-https.yml"` (and any other private
+override) before `"$@"` if your installation uses them. Use `dc config --quiet` to validate,
+never an unredacted `docker compose config`, which prints passwords.
+
+## Optional self-signed LAN HTTPS
+
+HTTPS is **opt-in** and not needed for password login. Enable it during setup by answering yes to
+the HTTPS prompt and entering the hostname or IPv4 address clients will use, or with options:
+
+```bash
+bash install.sh --target local --image-source build --https-host 192.0.2.10
+```
+
+Replace the documentation address with the host's real LAN IP or a DNS name that already
+resolves to the host. `--https-port` changes the default port `18638` (it must differ from the
+HTTP port). `--https` turns on the host prompt; non-interactive setups need `--https-host` or
+`CHORUS_HTTPS_HOST`. `--no-https` overrides any environment selection. IPv6 literals, wildcard
+names, and URLs are rejected.
+
+**What it exposes.** Setup adds a `lan-https` Nginx service, started in the same Compose `up` as
+the app and database. It listens on `0.0.0.0:18638` and forwards to `http://app:8637` on the
+internal Compose network. It marks response cookies Secure, keeps the forwarding and WebSocket
+upgrade headers, and disables proxy buffering so Server-Sent Events stream. The plain HTTP
+listener stays available, and a Cloudflare Tunnel origin stays internal HTTP. Setup does not
+change DNS, router, or firewall rules; restrict both ports to trusted networks.
+
+**Where the TLS material lives.** Setup generates a 30-day RSA self-signed certificate whose SAN
+contains the chosen host, stored as `lan-tls/server.crt` and `lan-tls/server.key` in the private
+directory. Their paths and the HTTPS port are saved in the private env (`CHORUS_TLS_CERT_FILE`,
+`CHORUS_TLS_KEY_FILE`, `CHORUS_HTTPS_PORT`), and `compose.lan-https.yml` is copied to the private
+`lan-https.yml`. The files are mounted read-only; a missing file fails startup. Redeploys reuse
+them and never regenerate the certificate.
+
+:::caution[Self-signed means untrusted]
+Browsers show a certificate warning. Accepting it is a temporary exception, not trusted server
+authentication, and not a production recommendation. In the upstream Chromium trial, choosing
+**Advanced → Proceed** enabled a secure context and `crypto.subtle`; other browsers and managed
+devices may differ. For lasting use, install a trusted certificate or a local CA on client
+devices.
+:::
+
+For OIDC over this endpoint, register the exact callback (for example
+`https://<host-LAN-IP>:18638/login/callback`) with your identity provider and keep existing
+callbacks. Cookies are scoped by host, not port, so HTTP and HTTPS on the same host share
+sessions; use HTTPS consistently once logged in.
+
+**Renewing.** Before the 30-day expiry, or after the host or IP changes, back up the TLS files,
+write a new certificate and key with the matching SAN to the same paths, then recreate only the
+proxy with your full Compose command: `up -d --no-deps --force-recreate lan-https`. A plain
+Nginx restart does not pick up replaced files.
+
+**Disabling.** With your full Compose command, run `stop lan-https` and then `rm -f lan-https`;
+only then move the private `lan-https.yml` out of the private directory. The wrapper stops
+including the proxy once that file is gone. Keep the certificates for rollback.
+
+**Adding it to an existing installation.** Do not rerun setup. Generate a certificate and key
+with OpenSSL outside the checkout, set `CHORUS_TLS_CERT_FILE`, `CHORUS_TLS_KEY_FILE`, and
+`CHORUS_HTTPS_PORT` in the private env, copy `deploy/self-host/compose.lan-https.yml` to
+`lan-https.yml` in the private directory, and run the wrapper (which also redeploys the app).
+
+## Optional Cloudflare Named Tunnel
+
+To publish the stack over HTTPS without opening host ports, use `compose.tunnel.yml` **instead
+of** `compose.local.yml`. Never combine the two primary modes; the LAN HTTPS add-on can still be
+layered separately. The tunnel publishes no host ports, and TLS terminates at Cloudflare.
+
+You supply the Cloudflare account, the domain, and a remotely managed Named Tunnel; Chorus
+does not provision them. In the Cloudflare dashboard, add a published application hostname and
+set its origin service to **`http://app:8637`**, not `localhost`.
+
+1. Save the connector token to a private file (for example `tunnel-token` in the private
+   directory, mode `0444` inside the `0700` directory). Do not put it in shell arguments or
+   history.
+2. In the private env, set `CHORUS_PUBLIC_URL` to the external `https://` origin (no trailing
+   slash), `CLOUDFLARED_IMAGE` to a pinned `cloudflare/cloudflared` release **2025.4.0 or newer**,
+   and `CLOUDFLARED_TOKEN_FILE` to the token file's absolute path.
+3. Stop the local-mode stack with `dc down` (this keeps the volumes), then switch `dc` to the
+   tunnel file and start it:
+
+```bash
+dc() {
+  docker compose --project-name "$PROJECT" --env-file "$ENV_FILE" \
+    -f "$REPO/deploy/self-host/compose.yml" \
+    -f "$REPO/deploy/self-host/compose.tunnel.yml" "$@"
+}
+dc config --quiet
+dc pull
+dc up -d --wait
+dc ps
+```
+
+The connector runs `tunnel --no-autoupdate run --token-file /run/secrets/tunnel_token`, and the
+override sets `NEXTAUTH_URL` to `CHORUS_PUBLIC_URL` and `COOKIE_SECURE=true`. The saved wrapper
+always uses `compose.local.yml`, so manage a tunnel-mode stack with this explicit `dc` command.
+To switch back, `down` with the tunnel function first, then `up` with the local one. Never use
+`down -v`.
+
+On the Cloudflare side:
+
+- Bypass the cache for the whole Chorus hostname, or at least for authenticated pages, login
+  routes, `/api/*`, `/api/mcp`, `/api/events`, and `/api/events/notifications`.
+- Check that Server-Sent Events arrive incrementally through the full path.
+- Interactive Cloudflare Access challenges turn API, MCP, and daemon requests into HTML or
+  redirects. Chorus API keys do not satisfy Access by themselves.
+- Keep the tunnel token secret; rotate it in Cloudflare if it leaks.
+
+## Worked example: LAN HTTPS plus a separate Cloudflare connector
+
+One verified single-host layout keeps **local mode** for the LAN and publishes the same app
+through Cloudflare without switching to `compose.tunnel.yml`. It runs four containers:
+
+| Container | Comes from | Role |
+| --- | --- | --- |
+| `<project>-app-1` | `compose.yml` + `compose.local.yml` | Chorus on host port `18637` (container `8637`) |
+| `<project>-db-1` | `compose.yml` (+ private `pg17.yml` after a migration) | PostgreSQL 17, internal only |
+| `<project>-lan-https-1` | private LAN HTTPS override | Nginx on host port `18638`, forwarding to `http://app:8637` |
+| `chorus-cloudflare` | a standalone `docker run` | Cloudflare connector, forwarding the public hostname to `http://app:8637` |
+
+The private directory then holds `env`, the saved wrapper, the LAN HTTPS override (`lan-https.yml`; a
+hand-built setup may use another name such as `https.yml`), `lan-tls/` (certificate and key), and, after a PG16 migration, `pg17.yml`, which points the
+`db-data` volume at the migrated external volume. The wrapper passes every override with `-f`,
+so `dc ps` lists the three Compose services.
+
+To build it:
+
+1. Install local mode with LAN HTTPS as described above, and check both
+   `http://<host>:18637/api/health` and `https://<host>:18638/api/health`.
+2. In the Cloudflare dashboard, give the tunnel's published hostname the origin service
+   **`http://app:8637`**.
+3. If the public hostname is the address users and OIDC callbacks should use, set `NEXTAUTH_URL`
+   to that `https://` origin under `app.environment` in your private override, then redeploy.
+4. Save the connector token to a private file (as in the tunnel section), then attach the connector
+   to the stack's default network, `<project>_default`:
+
+```bash
+docker run -d --name chorus-cloudflare --restart unless-stopped \
+  --network "${PROJECT}_default" \
+  -v "$HOME/.config/chorus-self-host/$PROJECT/tunnel-token:/run/secrets/tunnel_token:ro" \
+  cloudflare/cloudflared:<pinned-version> \
+  tunnel --no-autoupdate run --token-file /run/secrets/tunnel_token
+```
+
+Know the trade-offs of this layout before you adopt it:
+
+- **The connector is outside Compose.** The wrapper, `dc ps`, and `dc down` do not manage it.
+  Before `dc down`, run `docker stop chorus-cloudflare` and `docker rm chorus-cloudflare`.
+  `down` removes `<project>_default`, so re-run the `docker run` above after `dc up`.
+  Stopping the connector only takes the public hostname offline; LAN access keeps working.
+- **Keep the token out of the command line.** A `--token <value>` argument is visible in
+  `docker inspect` and process listings. Use `--token-file` with cloudflared 2025.4.0 or newer,
+  and rotate the token in Cloudflare if it was ever passed inline.
+- **Host ports stay published.** Unlike tunnel mode, `18637` and `18638` remain open on
+  `0.0.0.0`, so restrict them to trusted networks with Docker-aware firewall rules.
+- **Cookies.** Local mode keeps `COOKIE_SECURE=false` so plain-HTTP LAN login works. The Nginx
+  proxy marks cookies Secure on the LAN HTTPS path, but cookies set through the tunnel are not
+  marked Secure. If only HTTPS clients remain, set `COOKIE_SECURE: "true"` under
+  `app.environment` in your private override. This keeps LAN HTTPS and the tunnel working but
+  breaks plain-HTTP login on `18637`.
+- The Cloudflare cache, Server-Sent Events, and Access guidance in the tunnel section applies
+  unchanged.
+
+## PostgreSQL 17 and existing PostgreSQL 16 volumes
+
+New installations use **`postgres:17-alpine`**, in `deploy/self-host/` and in the repository's
+root `docker-compose.yml`.
+
+:::danger[PostgreSQL 17 cannot open a PostgreSQL 16 data volume]
+If you already have a PostgreSQL 16 volume, for example from the root development Compose file
+(`pnpm docker:db`) or an earlier self-hosted stack, **migrate it before starting the PG17
+default**. Changing the image and restarting does not convert the data; `prisma migrate deploy`
+only updates the application schema. Do not delete the volume or run `docker compose down -v`
+to clear the startup error.
+:::
+
+The repository ships an explicit **offline** migration helper,
+`deploy/self-host/migrate-pg16-to-17.sh`, documented in full in `docs/POSTGRES_UPGRADE.md`
+(Chinese: `docs/POSTGRES_UPGRADE.zh.md`). In summary:
+
+1. Pre-pull `postgres:16-alpine` and `postgres:17-alpine`; the helper does not pull images.
+2. Back up the deployment configuration and app signing material. Stop **every** writer (app,
+   CLI, dev server) and the source database. For an installer-managed instance, stop `app` and
+   `db` with its full Compose command; do not rerun the installer.
+3. Find the source volume name with `docker inspect` on the project's database container, and
+   write the database role password (not a Chorus login password) to a private `0600` file.
+4. Run the helper with `--dry-run`, then again without it. The backup directory must not exist
+   yet, and the target names must be unused:
+
+```bash
+bash deploy/self-host/migrate-pg16-to-17.sh \
+  --source-volume YOUR_OLD_PG16_VOLUME --target-volume chorus-pg17-migrated \
+  --backup-dir /absolute/private/path/pg17-backup \
+  --password-file /absolute/private/path/db-password --writers-stopped --dry-run
+```
+
+The helper never mounts the original volume writable. It copies the stopped PG16 cluster to a
+working volume, dumps it from an isolated PG16 container, restores into a **new** PG17 volume, and
+compares public-table row counts and sequence states. It keeps all volumes and backups whether it
+succeeds or fails, and it only supports a single default-layout database in the `public` schema.
+
+5. For an installer-managed instance, point the stack at the new volume with a private
+   `pg17.yml` in the private directory and set `POSTGRES_IMAGE=postgres:17-alpine` in the
+   private env:
+
+```yaml
+volumes:
+  db-data:
+    external: true
+    name: chorus-pg17-migrated
+```
+
+Validate the database with the **same** app image first. After that, the wrapper includes
+`pg17.yml` on every run. Rolling back before new writes means selecting the original volume
+**and** a PG16 image; once PG17 has accepted writes, switching back loses them.
+
+## Verify the deployment
+
+1. `dc ps` shows `app` and `db` (and `lan-https`, if enabled) healthy.
+2. The health endpoint reports the database:
+
+   ```bash
+   curl --fail --silent --show-error http://localhost:18637/api/health
+   ```
+
+   Expect `status: ok` and `database: connected`.
+3. Sign in from a browser, create a disposable project and idea, reload, and confirm it persists.
+   Over HTTPS, check that the session cookie is Secure and HttpOnly.
+4. Sign in to `/admin` with the super admin account.
+5. Optionally, create a test agent API key and run `chorus mcp whoami` from a client with
+   `CHORUS_URL` set to this origin; see [The chorus CLI](/reference/cli/).
+6. Run `dc up -d --force-recreate app` and confirm you are still signed in. This proves the
+   signing key in `app-data` persists.
+
+## Back up and restore
+
+The database lives in `db-data`, and `/app/data` (including the generated signing key) lives in
+`app-data`. `dc down` keeps both; **`dc down -v` destroys them**. In a maintenance window, stop
+the app, take a logical dump, archive `app-data`, and copy the private env:
+
+```bash
+BACKUP_DIR="$HOME/chorus-backups/$PROJECT/$(date -u +%Y%m%dT%H%M%SZ)"
+mkdir -p "$BACKUP_DIR"
+chmod 700 "$BACKUP_DIR"
+dc stop app
+dc exec -T db pg_dump -U chorus -d chorus -Fc > "$BACKUP_DIR/database.dump"
+dc run --rm --no-deps -T --entrypoint tar app \
+  -C /app/data -czf - . > "$BACKUP_DIR/app-data.tar.gz"
+cp "$ENV_FILE" "$BACKUP_DIR/env"
+dc start app
+```
+
+Keep the backup directory private (`0700`) and encrypt it before sending it off-host. Rehearse
+restores into a **new** Compose project and port, never over the original. The upstream guide
+walks through the restore rehearsal in detail.
+
+## Troubleshooting
+
+| Symptom | Check |
+| --- | --- |
+| Setup says the private directory, script, or project resources already exist | This is an existing installation. Run its wrapper, or choose a new `--project` and `CHORUS_DEPLOY_CONFIG` for a separate instance. |
+| Compose rejects missing variables | Use the private absolute `--env-file`, keep `DEFAULT_USER` and `DEFAULT_PASSWORD` non-empty, and select only one primary mode. |
+| Port already in use | Choose another `--port` or `--https-port`. Do not delete existing volumes to resolve it. |
+| `db` fails right after switching to PostgreSQL 17 | The volume still holds PG16 data. Keep it and follow the migration above. |
+| Database authentication fails after editing the env | An existing volume keeps the old role password; changing `POSTGRES_PASSWORD` does not change it. |
+| HTTP login fails immediately | Local mode needs `COOKIE_SECURE=false` (from `compose.local.yml`); a private `https.yml` that sets it to `true` blocks LAN HTTP login. |
+| Browser rejects the HTTPS endpoint after a month | The 30-day certificate expired; renew it and recreate `lan-https`. |
+| OIDC fails with `redirect_uri_mismatch` | Register the exact HTTPS callback, including the port, with the provider. |
+| Users are signed out after recreate | The `app-data` volume or the explicit `NEXTAUTH_SECRET` changed. |
+| Tunnel is healthy but the hostname errors | Check the published hostname, the `http://app:8637` origin, app health, and token file readability. |
+| CLI receives HTML from the tunnel hostname | An Access challenge, a cache or Worker rule, or a wrong `/api/mcp` URL. |
+
+Never share env files, tokens, cookies, or unredacted logs while troubleshooting, and do not run
+host-wide Docker prune commands.

@@ -21,7 +21,11 @@ Open **Settings** from the sidebar and go to the **Agents** section. Each key yo
 already created appears as a card with its name. From a card you can:
 
 - **Edit Agent** — change the key's name, permissions, or persona.
-- **Delete** — remove the key permanently.
+- **Delete** — remove the key and its agent permanently. The agent's unfinished work is
+  released back to open: tasks that were assigned or in progress, and ideas that are not
+  done, lose their assignee so someone else can pick them up. Finished work (tasks waiting
+  for verification, done, or closed, and done ideas) keeps the agent as its assignee for
+  history.
 - Expand **Sessions** to see the agent's sessions and **Close** or **Reopen** each one.
 
 <Screenshot
@@ -90,3 +94,11 @@ installs the plugin and seeds the credential in one command — see
 credential, [Prepare agent access](/guides/administrator-setup/). To keep a connected runtime
 online and drive it from Chorus, see [Operate the Chorus daemon](/guides/daemon-operations/) and
 [Start work on a remote agent](/guides/remote-control/).
+
+Re-running `chorus agents add` for an agent that is already configured is safe. From Chorus
+0.22.2, `chorus agents add --daemon-wake <agent>` turns on daemon waking for that existing
+agent. The summary reports `seeded` (settings updated), `skipped` (nothing to change), or
+`failed` (a requested setting could not be applied; the command exits nonzero). Only an
+explicit request changes waking, so a non-interactive re-run never switches off an earlier
+opt-in, and the agent's working directories are kept unless you explicitly choose new ones.
+See [Re-run setup for a configured agent](/reference/cli/#re-run-setup-for-a-configured-agent).

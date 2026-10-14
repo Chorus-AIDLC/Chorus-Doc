@@ -9,7 +9,7 @@ sidebar:
 
 import Screenshot from '../../../../components/Screenshot.astro';
 
-Chorus 管理员给你智能体 API 密钥之后，请按本指南操作。它会把 Claude Code、Codex、Kiro 或 Pi 连接为常驻运行环境，供 Chorus 远程发起工作。
+Chorus 管理员给你智能体 API 密钥之后，请按本指南操作。它会把 Claude Code、Codex、TRAE CLI、Kiro 或 Pi 连接为常驻运行环境，供 Chorus 远程发起工作。
 
 [Hermes](/zh/reference/agents/hermes/) 通过自己的网关保持在线，不使用 Chorus 后台服务。支持评论审批命令和中断/恢复；网关不执行调研和创建想法的专用操作轮次。
 
@@ -30,7 +30,7 @@ npm install --global @chorus-aidlc/chorus
 
 ## 配置智能体
 
-`chorus agents add` 是把本机智能体连接到 Chorus 的一条命令。它会检测你已安装的智能体，为每个智能体安装其 Chorus 插件，并把 Chorus 网址和 API 密钥一次性写入 `~/.chorus/daemon.json`。对 Claude Code、Codex、Hermes 和 DeepSeek Harness，它还会把凭据写入该智能体自己的配置，因此交互式会话无需手动设置任何环境变量即可完成认证。
+`chorus agents add` 是把本机智能体连接到 Chorus 的一条命令。它会检测你已安装的智能体，为每个智能体安装其 Chorus 插件，并把 Chorus 网址和 API 密钥一次性写入 `~/.chorus/daemon.json`。对 Claude Code、Codex、TRAE CLI、Hermes 和 DeepSeek Harness，它还会把凭据写入该智能体自己的配置，因此交互式会话无需手动设置任何环境变量即可完成认证。
 
 ```sh
 chorus agents add
@@ -59,7 +59,7 @@ chorus agents add --agents claude,codex \
 chorus daemon --agent claude-code --cwd /home/demo/workspace --chorus-only
 ```
 
-使用 Codex 或 Kiro 时，把 `claude-code` 分别替换为 `codex` 或 `kiro`。`--chorus-only` 会限制智能体只能使用 Chorus 工具。只有在你确实希望智能体使用完整的本地工具集、并已评估过安全影响时，才省略这个参数。
+使用 Codex、TRAE CLI 或 Kiro 时，把 `claude-code` 分别替换为 `codex`、`trae` 或 `kiro`。`--chorus-only` 会限制智能体只能使用 Chorus 工具。从 Chorus 0.22.2 起，这项限制会被强制执行：Claude Code 唤醒只保留 Chorus MCP 工具和子智能体派发，如果唤醒的工具列表中包含其他任何工具，后台服务会终止该唤醒。Codex 和 TRAE CLI 唤醒以只读方式运行，只有 Chorus MCP 服务器被预先批准。参见 [`--chorus-only` 的强制范围](/zh/guides/daemon-operations/#--chorus-only-的强制范围)。只有在你确实希望智能体使用完整的本地工具集、并已评估过安全影响时，才省略这个参数。
 
 保持该终端运行，同时确认连接是否正常。若想安装一个服务，让后台服务在登录时自动启动，可给 `chorus agents add` 加上 `--daemon-autostart`，或参阅[管理后台服务](/zh/guides/daemon-operations/)。
 

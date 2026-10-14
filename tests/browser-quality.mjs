@@ -56,6 +56,10 @@ try {
       '/zh/reference/agents/hermes/',
       '/ja/reference/agents/hermes/',
       '/ko/reference/agents/hermes/',
+      '/reference/agents/trae/',
+      '/zh/reference/agents/trae/',
+      '/ja/reference/agents/trae/',
+      '/ko/reference/agents/trae/',
     ]) {
       const page = await context.newPage();
       await page.goto(`http://127.0.0.1:${address.port}${route}`, {

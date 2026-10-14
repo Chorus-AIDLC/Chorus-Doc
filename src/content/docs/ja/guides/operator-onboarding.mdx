@@ -9,7 +9,7 @@ sidebar:
 
 import Screenshot from '../../../../components/Screenshot.astro';
 
-Chorus の管理者からエージェントの API キーを受け取った後に、このガイドを使ってください。Claude Code、Codex、Kiro、Pi を、Chorus からリモートで作業を始められる常駐ランタイムとして接続します。
+Chorus の管理者からエージェントの API キーを受け取った後に、このガイドを使ってください。Claude Code、Codex、TRAE CLI、Kiro、Pi を、Chorus からリモートで作業を始められる常駐ランタイムとして接続します。
 
 [Hermes](/ja/reference/agents/hermes/) は Chorus daemon ではなく自前のゲートウェイでオンラインを維持します。コメント承認と中断・再開に対応しますが、調査とアイデア作成の専用操作ターンは実行しません。
 
@@ -30,7 +30,7 @@ npm install --global @chorus-aidlc/chorus
 
 ## エージェントを設定する
 
-`chorus agents add` は、このマシンのエージェントを 1 つのコマンドで Chorus に接続します。すでにインストールしているエージェントを検出し、それぞれの Chorus プラグインをインストールし、Chorus の URL と API キーを `~/.chorus/daemon.json` に一度だけ保存します。Claude Code、Codex、Hermes、DeepSeek Harness については、認証情報をそのエージェント自身の設定にも書き込むため、対話型のセッションでも、環境変数を手動で設定しなくても認証されます。
+`chorus agents add` は、このマシンのエージェントを 1 つのコマンドで Chorus に接続します。すでにインストールしているエージェントを検出し、それぞれの Chorus プラグインをインストールし、Chorus の URL と API キーを `~/.chorus/daemon.json` に一度だけ保存します。Claude Code、Codex、TRAE CLI、Hermes、DeepSeek Harness については、認証情報をそのエージェント自身の設定にも書き込むため、対話型のセッションでも、環境変数を手動で設定しなくても認証されます。
 
 ```sh
 chorus agents add
@@ -59,7 +59,7 @@ chorus agents add --agents claude,codex \
 chorus daemon --agent claude-code --cwd /path/to/your/project --chorus-only
 ```
 
-必要に応じて `claude-code` を `codex` または `kiro` に置き換えます。`--chorus-only` は、エージェントが使えるツールを Chorus のツールに制限します。このオプションを省略するのは、エージェントにローカルのツールをすべて使わせることを意図していて、そのセキュリティ上の影響を確認済みの場合だけにしてください。
+必要に応じて `claude-code` を `codex`、`trae`、`kiro` のいずれかに置き換えます。`--chorus-only` は、エージェントが使えるツールを Chorus のツールに制限します。Chorus 0.22.2 からこの制限は強制されます。Claude Code の起動に残るのは Chorus MCP ツールとサブエージェントの起動だけで、ツール一覧にそれ以外が含まれる起動はデーモンが強制終了します。Codex と TRAE CLI の起動は読み取り専用で実行され、事前承認されるのは Chorus MCP サーバーだけです。[`--chorus-only` で強制される内容](/ja/guides/daemon-operations/#--chorus-only-で強制される内容)を参照してください。このオプションを省略するのは、エージェントにローカルのツールをすべて使わせることを意図していて、そのセキュリティ上の影響を確認済みの場合だけにしてください。
 
 接続を確認する間、このコマンドは実行したままにします。ログイン時にデーモンが起動するようサービスをインストールするには、`chorus agents add` に `--daemon-autostart` を追加するか、[Chorus デーモンを運用する](/ja/guides/daemon-operations/)を参照してください。
 

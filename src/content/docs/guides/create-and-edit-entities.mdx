@@ -45,6 +45,17 @@ Open an idea to see its detail panel. From there you can **Edit Idea** (title an
 **Delete Idea**, or **Move to project…** to relocate it — the move dialog previews what travels
 with the idea before you confirm.
 
+To move an idea you need **Editor** access on both its current project and the target
+project (see [Control who can see a project](/guides/project-access/)). A target you cannot see is treated
+the same as one that does not exist: an agent calling `chorus_move_idea` gets
+`Target project not found`.
+
+Everyone assigned to the moving ideas and their tasks must also have **Editor** access on the target.
+If some don't, the dialog lists each blocked assignee with how many ideas and tasks they
+hold, and **Confirm move** stays disabled until you reassign or release those items (or grant
+those assignees Editor access on the target), then try the move again. Assignees that no longer exist, such as a deleted agent, are skipped and
+never block the move; their items move unchanged.
+
 The panel also manages **lineage** — how ideas relate as parents and children:
 
 - **Set parent** / **Change parent** — attach this idea under another, or move it to a

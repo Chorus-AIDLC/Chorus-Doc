@@ -97,7 +97,7 @@ Both backends resolve `${CHORUS_API_KEY}`; keep real keys in the environment. Le
 
 ### Upgrade and migrate an existing adapter
 
-`chorus upgrade --plugins` and `chorus init --update-installed` target eligible Chorus components, not all extensions or Pi itself. Legacy setup retains the verified adapter `5.0.0` pin instead of updating it to latest. Other adapter constraints and Chorus pins/ranges are preserved and may leave setup or the latest refresh incomplete.
+`chorus upgrade --plugins` and an accepted plugin update in `chorus agents add` target eligible Chorus components, not all extensions or Pi itself. Legacy setup retains the verified adapter `5.0.0` pin instead of updating it to latest. Other adapter constraints and Chorus pins/ranges are preserved and may leave setup or the latest refresh incomplete.
 
 On native hosts, Chorus only warns about existing adapters or a `-builtin:mcp` extension filter. If you choose native MCP, inspect global `~/.pi/agent/settings.json` (respecting `PI_CODING_AGENT_DIR`) and project `.pi/settings.json`; remove the adapter and that filter only in the scope where they are configured, preserving other settings. `pi remove npm:pi-mcp-adapter` is for a global npm installation, not a project-local entry. Restart Pi and verify the active MCP tools; writing a config alone does not prove connectivity.
 
@@ -133,8 +133,16 @@ the skills loaded, and inspect `/subagents` for `chorus-proposal-reviewer`.
   `chorus-code-reviewer` — discovered package-relative (no copy) and spawned via the
   `subagent` tool; they post a `VERDICT` comment and stop. Under the community `pi-subagents`
   package, Chorus reviewers and workers named directly in a call run in the background even
-  if the call asks for `async: false`, because a foreground child there cannot reach the
-  Chorus tools.
+  if the call asks for `async: false`; the extension pins them to the background run path.
+- **Role-scoped Chorus tools for sub-agents** (Chorus 0.22.1+) — each reviewer reaches Chorus
+  only through its `chorus_review` tool (query, check-in, and comment operations), and the
+  bundled `chorus-worker` uses `chorus_work`, which adds the task claim, release, update,
+  report, self-check, submit-for-verify, and session check-in/check-out operations. Both work
+  on native MCP and legacy adapter hosts with no MCP gateway tool and no config change.
+  Neither role allows admin actions, entity creation, or session creation and closure. Call
+  `chorus_review({ action: "discover" })` or `chorus_work({ action: "discover" })` to list
+  the allowed operations. This is a tool policy, not a sandbox: `bash`, network access, and
+  inherited credentials are not isolated.
 - **Pi's official `subagent` tool**, bundled at `extensions/subagent/` (Pi's reference
   pattern), so no third-party sub-agents package is required. It also **coexists with the
   community `pi-subagents` package** (nicobailon): both register a `subagent` tool, so exclude
@@ -213,6 +221,6 @@ npm install -g "@earendil-works/pi-coding-agent@>=0.85.0 <2.0.0"       # upgrade
 - **Skills or reviewers are missing:** confirm `chorus-pi` is installed and restart Pi. Reviewer agents are bundled; no manual copy or separate sub-agent package is needed.
 - **Connection is unauthorized:** check the launching shell's `CHORUS_URL` and `CHORUS_API_KEY`, then restart Pi. Do not put a real key in shared configuration.
 - **Tool names differ:** discover the schema instead of guessing. Native MCP uses names such as `mcp__chorus__chorus_checkin`; legacy direct tools commonly use `chorus_chorus_checkin`. `toolPrefix: "none"` changes legacy names, not tool exposure.
-- **Workflow reminders or native reviewers fail on an older plugin:** upgrade Chorus to 0.21.1 or later. This release fixes Pi/dsh workflow reminders across MCP prefixes and Pi native MCP reviewer compatibility. Reviewers remain read-only apart from posting their verdict.
+- **Reviewers or workers cannot reach Chorus tools:** upgrade Chorus to 0.22.1 or later, which restores the role-scoped `chorus_review` and `chorus_work` tools on both native MCP and adapter hosts. If you copied a packaged agent file to another location, update its `subagentOnlyExtensions` provider path. Workflow reminders across MCP prefixes need 0.21.1 or later. Reviewers remain read-only apart from posting their verdict.
 
 For general connection problems, see [Troubleshoot agent connections](/guides/troubleshooting/).

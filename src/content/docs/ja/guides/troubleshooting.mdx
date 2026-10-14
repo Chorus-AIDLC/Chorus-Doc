@@ -62,6 +62,10 @@ chorus daemon --cwd /path/to/your/project --chorus-only
 
 会話の失敗したターンで**エージェントの起動・実行に失敗**の要約を読み、可能なら**エラーの詳細を表示**を選びます。返信がなくても診断は記録される場合があります。再試行前に[失敗したターンの診断](/ja/guides/session-recovery/#失敗したターンの診断を読む)を確認してください。
 
+**`--chorus-only` の違反（Claude Code、Chorus 0.22.2 以降）。** 詳細に `--chorus-only is not being enforced by this Claude Code build` とあり、まだ使えるツールが列挙されている場合、デーモンは起動時に Chorus の許可リスト外のツールを検出しています。デーモンはプロセスツリーを強制終了してそれ以降を何も転送しなかったため、その Claude Code ビルドでは制限付きの起動を実行できません。デーモンが示す対処は `--yolo` です。エージェントにツールをすべて使わせるつもりの場合に限り切り替え、そうでなければ `--chorus-only` のまま別の Claude Code バージョンを試してください。[`--chorus-only` で強制される内容](/ja/guides/daemon-operations/#--chorus-only-で強制される内容)を参照してください。
+
+エラーの詳細に含まれる既知の認証情報は `[redacted]` に置き換えられます。それ以外のテキストは伏せられないため、共有する前に確認してください。
+
 Linux デーモンが SSH のログアウトや再起動後にオフラインになる場合は、`chorus daemon status` と [lingering 設定](/ja/guides/daemon-operations/#ログアウト後も-linux-デーモンを動かす)を確認します。設定後も Codex が旧認証情報を使う場合は、`chorus daemon restart` だけでなく [App Server の安全な再起動](/ja/reference/agents/codex/#既存の-app-server-に設定を適用する)に従います。
 
 ## 役に立つ診断情報を集める

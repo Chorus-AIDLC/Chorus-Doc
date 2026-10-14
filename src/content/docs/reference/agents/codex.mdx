@@ -86,22 +86,16 @@ with the current working directory and permission policy.
 `--chorus-only` keeps Codex read-only, with interactive approvals and network access
 disabled for the turn. Native requests for approval or user input are denied; requests that
 cannot be safely rejected fail the wake. Questions should go through Chorus
-comments or elaboration. On the verified Codex version, Chorus MCP tools that require
-approval can also be rejected, including `chorus_checkin`. A completed turn does not prove
-that its MCP calls succeeded.
+comments or elaboration. A completed turn does not prove that its MCP calls succeeded.
 
-If you choose to allow check-in, put this explicit tool allowance in `~/.codex/config.toml`
-(or the agent's `CODEX_HOME/config.toml`):
-
-```toml
-[mcp_servers.chorus.tools.chorus_checkin]
-approval_mode = "approve"
-```
-
-This allowance was verified for new and resumed threads on 0.157.1 while read-only mode
-and disabled interactive approvals remained in effect. It permits only check-in; comments
-and task updates require their own explicit allowance and verification. Put these rules in
-Codex configuration, not daemon `args`. The daemon does not approve requests on your behalf.
+From Chorus 0.22.2, when `[mcp_servers.chorus]` is declared in `~/.codex/config.toml` (or the
+agent's `CODEX_HOME/config.toml`), the daemon pre-approves only the Chorus MCP server for each
+new or resumed thread, using a per-thread `mcp_servers.chorus.default_tools_approval_mode`
+override. Chorus tools such as `chorus_checkin`, comments, and task updates then work
+without per-tool allowances in your config. Other MCP servers, shell commands, and file
+changes stay refused, and the sandbox stays read-only. Without that entry, the daemon logs a
+warning and the wake runs without Chorus MCP tools. `--yolo` is unchanged. TRAE CLI wakes
+behave the same way with `traecli.toml`.
 
 ### Interrupts and troubleshooting
 
@@ -155,6 +149,9 @@ for the full flow.
 
 - **`codex` is not found:** install `@openai/codex` globally and re-run `chorus agents add`.
 - **Old credentials after configuration, or missing `CHORUS_API_KEY`:** check `.env` under the actual `CODEX_HOME` and rerun `chorus agents add --agents codex`; use the safe App Server restart flow above. Rotate the key only if it is invalid or revoked.
+- **Wrong agent identity in daemon wakes:** several Codex agents share one `CODEX_HOME`.
+  Its `.env` overrides the credentials the daemon exports, so give each agent its own
+  `CODEX_HOME`. See [how each backend receives its key](/guides/daemon-operations/#how-each-backend-receives-its-key).
 - **Plugin or hooks are disabled:** enable them in `/plugins` and `/hooks`, then restart
   Codex.
 - **Daemon is offline:** run `chorus daemon status`, then see

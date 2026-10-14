@@ -1,0 +1,219 @@
+---
+title: TRAE CLI
+description: 共通の Codex プラグインパッケージで TRAE CLI（traecli）を Chorus に接続し、必要に応じてリモート作業に利用できるようにします。
+docsLocale: ja
+route: /ja/reference/agents/trae/
+---
+
+**Chorus 0.22.2 以降**では、TRAE CLI（`traecli`）に公式の Chorus 統合があります。TRAE CLI は
+Codex のフォークなので、Chorus は **Codex プラグインパッケージ**を再利用し、デーモンの起動にも
+Codex App Server のトランスポートを使います。TRAE 専用のプラグインを別途インストールする必要は
+ありません。TRAE CLI はサポートされる Chorus デーモンのバックエンドでもあります。
+
+テスト済みの最小バージョンは **traecli 0.209.1** です。それより古いバージョンは検証されていません。
+
+## 前提条件
+
+- `traecli` がインストールされ、`PATH` 上にあること。バージョンは `traecli --version` で確認します。
+- TRAE CLI にログイン済みであること（`traecli login` を実行するか、`traecli` を一度起動して
+  ログインを完了します）。TRAE の認証は Chorus では扱いません。
+- 到達可能な Chorus URL と API キー。キーは
+  [エージェントのアクセスを準備する](/ja/guides/administrator-setup/)に従って作成します。
+
+以下の TRAE のパスはすべて `TRAE_HOME` に従い、未設定なら `~/.trae` を使います。Chorus が
+読むのは `TRAE_HOME` だけで、`TRAECLI_HOME` は参照しません。
+
+## 統合をインストールする
+
+`chorus` CLI をインストールしてから、TRAE CLI を設定します。
+
+```bash
+npm install --global @chorus-aidlc/chorus
+chorus agents add --agents trae
+```
+
+プロンプトが出たら Chorus URL と API キーを入力します。先に `CHORUS_URL` と `CHORUS_API_KEY` を
+エクスポートしておくこともできます。このコマンドは冪等で、何度実行しても安全です。処理内容は
+次のとおりです。
+
+1. `traecli` がインストールされているかを確認します。
+2. TRAE 自身のプラグイン CLI（`traecli plugin marketplace add …`）で `chorus-plugins`
+   マーケットプレイスを登録します。登録済みのマーケットプレイスは再追加しません。既存の
+   インストールを更新するときは `traecli plugin marketplace upgrade chorus-plugins` を実行します。
+3. `traecli plugin install chorus@chorus-plugins --yes` で Codex プラグインパッケージを
+   インストールします。プラグインは `$TRAE_HOME/plugins/cache/chorus-plugins/chorus/<version>/` に
+   コピーされ、`$TRAE_HOME/traecli.toml` に `[marketplaces.chorus-plugins]` と
+   `[plugins."chorus@chorus-plugins"]` が追加されます。変更前に元の `traecli.toml` を
+   バックアップします。
+4. Chorus の認証情報を、エージェント種別 `trae` として `~/.chorus/daemon.json` に保存します。
+5. `CHORUS_URL`、`CHORUS_API_KEY`、`CHORUS_AGENT_PROFILE` を `$TRAE_HOME/.env` に書き込みます
+   （モード `0600`、他のエントリは保持）。traecli は起動時にこのファイルを読み込むため、
+   プラグインのフック、シェルツールからの `chorus` 呼び出し、ネイティブ MCP のいずれも、手動で
+   エクスポートしなくてもあなたの ID を使えます。
+6. `$TRAE_HOME/traecli.toml` に、キーを含まない `[mcp_servers.chorus]` ブロックを書き込みます。
+
+   ```toml
+   [mcp_servers.chorus]
+   url = "https://chorus.example.com/api/mcp"
+   bearer_token_env_var = "CHORUS_API_KEY"
+   ```
+
+   traecli は `$TRAE_HOME/.env` にあるこの変数の値を `Authorization: Bearer <key>` ヘッダーに
+   変換します。キーが `traecli.toml` に保存されることはありません。
+
+非対話のインストール（CI やサンドボックス）では次のようにします。
+
+```bash
+chorus agents add --agents trae \
+  --url https://chorus.example.com \
+  --api-key cho_REDACTED --yes
+```
+
+アプリ内の **Settings → Setup Guide** のウィザードにも、同じ手順を示す **TRAE CLI** タブが
+あります。
+
+### `.env` はシェルより優先される
+
+Codex と同様に、traecli では `$TRAE_HOME/.env` の値が、シェルや親プロセスがエクスポートした
+同名の値を**上書き**します。
+
+- ID を切り替えるには、`chorus agents add --agents trae` を再実行する（端末では、既存の
+  プロファイルを切り替える前に確認されます）か、`$TRAE_HOME/.env` を編集します。別の
+  `CHORUS_API_KEY` をエクスポートしても効果はありません。
+- 1 つのデーモンで複数の Chorus エージェントが TRAE バックエンドを使う場合は、**エージェントごとに
+  専用の `TRAE_HOME`** を用意してください。`~/.chorus/daemon.json` のそのエージェントの `env` に
+  `TRAE_HOME` を設定し、その `TRAE_HOME` をエクスポートした状態で
+  `chorus agents add --agents trae` を一度実行します。そうしないと、同じホームを共有する
+  エージェントはすべて、その `.env` に保存された ID で起動されます。
+
+### 実行中の App Server に設定を反映する
+
+TRAE App Server デーモンがすでに実行中の場合、対話的な実行では、新しい環境を読み込ませるために
+`traecli app-server daemon restart` で再起動するかを確認します。再起動すると他の TRAE CLI
+セッションが中断される可能性があるため、既定の答えは**いいえ**です。
+
+- 非対話の実行、`--yes`、`CHORUS_DAEMON_HEADLESS=1` では再起動しません。
+- App Server デーモンが動いていなければ、セットアップが新たに起動することはありません。Codex と
+  異なり、デーモンがないと `traecli app-server daemon version` はエラーで終了するため、
+  セットアップは再起動を延期として報告します（"daemon state could not be determined"）。
+
+## Chorus のフックを信頼する
+
+プラグインには Chorus のライフサイクルフックが含まれます。`SessionStart` のチェックインと、
+`chorus_pm_submit_proposal`、`chorus_submit_for_verify`、`chorus_admin_verify_task` の後に
+レビュアーを促す `PostToolUse` 通知です。**traecli は、信頼したプラグインフックしか実行しません。**
+`traecli` を開き、フック信頼のレビューで `chorus@chorus-plugins` のフックを承認してください。
+承認するまでは、自動チェックインもレビュアーの通知も行われません。プラグインの更新でフックの
+定義が変わったら、再度レビューしてください。
+
+TRAE CLI と Codex は同じフックスクリプトを実行します。各スクリプトは、プラグインが
+`$TRAE_HOME/plugins/` 配下にインストールされていると TRAE と判断し、TRAE 向けの表現に切り替えます。
+たとえば、サブエージェントは Codex の `spawn_agent` ではなく `Agent` ツールで起動します。
+`CHORUS_HOOK_RUNTIME=trae` または `CHORUS_HOOK_RUNTIME=codex` を設定すると判定を固定できます。
+
+## リモート起動を有効にする
+
+対話的な TRAE CLI セッションから Chorus を使うだけなら、このセクションは不要です。それ以外の
+場合は、[エージェントランタイムを接続する](/ja/guides/operator-onboarding/)に従い、バックエンドに
+`trae` を選択してください。[Chorus デーモンを運用する](/ja/guides/daemon-operations/)で常時
+オンラインにする前に、フォアグラウンドで接続を確認します。
+
+```bash
+chorus daemon --agent trae
+```
+
+`~/.chorus/daemon.json` に `{ "agent": "trae" }` と書いて TRAE CLI を既定にするか、`agents[]` の
+いずれかのエントリに `"agentType": "trae"` を設定することもできます。
+
+## デーモンの動作
+
+起動のたびに、独立した `traecli app-server --listen stdio://` プロセスが 1 つ立ち上がります。
+[Codex バックエンド](/ja/reference/agents/codex/)と同じ App Server 実装を使い、スレッドの再開、
+中断、クリーンアップ、権限モードの対応付けも同じです。Codex との違いは次のとおりです。
+
+- **実行ファイルとホーム：** 実行ファイルは `traecli`（`CHORUS_TRAE_PATH` で上書き可能）、ホームは
+  `TRAE_HOME`（既定は `~/.trae`）、設定ファイルは `traecli.toml` です。
+- **別々のローカル記録：** スレッド ID と使用量は `~/.chorus/trae-sessions.json` と
+  `~/.chorus/trae-usage.json` に、Codex とは別に保存されます。そのため、スレッドが誤った
+  バックエンドで再開されることはありません。
+- **報告：** 起動エラーとデーモン接続は、ソースとクライアント種別として `trae` を報告します。
+  **Settings → Agents** では、その接続は **TRAE CLI** と表示されます。
+- **引数：** エージェントごとの `args` は Codex と同じ規則に従います。モデル選択（`-m`）と、許可
+  された `-c key=value` 設定だけが使え、保護されるキーも同じです。TRAE CLI では
+  `permission_mode` 設定キーも使えず、さらに `--permission-mode`、`--worktree`、`--session-id` などの保護された制御項目が追加されています。
+  権限の姿勢はデーモンがプロトコル経由で適用します。
+- **フック：** フックが信頼されていない場合でも、起動された TRAE プロセスは動作しますが、
+  `SessionStart` のチェックインは行われません。
+
+エージェントの Chorus 接続を注入してフォアグラウンドで起動するには、
+`chorus agents run --name <agent> --type trae` を実行します。
+
+### 制限モード（`--chorus-only`）
+
+`--chorus-only` では、TRAE のサンドボックスは読み取り専用のままで、対話的な承認は無効になります。
+読み取り専用のサンドボックスは通常すべての MCP ツールに承認を求めるため、そのままでは Chorus の
+ツールも拒否されます。そこで、`traecli.toml` に `[mcp_servers.chorus]` が宣言されている場合、
+デーモンは起動したスレッドに限り、Chorus の MCP サーバー 1 つだけを事前承認します。
+
+```json
+"config": { "mcp_servers.chorus.default_tools_approval_mode": "approve" }
+```
+
+- サンドボックスは読み取り専用のままなので、書き込みなど副作用のあるコマンドは引き続きブロック
+  されます。他の MCP サーバーのツールや、シェル、ファイル変更、権限の承認要求も引き続き拒否
+  されます。
+- この上書きが設定ファイルに書き込まれることはなく、YOLO モードでは送信されません。
+  `[mcp_servers.chorus]` テーブルが宣言されていなければ送信されません。検出されるのは通常の
+  `[mcp_servers.chorus]` テーブルヘッダーだけで、インラインテーブルやドット区切りキーの形式は
+  検出されません。
+- `chorus` という名前のサーバーのツールは、書き込みや管理用のものも含めてすべて事前承認されます。
+  起動されたエージェントが Chorus で変更できる範囲はキーの権限だけで決まるため、制限モードの
+  デーモンには必要な権限だけを持つキーを使ってください。
+- デーモンは `[mcp_servers.chorus]` が指す先をそのまま信頼します。このエントリは、
+  `chorus agents add` が書き込んだとおり、Chorus の MCP エンドポイントを指したままにしてください。
+
+## 接続を確認する
+
+`traecli` を開き、`check in to chorus` と依頼します。TRAE は MCP サーバー経由で `chorus_checkin()`
+を呼び出し、エージェントの ID と権限を報告します。MCP サーバーの一覧は `traecli mcp list` で
+確認できます。
+
+Chorus のワークフロースキル（`$chorus`、`$develop`、`$proposal`、`$yolo` など）は Codex と同じ
+プラグインから提供されます。スキルは Codex の `spawn_agent` ツールでサブエージェントを説明して
+いますが、TRAE CLI のサブエージェントツールは `Agent` です。
+
+デーモンモードでは、Chorus の **Settings → Agents** を開き、想定したホストと作業ディレクトリが
+オンラインになっていることを確認します。
+
+## 更新と削除
+
+- `chorus upgrade --plugins` は、`~/.chorus/daemon.json` で設定された `trae` エントリの Chorus
+  プラグインを、各エントリの `TRAE_HOME` に従って更新します。
+  [CLI リファレンス](/ja/reference/cli/#cli-とプラグインを更新する)を参照してください。
+- プラグインがインストール済みの状態で `chorus agents add --agents trae` を再実行すると、
+  `Update installed Chorus plugins to the latest available versions? [y/N]` と確認されます。
+  `y` と答えるとマーケットプレイスを更新してプラグインを再インストールし、既定（いいえ）では
+  インストール済みのプラグインをそのまま使います。`--yes` を付けるか非対話で実行すると、確認なしで
+  更新します。いずれの場合も、`$TRAE_HOME/.env` の認証情報は更新されます。
+- `chorus agents remove <name|uuid>` は、`~/.chorus/daemon.json` からエージェントを削除するだけ
+  です。`~/.trae/.env` の `CHORUS_*` の値、キーを含まない `[mcp_servers.chorus]` ブロック、
+  `~/.trae/traecli.toml` の `chorus@chorus-plugins` プラグインエントリは残るので、必要に応じて
+  手動で削除してください。
+
+## よくある問題
+
+- **`traecli` が見つからない：** TRAE CLI をインストールして `traecli` を `PATH` に通すか、
+  `CHORUS_TRAE_PATH` を設定します。
+- **Chorus のツールがない、または `401 Unauthorized`：** `$TRAE_HOME/.env` にキーがない、キーが
+  失効している、あるいは App Server デーモンが古い環境のまま動いています。
+  `chorus agents add --agents trae` を再実行して App Server を再起動させるか、作業を保存してから
+  自分で `traecli app-server daemon restart` を実行します。
+- **フックが動かない：** Chorus のフックを信頼し、`$TRAE_HOME/traecli.toml` で
+  `chorus@chorus-plugins` が有効になっていることを確認します。
+- **デーモン起動時のエージェント ID が違う：** 複数の TRAE エージェントが 1 つの `TRAE_HOME` を
+  共有しています。エージェントごとに専用のホームを用意してください。
+- **マーケットプレイスの更新で "is not configured as a Git marketplace" と表示される：**
+  ローカルパスのマーケットプレイスソース（`CHORUS_MARKETPLACE_SOURCE_TRAE`）では想定どおりの
+  動作です。セットアップはこれを何もしない処理として扱い、プラグインを再インストールします。
+- **デーモンがオフライン：** `chorus daemon status` を実行し、
+  [エージェント接続のトラブルシューティング](/ja/guides/troubleshooting/)を参照します。

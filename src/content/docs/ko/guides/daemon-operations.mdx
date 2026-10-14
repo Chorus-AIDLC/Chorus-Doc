@@ -7,7 +7,7 @@ sidebar:
   order: 10
 ---
 
-포그라운드 데몬 연결을 확인한 뒤에 이 가이드를 사용하세요. 명령은 지원되는 상주 백엔드, 즉 Claude Code, Codex, Kiro, Pi에 적용됩니다.
+포그라운드 데몬 연결을 확인한 뒤에 이 가이드를 사용하세요. 명령은 지원되는 상주 백엔드, 즉 Claude Code, Codex, TRAE CLI, Kiro, Pi에 적용됩니다.
 
 [Hermes](/ko/reference/agents/hermes/)는 Chorus daemon 대신 자체 게이트웨이로 온라인 상태를 유지합니다. 댓글 승인과 중단/재개를 지원하지만 조사 및 아이디어 생성 전용 작업 턴은 실행하지 않습니다.
 
@@ -15,7 +15,7 @@ sidebar:
 
 [업데이트 명령](/ko/reference/cli/#cli와-플러그인-업그레이드)으로 Chorus CLI를 갱신하고 진행 중인 작업에 지장이 없을 때 데몬을 재시작하세요. 호스트 CLI는 별도로 업데이트합니다. 데몬이 처음 작업을 시작하기 전에 백엔드별 요구사항을 확인하세요.
 
-- [Codex App Server](/ko/reference/agents/codex/#0200의-데몬-동작): codex-cli 0.157.1로 검증했습니다. 데몬 `args`는 모델 옵션과 허용된 설정만 받습니다. `--chorus-only`에서는 필요한 MCP 도구 허용을 Codex 설정에서 확인하세요.
+- [Codex App Server](/ko/reference/agents/codex/#0200의-데몬-동작): codex-cli 0.157.1로 검증했습니다. 데몬 `args`는 모델 옵션과 허용된 설정만 받습니다. Chorus 0.22.2 이상의 `--chorus-only` 모드에서는 `[mcp_servers.chorus]`가 선언되어 있으면 데몬이 Chorus MCP 서버를 미리 승인합니다([`--chorus-only`가 강제하는 것](#--chorus-only가-강제하는-것) 참조).
 - [Claude Code stream-json](/ko/reference/agents/claude-code/#0200의-데몬-동작): Claude Code 2.1.283 및 2.1.284로 검증했습니다. 중단할 때는 먼저 프로토콜 수준의 중단을 사용하며, 백그라운드에서 생긴 질문은 반드시 Chorus 댓글이나 요구사항 구체화로 처리해야 합니다.
 - [Pi RPC](/ko/reference/agents/pi/#0200의-데몬-동작): Pi 0.85.0 이상이 필요합니다(0.85.1로 검증). `--plugins`는 Chorus 패키지를 갱신하지만 Pi 자체는 업그레이드하지 않습니다.
 
@@ -39,6 +39,16 @@ chorus daemon \
 에이전트가 읽고 수정하도록 허용된 디렉터리만 등록하세요. 원격으로 시작된 에이전트는 데몬을 실행하는 사용자의 파일 시스템과 도구 권한을 그대로 받습니다.
 :::
 
+## `--chorus-only`가 강제하는 것
+
+Chorus 0.22.2부터 `--chorus-only`는 Chorus 도구를 자동 승인하는 데 그치지 않고 다른 도구를 제거합니다. Claude Code에서 제한을 확인할 수 없으면 해당 깨우기가 중단됩니다.
+
+- **Claude Code** — 깨울 때마다 `--tools "mcp__chorus__*,Task,Agent"`와 `--strict-mcp-config`를 전달합니다. 깨어난 에이전트에는 이 데몬의 Chorus MCP 도구와 하위 에이전트 디스패치(`Task` / `Agent`)만 남습니다. Bash나 파일 편집 같은 내장 도구는 제거되고, 사용자의 MCP 서버는 로드되지 않으며, `Edit`, `Write`, `NotebookEdit`도 이름으로 거부됩니다. 데몬은 깨울 때마다 Claude Code의 시작(init) 프레임에 담긴 도구 목록을 이 허용 목록과 대조합니다. 다른 도구가 하나라도 있으면 데몬은 프로세스 트리를 강제 종료하고, 그 시점부터 출력을 전달하지 않으며, 유출된 도구 이름을 담은 실패한 깨우기를 기록합니다. Claude Code가 도구 목록을 보고하지 않으면 데몬은 제한을 확인할 수 없다는 경고를 로그에 남기고 깨우기를 계속합니다.
+- **Codex와 TRAE CLI** — 턴은 승인이 꺼진 읽기 전용 샌드박스에서 실행됩니다. 백엔드 설정에 `[mcp_servers.chorus]`가 선언되어 있으면 데몬이 해당 스레드에 대해 Chorus MCP 서버만 미리 승인하므로 Chorus 도구가 동작합니다. 다른 MCP 서버, 셸 명령, 파일 변경은 계속 거부됩니다. 이 항목이 없으면 데몬은 경고를 로그에 남기고 Chorus MCP 도구 없이 깨우기를 실행합니다.
+- `--yolo`는 바뀌지 않습니다. 깨어난 에이전트는 로컬 도구 전체를 사용합니다.
+
+위반은 **에이전트 시작 또는 실행 실패** 턴으로 나타납니다. [에이전트 연결 문제 해결](/ko/guides/troubleshooting/#응답-전에-턴이-실패함)을 참고하세요.
+
 ## `daemon.json` 구성하기
 
 데몬은 설정을 `~/.chorus/daemon.json`에서 읽습니다. 일반적인 단일 에이전트 구성에서는 에이전트 인증 정보와 런타임 옵션을 함께 담은 평면 JSON 객체 하나입니다. 하나의 데몬으로 여러 에이전트를 서비스하려면 대신 `agents` 배열에 에이전트를 나열합니다([하나의 데몬에서 여러 에이전트 실행하기](#하나의-데몬에서-여러-에이전트-실행하기) 참조). 어느 형식이든 파일은 `0600`(소유자만 읽기/쓰기) 권한으로 원자적으로 기록되므로, 쓰기 도중 크래시가 나도 잘린 파일이 남지 않습니다. 다른 파일을 사용하려면 `CHORUS_DAEMON_CONFIG_PATH`를 설정하세요. 이 경우 CLI와 데몬 서비스에 같은 값을 설정해야 합니다. 셸에서 export해도 이미 실행 중인 서비스에는 반영되지 않습니다.
@@ -53,7 +63,7 @@ chorus daemon \
 | `agentName` | string | 인증된 에이전트 이름(참고용). |
 | `cwds` | string[] | 이 데몬이 제공하는 작업 디렉터리. 각 경로는 하나의 독립된 온라인 연결입니다. |
 | `browseRoots` | string[] | 원격 작업 디렉터리 탐색에 노출하는 루트. browse root는 연결을 만들지 않습니다. |
-| `agent` | string | 깨울 로컬 백엔드: `"claude-code"`, `"codex"`, `"kiro"`, `"pi"`, `"dsh"`. |
+| `agent` | string | 깨울 로컬 백엔드: `"claude-code"`, `"codex"`, `"trae"`, `"kiro"`, `"pi"`, `"dsh"`. |
 | `sigintTimeoutMs` | number | 중단 후 강제 종료까지의 유예 시간(밀리초). Claude Code, Codex, Pi는 먼저 프로토콜 중단을 보냅니다. 기본값 `10000`. |
 | `agents` | object[] | *선택.* 하나의 데몬으로 여러 독립 에이전트를 서비스합니다. 각 항목은 공유 런타임 기본값을 재정의할 수 있지만 `args`와 `env`는 상속되지 않습니다. [하나의 데몬에서 여러 에이전트 실행하기](#하나의-데몬에서-여러-에이전트-실행하기) 참조. |
 
@@ -126,7 +136,7 @@ chorus daemon \
 | --- | --- |
 | `apiKey`(필수) | 에이전트의 `cho_` 키. 이 키로 에이전트의 신원이 정해집니다. |
 | `url` | Chorus 서버(에이전트마다 다를 수 있음 — 다른 서버나 워크스페이스). |
-| `agentType` | `claude-code`, `codex`, `kiro`, `pi`(백엔드는 혼합 가능). |
+| `agentType` | `claude-code`, `codex`, `trae`, `kiro`, `pi`(백엔드는 혼합 가능). |
 | `cwds` | 이 에이전트가 제공하는 작업 디렉터리(각각 하나의 연결). |
 | `permissionMode` | `yolo` 또는 `chorus`. |
 | `maxConcurrency` | 이 에이전트 자신의 깨우기 동시 실행 상한(기본값 `4`). |
@@ -162,7 +172,7 @@ chorus daemon \
 - **보호된 제어 항목**: 영구 인수는 알려진 세션/재개, 프롬프트, 전송/출력, 작업 디렉터리, 관리형 MCP, 권한 제어를 변경할 수 없습니다. 도움말/버전처럼 정보만 출력하고 종료하는 옵션, 단독 `--`, 표준 입력 표시자 `-`도 금지됩니다. 모든 `CHORUS_*` 환경 변수 이름과 중첩 Claude 컨텍스트 이름 `CLAUDECODE` / `CLAUDE_CODE_ENTRYPOINT`는 대소문자와 무관하게 예약되어 있습니다. 이를 설정하면 조용히 무시되지 않고 오류가 발생합니다. 대신 전용 Chorus 설정이나 명시적인 포그라운드 패스스루를 사용하세요.
 - **Windows 명령 래퍼**: `.cmd`/`.bat` 실행은 구성된 빈 인수와 공백, 따옴표, 명령 메타 문자가 포함된 인수를 거부합니다. 이런 값에는 네이티브 실행 파일을 사용하세요. 래퍼를 거치는 명시적 포그라운드 패스스루는 셸에서 안전하다고 보장되지 않습니다.
 
-Env에는 평문 제공자 인증 정보가 들어갈 수 있습니다. 파일을 보호하고(POSIX에서 `chmod 600 ~/.chorus/daemon.json`) 비밀을 커밋하지 마세요. Chorus는 검증/실행 메시지에 구성 값을 표시하지 않지만, 자식 프로그램이나 OS 수준의 검사로 노출될 수 있습니다. 암호화나 비밀 저장소(vault) 기능은 없습니다. `CODEX_HOME`이나 `PI_CODING_AGENT_DIR` 같은 사용자 지정 홈을 설정하면 그곳에도 Chorus 통합을 구성하세요.
+Env에는 평문 제공자 인증 정보가 들어갈 수 있습니다. 파일을 보호하고(POSIX에서 `chmod 600 ~/.chorus/daemon.json`) 비밀을 커밋하지 마세요. Chorus는 검증/실행 메시지에 구성 값을 표시하지 않지만, 자식 프로그램이나 OS 수준의 검사로 노출될 수 있습니다. 암호화나 비밀 저장소(vault) 기능은 없습니다. `CODEX_HOME`, `TRAE_HOME`, `PI_CODING_AGENT_DIR` 같은 사용자 지정 홈을 설정하면 그곳에도 Chorus 통합을 구성하세요.
 
 **변경 적용**: `chorus daemon restart`를 실행하세요. 데몬은 이 설정을 시작할 때 읽으며, 깨울 때마다 다시 읽지는 않습니다. 파일을 편집해도 실행 중인 자식 프로세스는 바뀌지 않고, 재시작하기 전까지는 이후의 깨우기에도 이전 설정이 사용됩니다. 새로 실행하는 `chorus agents run`은 매번 프로필을 다시 읽지만, 이미 실행 중인 자식 프로세스에는 영향을 주지 않습니다. `args`/`env`를 제거하면 사용자 지정 전 동작으로 돌아갑니다.
 
@@ -184,7 +194,8 @@ Env에는 평문 제공자 인증 정보가 들어갈 수 있습니다. 파일�
 
 - **Claude Code** — 자동. 데몬이 깨울 때마다 해당 에이전트의 URL과 키를 담은 MCP 설정을 작성합니다. 따로 구성할 것은 없습니다.
 - **Kiro** — 환경 변수를 통해 자동. 설치된 `mcp.json`은 `${CHORUS_URL}`과 `${env:CHORUS_API_KEY}`를 참조하고, 데몬이 깨울 때마다 이를 내보내므로, 각 Kiro 에이전트는 자신의 키로 인증합니다.
-- **Codex** — 환경 변수를 통해 자동. `chorus agents add`는 Codex 설정 파일에 키를 저장하지 않는 방식으로 Codex를 구성합니다. `CHORUS_URL` / `CHORUS_API_KEY` / `CHORUS_AGENT_PROFILE`를 `~/.codex/.env`(Codex가 시작할 때 로드함)에 쓰고 `config.toml`에 `bearer_token_env_var = "CHORUS_API_KEY"`를 설정하므로, Codex는 파일에 기록된 키가 아니라 환경 변수에서 키를 읽습니다. 데몬이 깨울 때마다 각 에이전트의 키를 주입하므로, 하나의 데몬에 있는 여러 Codex 에이전트가 각자 자신의 신원으로 인증합니다.
+- **Codex** — 환경 변수를 통해 자동. `chorus agents add`는 Codex 설정 파일에 키를 저장하지 않는 방식으로 Codex를 구성합니다. `CHORUS_URL` / `CHORUS_API_KEY` / `CHORUS_AGENT_PROFILE`를 `~/.codex/.env`(Codex가 시작할 때 로드함)에 쓰고 `config.toml`에 `bearer_token_env_var = "CHORUS_API_KEY"`를 설정하므로, Codex는 파일에 기록된 키가 아니라 환경 변수에서 키를 읽습니다. 데몬은 깨울 때마다 각 에이전트의 키를 내보내지만, Codex의 `CODEX_HOME/.env`가 내보낸 값을 **덮어씁니다**. Codex 데몬 에이전트마다 별도의 `CODEX_HOME`을 지정하세요(에이전트의 `env`에서 설정). 그렇지 않으면 홈을 공유하는 모든 에이전트가 그 `.env`에 저장된 ID로 깨어납니다.
+- **TRAE CLI**(Chorus 0.22.2 이상) — Codex처럼 환경 변수를 통해 전달합니다. `chorus agents add --agents trae`는 키를 포함하지 않는 `[mcp_servers.chorus]`(`bearer_token_env_var = "CHORUS_API_KEY"`)를 `$TRAE_HOME/traecli.toml`에, 인증 정보를 `$TRAE_HOME/.env`(기본값 `~/.trae`)에 씁니다. traecli는 시작할 때 이 `.env`를 불러오며, 그 값이 데몬이 내보내는 `CHORUS_*` 값을 **덮어씁니다**. TRAE 데몬 에이전트마다 별도의 `TRAE_HOME`을 지정하세요(에이전트의 `env`에서 설정). 그렇지 않으면 홈을 공유하는 모든 에이전트가 그 `.env`에 저장된 ID로 깨어납니다. [TRAE CLI](/ko/reference/agents/trae/)를 참고하세요.
 - **Pi** — 환경 변수를 통해 자동. 데몬은 깨울 때마다 각 에이전트의 `CHORUS_URL` / `CHORUS_API_KEY` / `CHORUS_AGENT_PROFILE`를 깨운 Pi 세션으로 내보내고 `chorus-pi` 확장이 이를 읽으므로, 각 Pi 에이전트는 자신의 키로 인증합니다.
 
 ## Linux 서비스 설치하기
@@ -264,6 +275,11 @@ chorus daemon -d --agent codex --cwd ~/work/project-a --chorus-only
 4. 작은 테스트 세션을 시작해 의도한 디렉터리를 대상으로 하는지 확인합니다.
 
 로그에는 경로, 프롬프트, 명령 출력이 담길 수 있습니다. 공유하기 전에 민감한 값을 제거하세요. 실패한 경우 [에이전트 연결 문제 해결](/ko/guides/troubleshooting/)로 이어 가세요.
+
+## 실패한 깨우기와 멘션 복구
+
+- **인증 정보 가리기**(Chorus 0.22.2 이상) — 실패한 깨우기의 오류 세부 정보를 저장하기 전에, 데몬은 알려진 인증 정보를 `[redacted]`로 바꿉니다. 대상은 에이전트의 Chorus 키와 인증 정보처럼 보이는 환경 변수 값(`*_API_KEY`, `*_TOKEN`, `*_SECRET`, `*_PASSWORD` 같은 이름)입니다. 보존된 출력 끝부분이 시작되는 지점에서 반으로 잘린 키도 포함되며, 네 글자보다 짧은 조각만 그대로 남습니다. 가리기는 알려진 인증 정보에만 적용됩니다. 세부 정보를 공유하기 전에 경로, 프롬프트, URL, 명령 출력 같은 다른 민감한 텍스트를 검토하고 제거하세요.
+- **멘션 복구**(Chorus 0.22.1 이상) — 데몬은 각 깨우기의 컨텍스트를 저장합니다. 이벤트가 도착한 뒤 댓글이나 멘션을 가져오거나 라우팅하는 데 실패하면, SSE 연결이 정상이어도 데몬은 상한이 있는 백오프로 재시도하고, 서버에 다시 연결할 수 있게 되면 깨우기를 한 번 대기열에 넣습니다. 채팅 메시지를 보내거나 데몬을 재시작할 필요가 없습니다. 각 깨우기의 상태는 그것을 일으킨 바로 그 턴에 기록되므로, 이후의 채팅 메시지와 원래 댓글은 각자의 턴과 대화 기록을 유지합니다.
 
 ## Claude 백그라운드 대기 상한(0.22.0)
 

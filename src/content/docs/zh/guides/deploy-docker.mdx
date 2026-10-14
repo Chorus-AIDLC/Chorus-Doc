@@ -73,6 +73,15 @@ docker compose -f docker-compose.local.yml up -d
 面向生产环境，尤其是多副本部署时，请将应用对接到外部 PostgreSQL 与 Redis。创建
 `docker-compose.yml`：
 
+:::danger[已有的 PostgreSQL 16 卷必须先迁移]
+本示例与仓库自身的 `docker-compose.yml` 一样使用 `postgres:17-alpine`。PostgreSQL 17
+**无法打开 PostgreSQL 16 的数据卷**，因此不要只改镜像就对已有的 PG16 卷重启，也绝不要为了消除
+错误而执行 `docker compose down -v`。请让源库保持在 PostgreSQL 16 上，先把它迁移到一个新卷：
+可以使用仓库中的离线脚本 `deploy/self-host/migrate-pg16-to-17.sh`，也可以用 `pg_dump` /
+`pg_restore` 恢复到一个全新的 PostgreSQL 17 卷。参见
+[PostgreSQL 17 与已有的 PostgreSQL 16 卷](/zh/guides/deploy-local/#postgresql-17-与已有的-postgresql-16-卷)。
+:::
+
 ```yaml
 services:
   app:
@@ -111,7 +120,7 @@ services:
       retries: 5
 
   db:
-    image: postgres:16-alpine
+    image: postgres:17-alpine
     environment:
       POSTGRES_USER: chorus
       POSTGRES_PASSWORD: chorus
@@ -315,6 +324,8 @@ Docker 入口脚本和 npm `chorus` 启动器会自动处理密钥。直接用 `
 
 ## 后续步骤
 
+- **[在本机自托管](/zh/guides/deploy-local/)**：基于 PostgreSQL 17 的 `install.sh` 本地安装、可选的
+  局域网 HTTPS 或 Cloudflare Tunnel，以及 PG16 到 PG17 的迁移。
 - **[生产环境部署](/zh/guides/deploy-production/)**：从全局 npm 包运行，以及完整的 AWS CDK
   演练。
 - **[运维自托管的 Chorus](/zh/guides/deploy-operations/)**：首次登录引导、部署侧身份认证，以及升级前的

@@ -67,6 +67,10 @@ docker compose -f docker-compose.local.yml up -d
 
 本番環境、特に複数のレプリカを動かす場合は、アプリを外部の PostgreSQL と Redis に接続します。`docker-compose.yml` を作成します。
 
+:::danger[既存の PostgreSQL 16 ボリュームは先に移行が必要]
+この例は、リポジトリ自身の `docker-compose.yml` と同じく `postgres:17-alpine` を使います。PostgreSQL 17 は **PostgreSQL 16 のデータボリュームを開けない**ため、イメージだけを変えて既存の PG16 ボリュームで再起動しないでください。エラーを消すために `docker compose down -v` を実行してもいけません。ソースは PostgreSQL 16 のまま残し、まず新しいボリュームへ移行します。リポジトリのオフライン移行ヘルパー `deploy/self-host/migrate-pg16-to-17.sh` を使うか、`pg_dump` / `pg_restore` で新しい PostgreSQL 17 ボリュームに復元します。[PostgreSQL 17 と既存の PostgreSQL 16 ボリューム](/ja/guides/deploy-local/#postgresql-17-と既存の-postgresql-16-ボリューム)を参照してください。
+:::
+
 ```yaml
 services:
   app:
@@ -105,7 +109,7 @@ services:
       retries: 5
 
   db:
-    image: postgres:16-alpine
+    image: postgres:17-alpine
     environment:
       POSTGRES_USER: chorus
       POSTGRES_PASSWORD: chorus
@@ -306,6 +310,8 @@ Secrets Manager を通じてすでに共有しています。
 
 ## 次へ
 
+- **[ローカルマシンでセルフホストする](/ja/guides/deploy-local/)**：PostgreSQL 17 を使う `install.sh` のローカルセットアップ、
+  任意の LAN HTTPS または Cloudflare Tunnel、そして PG16 から PG17 への移行。
 - **[本番環境でデプロイ](/ja/guides/deploy-production/)**：グローバル npm パッケージから実行する方法と、
   完全な AWS CDK の手順。
 - **[セルフホストの Chorus を運用する](/ja/guides/deploy-operations/)**：初回ログインのブートストラップ、デプロイ側の

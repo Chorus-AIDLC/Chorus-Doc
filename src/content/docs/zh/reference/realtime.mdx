@@ -1,6 +1,6 @@
 ---
 title: 实时事件与通知
-description: 浏览器 UI 如何通过 Server-Sent Events 实时更新，以及智能体如何通过通知 REST API 接收同样的工作。
+description: 浏览器 UI 与智能体后台服务如何通过 Server-Sent Events 接收实时事件、后台服务如何找回漏掉的工作，以及通知 REST API。
 docsLocale: zh
 route: /zh/reference/realtime/
 sidebar:
@@ -9,8 +9,9 @@ sidebar:
 
 Chorus 让每个打开的浏览器与人和智能体正在做的事保持同步。每当有变化发生（任务被移动、
 想法被认领、提案被批准），该变化会通过 Server-Sent Events（SSE）广播出去，受影响的页面会
-自动刷新。智能体不消费该数据流；它们通过通知接收同样的工作。本页记录这两条路径：SSE 端点
-及其事件结构，以及智能体（和浏览器客户端）调用的通知 REST API。
+自动刷新。智能体后台服务同样监听 SSE：它的通知流是可唤醒智能体得知新工作的途径。本页记录
+SSE 端点及其事件结构、后台服务如何认证并找回漏掉的工作，以及未运行后台服务的智能体（和浏览器
+客户端）调用的通知 REST API。
 
 ## 实时更新如何流转
 
@@ -30,15 +31,15 @@ Chorus 让每个打开的浏览器与人和智能体正在做的事保持同步�
 
 ## SSE 端点
 
-有两个端点向浏览器推送事件。二者都是 `GET`，都通过请求的 Cookie 完成认证，
-且响应都不会被缓存。
+有两个端点推送事件。二者都是 `GET`，都接受浏览器会话 Cookie 或 `Authorization: Bearer`
+API 密钥（见[智能体如何接收事件](#智能体如何接收事件)），且响应都不会被缓存。
 
 <div class="table-scroll" role="region" aria-label="SSE 端点" tabindex="0">
 
   | 端点 | 推送内容 |
   | --- | --- |
   | `GET /api/events?projectUuid=<uuid>` | 实体变更事件，限定在你所在的工作区；提供 `projectUuid` 时，进一步限定到该项目。 |
-  | `GET /api/events/notifications` | 已认证用户的通知事件，从而让应用内的通知指示器实时更新。 |
+  | `GET /api/events/notifications` | 已认证调用者的通知事件，从而让应用内的通知指示器实时更新。智能体后台服务订阅这条流，作为它的主要唤醒通道。 |
 
 </div>
 
@@ -77,19 +78,74 @@ interface RealtimeEvent {
 批准一个提案会发出一条提案更新事件，外加每个被创建任务各一条事件）。标签页隐藏时连接会被
 关闭，重新可见时会重新打开（并触发一次刷新）；离开页面时连接彻底关闭。
 
-## 智能体不使用 SSE
+## 智能体如何接收事件
 
-:::caution[SSE 仅限浏览器]
-SSE 端点通过**浏览器 Cookie** 认证，`EventSource` 无法发送自定义的 `Authorization` 请求头，
-因此无法携带智能体 API 密钥。**智能体不消费 SSE。** 智能体通过下文的
-[`chorus_get_notifications`](#通知-rest-api) MCP 工具与 `/api/notifications` REST 端点接收
-其工作。智能体的变更仍会发出变更事件，因此正在看同一个项目的浏览器用户会实时看到智能体的
-工作出现。这条流是单向的：智能体动作，人类观看。
-:::
+智能体通过 MCP 工具或 REST API 行动，它做出的每次变更都会发出变更事件，因此正在看同一个项目的
+浏览器用户会实时看到智能体的工作出现。智能体也会**消费** SSE：项目变更流（`GET /api/events`）
+只由浏览器读取，但[智能体后台服务](/zh/guides/daemon-operations/)会订阅通知流
+`GET /api/events/notifications`，这条流是它的主要唤醒通道。
+
+### 两种认证方式
+
+两个 SSE 端点都会先检查 Bearer 令牌，再回退到 Cookie：
+
+<div class="table-scroll" role="region" aria-label="SSE 客户端与认证" tabindex="0">
+
+  | 客户端 | 传输方式 | 认证 |
+  | --- | --- | --- |
+  | 浏览器 | `EventSource` | 会话 Cookie，自动发送。 |
+  | 智能体后台服务 | 用 `fetch` 读取流式响应 | `Authorization: Bearer cho_…` 加上 `Accept: text/event-stream`。 |
+
+</div>
+
+`EventSource` 无法设置自定义请求头，所以浏览器依赖 Cookie。这个限制只针对 `EventSource`：
+后台服务是一个用 `fetch` 读取数据流的 Node 进程，因此它像其他请求一样发送智能体 API 密钥。
+
+### 待处理轮次的找回
+
+`GET /api/daemon/pending-turns?connectionUuid=<uuid>` 使用智能体的 Bearer 密钥调用，返回属于该
+后台服务连接的会话中仍处于 `pending`（尚未开始）状态的轮次。它是**找回路径，不是 SSE 的替代品**。
+每个轮次在创建时就已保存，所以即使某次唤醒的 SSE 投递丢失了，也仍能被找到并执行。
+
+后台服务会在三个时机读取它：
+
+1. **注册时。** 每当 SSE 握手确认连接（包括重连之后），后台服务会立即扫描一次待处理轮次。
+2. **连接期间每 30 秒一次。** 周期扫描即使在从未断开的连接上，也能找回丢失的投递。
+3. **收到 `deliver_turn` 提示时。** 实时提示会触发一次只针对所通知轮次的定向读取。
+
+找回机制与 SSE 连接相互配合：
+
+- **静默断连。** 如果数据流 75 秒内没有收到任何内容（既没有事件，也没有服务器每 30 秒一次的
+  心跳），后台服务会中止连接并重连。
+- **重连期间**找回暂停，新连接一注册成功就以一次扫描恢复。
+
+```text
+daemon → GET /api/events/notifications (Bearer cho_…)
+server → connection registered
+daemon → GET /api/daemon/pending-turns          (sweep on registration)
+daemon → GET /api/daemon/pending-turns          (every 30s)
+server → new notification / deliver_turn        (primary path)
+         … no bytes for 75s → abort, pause recovery, reconnect …
+daemon → GET /api/events/notifications          (reconnect)
+server → connection registered
+daemon → GET /api/daemon/pending-turns          (catch-up sweep)
+```
+
+### 重复处理
+
+每个后台服务连接在内存中保留一份已接受的轮次与通知记录，由实时数据流和找回读取共用。在同一个
+后台服务中，经两条路径都到达的轮次只会被分派一次，以先看到它的路径为准。这份记录能跨越 SSE 重连，
+但**无法跨越后台服务重启**；当启动轮次被拒绝或取消时，相应记录会被释放，以便重试该轮次。另外，
+服务器只允许尚未被认领的 `pending` 轮次开始运行。以上都不构成端到端的“恰好一次”保证。
+
+### 没有后台服务的智能体
+
+未在后台服务下运行的 MCP 智能体不持有 SSE 连接。它通过下文的
+[`chorus_get_notifications`](#通知-rest-api) MCP 工具与 `/api/notifications` REST 端点接收其工作。
 
 ## 通知 REST API
 
-通知是智能体与浏览器客户端共用的持久化“轮询并行动”路径。接收者由认证上下文推导
+通知是浏览器客户端以及未在后台服务下运行的智能体使用的持久化“轮询并行动”路径。接收者由认证上下文推导
 得出：以用户身份认证的请求读取该用户的通知，以智能体 API 密钥认证的请求读取该智能体的通知。
 同一组路由服务两者，且没有接收者参数。
 

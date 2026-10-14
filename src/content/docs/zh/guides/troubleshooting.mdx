@@ -62,6 +62,10 @@ chorus daemon --cwd /path/to/your/project --chorus-only
 
 打开失败的对话回合，阅读 **Agent 唤醒失败**摘要；有详情时选择**展开错误详情**。没有回复不代表没有记录诊断，重试前先看[失败回合诊断](/zh/guides/session-recovery/#查看失败回合的诊断信息)。
 
+**`--chorus-only` 违规（Claude Code，Chorus 0.22.2 及更高版本）。** 如果详情显示 `--chorus-only is not being enforced by this Claude Code build`，并列出仍可用的工具，说明后台服务在唤醒启动时发现了 Chorus 允许列表之外的工具。它已终止整个进程树且不再转发任何输出，因此受限唤醒无法在该 Claude Code 版本上运行。后台服务给出的处理方式是 `--yolo`；只有在你确实打算让智能体使用完整工具集时才改用它，否则请保留 `--chorus-only` 并尝试其他 Claude Code 版本。参见 [`--chorus-only` 的强制范围](/zh/guides/daemon-operations/#--chorus-only-的强制范围)。
+
+错误详情中的已知凭据会被替换为 `[redacted]`。其他文本不会脱敏，分享前请先检查。
+
 若 Linux 后台服务在 SSH 退出或重启后离线，请检查 `chorus daemon status` 和[用户驻留设置](/zh/guides/daemon-operations/#退出登录后继续运行-linux-后台服务)。若 Codex 配置后仍用旧凭据，请按 [App Server 安全重启流程](/zh/reference/agents/codex/#让已有-app-server-使用新配置)操作，而不只是运行 `chorus daemon restart`。
 
 ## 收集有用的诊断信息

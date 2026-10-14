@@ -12,6 +12,7 @@ route: /ja/reference/agents/
 | --- | --- | --- | --- | --- |
 | [Claude Code](./claude-code/) | Chorus チーム | 完全な Chorus ワークフローを求める Claude Code ユーザー | 対応（Chorus デーモン経由） | Chorus デーモン |
 | [Codex](./codex/) | Chorus チーム | 完全な Chorus ワークフローを求める Codex ユーザー | 対応（Chorus デーモン経由） | Chorus デーモン |
+| [TRAE CLI](./trae/) | Chorus チーム | 完全な Chorus ワークフローを求める TRAE CLI ユーザー | 対応（Chorus デーモン経由） | Chorus デーモン |
 | [Kiro](./kiro/) | Chorus チーム | 完全な Chorus ワークフローを求める Kiro CLI ユーザー | 対応（Chorus デーモン経由） | Chorus デーモン |
 | [OpenClaw](./openclaw/) | Chorus チーム | すでにゲートウェイを運用している OpenClaw ユーザー | 対応（OpenClaw 経由） | OpenClaw ゲートウェイ |
 | [Hermes Agent](./hermes/) | Chorus チーム | ゲートウェイでリポジトリを扱う Hermes ユーザー | 対応（Hermes 経由） | Hermes ゲートウェイ |
@@ -20,12 +21,12 @@ route: /ja/reference/agents/
 | [Pi](./pi/) | Chorus チーム | 完全な Chorus ワークフローを求める Pi ユーザー | 対応（Chorus デーモン経由） | Chorus デーモン |
 | [汎用 MCP クライアント](./generic-mcp/) | MCP 互換のみ | 別の MCP クライアントから Chorus ツールを呼び出す | 非対応 | 非対応 |
 
-Claude Code、Codex、Kiro、Pi、DeepSeek Harness が、サポートされる Chorus デーモンのバックエンドです。
+Claude Code、Codex、TRAE CLI、Kiro、Pi、DeepSeek Harness が、サポートされる Chorus デーモンのバックエンドです。
 OpenClaw は自前のゲートウェイとプラグインを通じてオンラインを維持します。OpenCode および汎用 MCP
 クライアントは対話的に接続し、Chorus デーモンのバックエンドとしては選択できません。
 
 API キーと権限については、まず[エージェントのアクセスを準備する](/ja/guides/administrator-setup/)を
-ご覧ください。Claude Code、Codex、Kiro、Pi、DeepSeek Harness をリモートで利用可能にするには、プラットフォームの
+ご覧ください。Claude Code、Codex、TRAE CLI、Kiro、Pi、DeepSeek Harness をリモートで利用可能にするには、プラットフォームの
 セットアップを終えたあとで[Chorus デーモンを運用する](/ja/guides/daemon-operations/)に進みます。
 
 [Hermes](/ja/reference/agents/hermes/) は Chorus daemon ではなく自前のゲートウェイでオンラインを維持します。コメント承認と中断・再開に対応しますが、調査とアイデア作成の専用操作ターンは実行しません。
@@ -82,6 +83,14 @@ Codex の MCP サーバーはプラグインに同梱**されません**。Codex
 （`userConfig`）もないため、レビューと OpenSpec の挙動は、プラグインのトグルではなくスキルによって
 制御されます。
 
+### TRAE CLI
+
+Chorus 0.22.2 以降、TRAE CLI は自身の `traecli plugin` コマンドで**同じ Codex プラグインパッケージ**
+（`chorus@chorus-plugins`）をインストールするため、同じワークフロースキルとフックを
+利用できます。MCP サーバーも同じくキーを含まない形で、
+`$TRAE_HOME/traecli.toml` と `$TRAE_HOME/.env`（既定は `~/.trae`）に設定されます。traecli は、
+信頼したプラグインフックしか実行しません。[TRAE CLI](/ja/reference/agents/trae/)を参照してください。
+
 ### その他の公式統合：OpenClaw、Kiro、Pi
 
 これらのランタイムには公式の統合がありますが、その機能は Claude Code や Codex とは異なります。
@@ -96,13 +105,15 @@ Codex の MCP サーバーはプラグインに同梱**されません**。Codex
 
 ## プラグインをアップグレードする
 
-アップグレードはその場で行え、API キーと Chorus URL は影響を受けません。設定済みの Claude Code、Codex、Kiro、Pi のプロファイルでは、`chorus upgrade --plugins` を使うと、エージェントの再登録や認証情報のローテーションをせずに CLI と Chorus プラグインを更新できます。[CLI の更新範囲と完了状態](/ja/reference/cli/#cli-とプラグインを更新する)を参照してください。以下のセットアップ手順は、エージェントの選択や認証情報の変更にも引き続き使えます。
+アップグレードはその場で行え、API キーと Chorus URL は影響を受けません。設定済みの Claude Code、Codex、TRAE CLI、Kiro、Pi のプロファイルでは、`chorus upgrade --plugins` を使うと、エージェントの再登録や認証情報のローテーションをせずに CLI と Chorus プラグインを更新できます。[CLI の更新範囲と完了状態](/ja/reference/cli/#cli-とプラグインを更新する)を参照してください。以下のセットアップ手順は、エージェントの選択や認証情報の変更にも引き続き使えます。
 
-- **どのエージェントでも**：`--update-installed` を付けてセットアップを実行し、更新するエージェントを
-  選びます。このフラグがないと、完了している既存のインストールはスキップされる場合があります。
+- **どのエージェントでも**：セットアップを再実行し、更新するエージェントを選びます。Chorus プラグインが
+  すでにインストールされている場合、セットアップは `Update installed Chorus plugins to the latest available
+  versions? [y/N]` と確認します。`--yes` を指定した場合や TTY でない実行では、確認せずに更新します。
+  「いいえ」と答えると、完了している既存のインストールはスキップされます。
 
   ```bash
-  chorus agents add --update-installed
+  chorus agents add
   ```
 
 - **Claude Code**：`/plugin` メニューからプラグインを管理するか、marketplace add と install を
@@ -116,11 +127,11 @@ Codex の MCP サーバーはプラグインに同梱**されません**。Codex
   Claude Code を再起動し、`/plugin list` を実行して新しいバージョンが有効になっていることを
   確認します。
 
-- **Codex**：`chorus agents add --update-installed` を再実行すると、プラグインと `~/.codex/.env` の認証情報が更新
-  されます。これは API キーをローテーションする方法でもあります。最後に Codex 内で
+- **Codex**：`chorus agents add --agents codex` を再実行すると、`~/.codex/.env` の認証情報が更新されます（更新の確認に同意するか `--yes`
+  を付けた場合はプラグインも更新されます）。これは API キーをローテーションする方法でもあります。最後に Codex 内で
   `/plugins` を実行します。
 
-OpenClaw、Kiro、Pi は、`chorus agents add --update-installed` を再実行するか、インストール時と同じ仕組みで
+OpenClaw、Kiro、Pi は、`chorus agents add` を再実行してプラグインの更新を承認するか、インストール時と同じ仕組みで
 アップグレードします。手順は上記の各プラットフォームページに記載しています。
 
 ## プラグインをアンインストールする

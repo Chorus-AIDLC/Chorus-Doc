@@ -1,0 +1,443 @@
+---
+title: 在本机自托管
+description: 使用 install.sh 在一台 Linux 或 macOS 主机上运行 Chorus 与 PostgreSQL 17，用保存的包装脚本重新部署，并可选启用自签名局域网 HTTPS 或 Cloudflare Tunnel。
+docsLocale: zh
+route: /zh/guides/deploy-local/
+sidebar:
+  order: 21
+---
+
+本指南搭建一套**单主机自托管的 Chorus**：一个应用容器加一个 PostgreSQL 17 容器，由
+[Chorus 仓库](https://github.com/Chorus-AIDLC/Chorus)中 `deploy/self-host/` 目录下的
+Docker Compose 文件启动。`install.sh` 的本地安装流程（Chorus 0.22.2 及以后）负责准备镜像、
+写入受保护的配置，并保存一个用于后续重新部署的包装脚本。你还可以为局域网添加一个自签名
+HTTPS 入口，或通过你自己创建的 Cloudflare Named Tunnel 对外发布。
+
+完整的上游参考是仓库中的 `docs/SELF_HOST.zh.md`（英文：`docs/SELF_HOST.md`）。本页将其
+浓缩为大多数安装需要的步骤。
+
+## 何时选择这种方式
+
+| 你想要… | 使用 |
+| --- | --- |
+| 自己试用 Chorus，不用 Docker | 内置 PGlite 的 npm 包：[快速开始](/zh/guides/getting-started/) |
+| 在自己的 Linux 或 macOS 主机上长期运行、局域网可访问、使用真正的 PostgreSQL | **本指南** |
+| 围绕发布的镜像编写自己的 Compose 文件 | [使用 Docker 部署](/zh/guides/deploy-docker/) |
+| 多实例、托管的 PostgreSQL 与 Redis，或部署到 AWS | [生产环境部署](/zh/guides/deploy-production/) |
+
+这是单实例部署。Redis 被刻意禁用（`REDIS_URL` 为空），实时更新使用内存内投递，只适用于
+一个应用容器。
+
+## 前提条件
+
+- 一台装有 Docker Engine 的 Linux 主机，或运行 Linux 容器的 macOS + Docker Desktop。
+  Docker Compose v2，且支持 `up --wait`。用 `docker version` 和 `docker compose version` 检查。
+- Bash 3.2 或更新版本、OpenSSL（或 LibreSSL）和 curl。可选的脚本化登录检查需要 `jq`。
+  服务器**不需要** Node.js、pnpm 或 AWS CLI。
+- 一份包含 `deploy/self-host/` 的 Chorus 仓库检出。
+- 在 macOS 上先启动 Docker Desktop，并允许它共享检出目录以及私有配置和备份路径。
+- 能访问你的镜像仓库（Tunnel 模式还需要能访问 Cloudflare）。
+
+:::caution[Docker 权限与局域网暴露]
+Docker 操作权限基本等同于主机 root 权限，请保护好主机及其 Docker socket。本地模式把应用发布在
+`0.0.0.0` 上，以便其他局域网设备访问。只允许可信网络访问该端口，绝不要暴露到公网。Docker
+发布的端口可能绕过 UFW 规则，请使用适用于 Docker 的防火墙规则或上游防火墙加以限制。
+PostgreSQL 从不对外发布，始终只在内部 `db:5432` 可用。
+:::
+
+## 这套栈包含什么
+
+| `deploy/self-host/` 中的文件 | 作用 |
+| --- | --- |
+| `compose.yml` | 基础栈：服务 `app` 与 `db`（默认 `postgres:17-alpine`），命名卷 `app-data` 与 `db-data`，健康检查，`restart: unless-stopped`。不发布任何端口。 |
+| `compose.local.yml` | 本地模式：发布 `0.0.0.0:${CHORUS_PORT}:8637`，设置 `NEXTAUTH_URL=http://localhost:${CHORUS_PORT}` 和 `COOKIE_SECURE=false`。 |
+| `compose.lan-https.yml` | 可选附加项：Nginx 服务 `lan-https`，终止自签名 TLS 并转发到 `http://app:8637`。 |
+| `nginx.lan-https.conf` | 以只读方式挂载进 `lan-https` 的 Nginx 配置。 |
+| `compose.tunnel.yml` | 本地模式的可选替代：`cloudflared` 服务与 `COOKIE_SECURE=true`。 |
+| `install-local.sh` | 全新本地安装，通过 `install.sh --target local` 运行。 |
+| `deploy-local.sh` | 可重复的重新部署，由保存的包装脚本调用。 |
+| `migrate-pg16-to-17.sh` | 离线的 PostgreSQL 16 到 17 迁移脚本。 |
+| `.env.example` | 列出 Compose 文件读取的所有设置的模板。 |
+
+## 用 `install.sh` 安装
+
+在检出目录的根目录运行安装器，并选择本地目标：
+
+```bash
+bash install.sh --target local
+```
+
+不带 `--target` 运行 `bash install.sh` 会先询问 **aws** 还是 **local**，默认仍是 AWS。在终端中，
+本地安装接着会询问：
+
+1. **镜像来源**：`pull`（默认）下载已有的发布镜像；`build` 用当前检出的 `Dockerfile`
+   （`production` 目标）编译。
+2. 选择 `pull` 时，**镜像标签或摘要**，例如 `chorusaidlc/chorus-app:vX.Y.Z`。隐式标签或
+   `latest` 会被拒绝。build 模式默认把镜像标记为 `chorus-local:<project>`
+   （即 `chorus-local:chorus-local`）。
+3. **普通登录**的邮箱和密码，以及独立的**超级管理员**邮箱和密码。密码输入隐藏，且要求输入两次。
+4. **Also enable self-signed LAN HTTPS? [y/N]**。默认不启用，见下文「可选：自签名局域网 HTTPS」。
+
+两个密码都必须是单行且至少 8 字节；由于 bcrypt 的限制，超级管理员密码最多 72 字节。你无需
+自己生成 bcrypt 哈希：安装器会拉取辅助镜像 `httpd:2.4-alpine`，在一个无网络的一次性容器中用
+`htpasswd`（cost 12）计算哈希，密码通过 stdin 传入，而不是作为参数。
+
+### 非交互安装
+
+脚本化安装时，把每个密码各写成一行，放在**检出目录之外**的单独文件中（目录权限 `0700`，
+文件权限 `0600`）。安装器会拒绝符号链接和检出目录内的文件。以下两种形式二选一：
+
+```bash
+# 拉取已有的发布镜像
+bash install.sh --target local --image-source pull \
+  --image chorusaidlc/chorus-app:vX.Y.Z --project chorus-local \
+  --email owner@example.com --admin-email admin@example.com \
+  --password-file /absolute/private/path/login-password \
+  --admin-password-file /absolute/private/path/admin-password \
+  --port 18637 --non-interactive
+```
+
+```bash
+# 把当前检出编译为 chorus-local:chorus-local
+bash install.sh --target local --image-source build \
+  --project chorus-local --email owner@example.com --admin-email admin@example.com \
+  --password-file /absolute/private/path/login-password \
+  --admin-password-file /absolute/private/path/admin-password \
+  --port 18637 --non-interactive
+```
+
+加上 `--dry-run`（并省略两个密码文件选项）只打印计划，不计算哈希、不调用 Docker、不写文件。
+在非终端输入下，安装器从不等待回答，缺少必需值会直接失败。运行 `bash install.sh --help` 查看
+选项摘要。
+
+| 选项 | 等价环境变量 | 默认值 |
+| --- | --- | --- |
+| `--target local` | `CHORUS_INSTALL_TARGET=local` | `aws` |
+| `--image-source pull\|build` | `CHORUS_IMAGE_SOURCE` | `pull` |
+| `--image` | `CHORUS_IMAGE` | pull 时必需；build 时为 `chorus-local:<project>` |
+| `--project` | `CHORUS_LOCAL_PROJECT` | `chorus-local` |
+| `--port` | `CHORUS_PORT` | `18637` |
+| `--email`、`--admin-email` | `DEFAULT_USER`、`SUPER_ADMIN_EMAIL` | 无 |
+| `--password-file`、`--admin-password-file` | `DEFAULT_PASSWORD`、`SUPER_ADMIN_PASSWORD` | 无 |
+| `--non-interactive`、`--dry-run` | `CHORUS_INSTALL_NONINTERACTIVE=1`、`CHORUS_INSTALL_DRY_RUN=1` | 关闭 |
+
+命令行选项优先于环境变量，密码文件优先于密码变量。没有任何选项接受命令行上的明文密码。
+
+### 安装会创建什么
+
+| 路径 | 内容 |
+| --- | --- |
+| `~/.config/chorus-self-host/<project>/` | 新建的私有目录，权限 `0700`。 |
+| `…/<project>/env` | 权限 `0600`。镜像引用（`CHORUS_IMAGE`、`POSTGRES_IMAGE=postgres:17-alpine`）、随机的 `POSTGRES_PASSWORD`、`DEFAULT_USER` 及**明文**的普通 `DEFAULT_PASSWORD`、`CHORUS_PORT`、`SUPER_ADMIN_EMAIL`，以及仅保存 bcrypt 哈希的 `SUPER_ADMIN_PASSWORD_HASH`。请把它当作机密。 |
+| `…/<project>/lan-tls/`、`…/<project>/lan-https.yml` | 仅在选择局域网 HTTPS 时创建。 |
+| 检出目录中的 `default_deploy_local.sh` | 权限 `0700`，不含机密的重新部署包装脚本。`CHORUS_DEPLOY_CONFIG` 可指定其他路径，其父目录必须已存在。 |
+
+安装流程只用于**全新**安装。如果该项目的私有目录、包装脚本文件，或任何 Docker 容器、卷、网络
+已经存在，安装器会拒绝并且不做任何改动；它从不轮换密码，也不复用数据库。启动失败时，新项目的
+容器和配置会保留下来以便排查。
+
+`NEXTAUTH_SECRET` 留空，应用会在 `app-data` 卷中的 `/app/data/.secret` 生成签名密钥。请保留
+这个卷：丢失它会让所有人退出登录。
+
+## 打开 Chorus 并登录
+
+安装完成时会打印访问地址、私有 env 文件的位置、重新部署命令，以及一条限定在该项目内的
+`docker compose … stop` 命令。
+
+- 在主机上：`http://localhost:18637`（或你的 `--port`）。
+- 在其他局域网设备上：`http://<主机局域网 IP>:18637`。请使用主机的真实地址，而不是 `0.0.0.0`。
+- 使用你设置的普通登录账号登录。**`/admin` 面板**使用独立的超级管理员账号。
+
+内置邮箱/密码登录是引导和演示用途，不是团队 SSO。团队使用时，请在管理面板中按公司配置 OIDC，
+参见[运维自托管的 Chorus](/zh/guides/deploy-operations/)。局域网明文 HTTP 不会加密凭据或会话，
+而且浏览器在不安全的 HTTP 源上不提供 OIDC 客户端做 PKCE 所需的 Web Crypto API，因此 OIDC
+需要 HTTPS。
+
+## 用保存的包装脚本重新部署
+
+对已有的安装，**运行它保存的包装脚本，而不是重新安装**：
+
+```bash
+bash ./default_deploy_local.sh --dry-run
+bash ./default_deploy_local.sh
+```
+
+包装脚本只接受 `--dry-run`，并用保存的项目名、私有目录和镜像来源调用
+`deploy/self-host/deploy-local.sh`。每次运行：
+
+- 重新编译当前检出（build 模式），或拉取保存的 `CHORUS_IMAGE`（pull 模式）。要把 pull 模式的
+  实例升级到新版本，请先修改私有 env 中的 `CHORUS_IMAGE`。
+- **仅当本地缺少** 保存的 `POSTGRES_IMAGE` 时才拉取它。这绝不是数据库大版本升级。
+- 当私有目录中存在 `https.yml`、`pg17.yml`、`lan-https.yml` 这些私有覆盖文件时自动加入，并在
+  存在该附加项时拉取 `lan-https` 镜像。
+- 执行 `docker compose … up -d --pull never --wait`。它复用相同的项目、卷和凭据，从不执行
+  `down`、删除卷或轮换凭据。
+
+`--dry-run` 会校验保存的镜像引用并列出将使用的 Compose 文件，不调用 Docker。其他私有覆盖文件
+（例如 `oidc-only.yml`）**不会**被自动发现，每次都要用显式的 Compose 命令加上它们。
+
+:::caution[部署新代码前先备份]
+应用启动时会执行 Prisma 迁移，而旧镜像不会撤销这些迁移。重新部署新版本前，请备份数据库和
+`app-data` 卷，见下文「备份与恢复」。
+:::
+
+### 手动运行 Compose 命令
+
+查看日志、停止或重启时，请使用与包装脚本相同的项目、env 文件和 Compose 文件。在 Bash 中：
+
+```bash
+REPO=/absolute/path/to/Chorus
+PROJECT=chorus-local
+ENV_FILE="$HOME/.config/chorus-self-host/$PROJECT/env"
+dc() {
+  docker compose --project-name "$PROJECT" --env-file "$ENV_FILE" \
+    -f "$REPO/deploy/self-host/compose.yml" \
+    -f "$REPO/deploy/self-host/compose.local.yml" "$@"
+}
+dc ps
+dc logs --tail 100 app db
+```
+
+如果你的安装使用了 `lan-https.yml` 等私有覆盖文件，请在 `"$@"` 之前追加
+`-f "$HOME/.config/chorus-self-host/$PROJECT/lan-https.yml"`（及其他覆盖文件）。用
+`dc config --quiet` 校验配置，不要运行未脱敏的 `docker compose config`，它会打印密码。
+
+## 可选：自签名局域网 HTTPS
+
+HTTPS 是**可选的**，密码登录并不需要它。可以在安装时对 HTTPS 提示回答 yes 并输入客户端将使用的
+主机名或 IPv4 地址，或者使用选项启用：
+
+```bash
+bash install.sh --target local --image-source build --https-host 192.0.2.10
+```
+
+把示例地址换成主机真实的局域网 IP，或一个已经解析到该主机的 DNS 名称。`--https-port` 可修改默认
+端口 `18638`（必须与 HTTP 端口不同）。`--https` 会开启主机名提示；非交互安装需要 `--https-host`
+或 `CHORUS_HTTPS_HOST`。`--no-https` 会覆盖环境变量中的选择。IPv6 字面量、通配符名称和 URL
+都会被拒绝。
+
+**它暴露了什么。** 安装会添加一个 `lan-https` Nginx 服务，与应用和数据库在同一次 Compose `up`
+中启动。它监听 `0.0.0.0:18638`，并在内部 Compose 网络上转发到 `http://app:8637`。它会把响应
+Cookie 标记为 Secure，保留转发头和 WebSocket 升级头，并关闭代理缓冲以便 Server-Sent Events
+流式传输。原有的 HTTP 监听仍然可用，Cloudflare Tunnel 的源站仍是内部 HTTP。安装不会修改 DNS、
+路由器或防火墙规则，请把两个端口都限制在可信网络内。
+
+**TLS 材料存放在哪里。** 安装会生成一个有效期 30 天、SAN 中包含所选主机的 RSA 自签名证书，保存为
+私有目录中的 `lan-tls/server.crt` 和 `lan-tls/server.key`。它们的路径和 HTTPS 端口保存在私有
+env 中（`CHORUS_TLS_CERT_FILE`、`CHORUS_TLS_KEY_FILE`、`CHORUS_HTTPS_PORT`），并且
+`compose.lan-https.yml` 会被复制为私有的 `lan-https.yml`。这些文件以只读方式挂载，缺失文件会
+导致启动失败。重新部署会复用它们，从不重新生成证书。
+
+:::caution[自签名意味着不受信任]
+浏览器会显示证书警告。接受警告只是临时例外，并不是可信的服务器身份验证，也不推荐用于生产。
+在上游的 Chromium 试验中，选择 **高级 → 继续前往** 后获得了安全上下文和 `crypto.subtle`；
+其他浏览器和受管设备可能不同。长期使用时，请安装受信任的证书，或在客户端设备上安装本地 CA。
+:::
+
+要通过该入口使用 OIDC，请在身份提供方注册精确的回调地址（例如
+`https://<主机局域网 IP>:18638/login/callback`），并保留已有的回调。Cookie 按主机而非端口隔离，
+所以同一主机上的 HTTP 和 HTTPS 共享会话；登录后请始终使用 HTTPS。
+
+**续期。** 在 30 天到期前，或主机名/IP 变化后，先备份 TLS 文件，把带匹配 SAN 的新证书和私钥写入
+相同路径，然后用你完整的 Compose 命令只重建代理：`up -d --no-deps --force-recreate lan-https`。
+单纯重启 Nginx 不会加载替换后的文件。
+
+**停用。** 用你完整的 Compose 命令先执行 `stop lan-https`，再执行 `rm -f lan-https`；之后再把私有
+`lan-https.yml` 移出私有目录。该文件不存在后，包装脚本就不再包含代理。请保留证书以便回滚。
+
+**为已有安装添加。** 不要重新运行安装。用 OpenSSL 在检出目录外生成证书和私钥，在私有 env 中设置
+`CHORUS_TLS_CERT_FILE`、`CHORUS_TLS_KEY_FILE` 和 `CHORUS_HTTPS_PORT`，把
+`deploy/self-host/compose.lan-https.yml` 复制为私有目录中的 `lan-https.yml`，然后运行包装脚本
+（它也会重新部署应用）。
+
+## 可选：Cloudflare Named Tunnel
+
+要在不开放主机端口的情况下通过 HTTPS 对外发布，请用 `compose.tunnel.yml` **替代**
+`compose.local.yml`。不要同时使用这两种主模式；局域网 HTTPS 附加项仍可单独叠加。Tunnel 不发布
+任何主机端口，TLS 在 Cloudflare 终止。
+
+Cloudflare 账号、域名和远程管理的 Named Tunnel 都由你自己提供，Chorus 不会代为创建。在
+Cloudflare 控制台中添加一个发布的应用主机名，并把其源站服务设为 **`http://app:8637`**，
+而不是 `localhost`。
+
+1. 把连接器 token 保存到一个私有文件（例如私有目录中的 `tunnel-token`，在 `0700` 目录内设为
+   `0444`）。不要把它放进 shell 参数或历史记录。
+2. 在私有 env 中，把 `CHORUS_PUBLIC_URL` 设为外部 `https://` 源（不带结尾斜杠），把
+   `CLOUDFLARED_IMAGE` 设为固定版本的 `cloudflare/cloudflared`（**2025.4.0 或更新**），把
+   `CLOUDFLARED_TOKEN_FILE` 设为 token 文件的绝对路径。
+3. 用 `dc down` 停止本地模式的栈（卷会保留），然后把 `dc` 切换到 tunnel 文件并启动：
+
+```bash
+dc() {
+  docker compose --project-name "$PROJECT" --env-file "$ENV_FILE" \
+    -f "$REPO/deploy/self-host/compose.yml" \
+    -f "$REPO/deploy/self-host/compose.tunnel.yml" "$@"
+}
+dc config --quiet
+dc pull
+dc up -d --wait
+dc ps
+```
+
+连接器运行 `tunnel --no-autoupdate run --token-file /run/secrets/tunnel_token`，该覆盖文件把
+`NEXTAUTH_URL` 设为 `CHORUS_PUBLIC_URL`，并设置 `COOKIE_SECURE=true`。保存的包装脚本始终使用
+`compose.local.yml`，因此 tunnel 模式的栈请用上面这条显式的 `dc` 命令管理。要切换回来，先用
+tunnel 版本的函数执行 `down`，再用本地版本执行 `up`。绝不要使用 `down -v`。
+
+Cloudflare 侧：
+
+- 对整个 Chorus 主机名绕过缓存，至少要对已认证页面、登录路由、`/api/*`、`/api/mcp`、
+  `/api/events` 和 `/api/events/notifications` 绕过缓存。
+- 检查 Server-Sent Events 在完整链路上是逐条到达的。
+- 交互式的 Cloudflare Access 质询会把 API、MCP 和守护进程请求变成 HTML 或重定向。Chorus 的
+  API Key 本身无法通过 Access。
+- 妥善保管 tunnel token；一旦泄露，请在 Cloudflare 中轮换。
+
+## 实例：局域网 HTTPS 加独立的 Cloudflare 连接器
+
+一种已在单台主机上验证过的布局：局域网继续使用**本地模式**，同时通过 Cloudflare 发布同一个应用，而不切换到
+`compose.tunnel.yml`。它运行四个容器：
+
+| 容器 | 来源 | 作用 |
+| --- | --- | --- |
+| `<project>-app-1` | `compose.yml` + `compose.local.yml` | Chorus，主机端口 `18637`（容器内 `8637`） |
+| `<project>-db-1` | `compose.yml`（迁移后再加私有 `pg17.yml`） | PostgreSQL 17，仅内部可访问 |
+| `<project>-lan-https-1` | 私有局域网 HTTPS 覆盖文件 | Nginx，主机端口 `18638`，转发到 `http://app:8637` |
+| `chorus-cloudflare` | 单独的 `docker run` | Cloudflare 连接器，把公网主机名转发到 `http://app:8637` |
+
+私有目录中包含 `env`、保存的包装脚本、局域网 HTTPS 覆盖文件（`lan-https.yml`；手动搭建时也可能叫 `https.yml` 等其他名字）、`lan-tls/`（证书和私钥），以及
+PG16 迁移后生成的 `pg17.yml`（它让 `db-data` 卷指向迁移后的外部卷）。包装脚本用 `-f` 传入所有覆盖文件，因此
+`dc ps` 会列出这三个 Compose 服务。
+
+搭建步骤：
+
+1. 按上文以本地模式安装并启用局域网 HTTPS，确认 `http://<host>:18637/api/health` 和
+   `https://<host>:18638/api/health` 都正常。
+2. 在 Cloudflare 控制台中，把隧道的已发布主机名的源服务设为 **`http://app:8637`**。
+3. 如果用户和 OIDC 回调应使用公网主机名，请在私有覆盖文件的 `app.environment` 中把 `NEXTAUTH_URL` 设为该
+   `https://` 源，然后重新部署。
+4. 按隧道一节把连接器令牌保存到私有文件，再把连接器接入该栈的默认网络 `<project>_default`：
+
+```bash
+docker run -d --name chorus-cloudflare --restart unless-stopped \
+  --network "${PROJECT}_default" \
+  -v "$HOME/.config/chorus-self-host/$PROJECT/tunnel-token:/run/secrets/tunnel_token:ro" \
+  cloudflare/cloudflared:<pinned-version> \
+  tunnel --no-autoupdate run --token-file /run/secrets/tunnel_token
+```
+
+采用这种布局前请了解其取舍：
+
+- **连接器不归 Compose 管理。** 包装脚本、`dc ps` 和 `dc down` 都不会管理它。执行 `dc down` 前，先运行
+  `docker stop chorus-cloudflare` 和 `docker rm chorus-cloudflare`；`down` 会删除 `<project>_default`，
+  所以 `dc up` 之后要重新执行上面的 `docker run`。只停止连接器只会让公网主机名下线，局域网访问不受影响。
+- **不要把令牌放在命令行里。** `--token <value>` 参数在 `docker inspect` 和进程列表中可见。请使用 cloudflared
+  2025.4.0 或更新版本的 `--token-file`；如果令牌曾以内联方式传入，请在 Cloudflare 中轮换它。
+- **主机端口仍然对外发布。** 与隧道模式不同，`18637` 和 `18638` 仍在 `0.0.0.0` 上开放，请用能识别 Docker
+  的防火墙规则把它们限制在可信网络内。
+- **Cookie。** 本地模式保持 `COOKIE_SECURE=false`，以便局域网纯 HTTP 登录可用。Nginx 代理会在局域网 HTTPS
+  路径上把 Cookie 标记为 Secure，但经隧道设置的 Cookie 不会被标记为 Secure。如果只剩 HTTPS 客户端，请在私有覆盖文件的
+  `app.environment` 中设置 `COOKIE_SECURE: "true"`：局域网 HTTPS 和隧道仍可用，但 `18637` 上的纯 HTTP 登录会失效。
+- 隧道一节中关于 Cloudflare 缓存、Server-Sent Events 和 Access 的说明同样适用。
+
+## PostgreSQL 17 与已有的 PostgreSQL 16 卷
+
+新安装使用 **`postgres:17-alpine`**，`deploy/self-host/` 和仓库根目录的 `docker-compose.yml`
+都是如此。
+
+:::danger[PostgreSQL 17 无法打开 PostgreSQL 16 的数据卷]
+如果你已有 PostgreSQL 16 的卷（例如来自根目录开发用 Compose 文件 `pnpm docker:db`，或更早的
+自托管栈），**请在启动 PG17 默认配置之前先迁移**。只改镜像再重启并不会转换数据；
+`prisma migrate deploy` 只更新应用的表结构。不要为了消除启动错误而删除卷或执行
+`docker compose down -v`。
+:::
+
+仓库提供了一个显式的**离线**迁移脚本 `deploy/self-host/migrate-pg16-to-17.sh`，完整说明见
+`docs/POSTGRES_UPGRADE.zh.md`（英文：`docs/POSTGRES_UPGRADE.md`）。概括如下：
+
+1. 预先拉取 `postgres:16-alpine` 和 `postgres:17-alpine`；脚本本身不拉取镜像。
+2. 备份部署配置和应用签名材料。停止**所有**写入方（应用、CLI、开发服务器）以及源数据库。
+   对安装器管理的实例，用它完整的 Compose 命令停止 `app` 和 `db`；不要重新运行安装器。
+3. 对该项目的数据库容器执行 `docker inspect` 找出源卷名，并把数据库角色密码（不是 Chorus 的
+   登录密码）写入一个权限为 `0600` 的私有文件。
+4. 先带 `--dry-run` 运行脚本，再去掉它正式运行。备份目录必须尚不存在，目标名称必须未被占用：
+
+```bash
+bash deploy/self-host/migrate-pg16-to-17.sh \
+  --source-volume YOUR_OLD_PG16_VOLUME --target-volume chorus-pg17-migrated \
+  --backup-dir /absolute/private/path/pg17-backup \
+  --password-file /absolute/private/path/db-password --writers-stopped --dry-run
+```
+
+脚本从不以可写方式挂载原卷。它把已停止的 PG16 集群复制到一个工作卷，从隔离的 PG16 容器导出，
+恢复到一个**新的** PG17 卷，并比较 public 表的行数和序列状态。无论成功还是失败，它都会保留所有卷
+和备份；它只支持默认布局、使用 `public` schema 的单个数据库。
+
+5. 对安装器管理的实例，在私有目录中用私有 `pg17.yml` 指向新卷，并在私有 env 中设置
+   `POSTGRES_IMAGE=postgres:17-alpine`：
+
+```yaml
+volumes:
+  db-data:
+    external: true
+    name: chorus-pg17-migrated
+```
+
+先用**相同**的应用镜像验证数据库。之后包装脚本每次运行都会包含 `pg17.yml`。在产生新写入之前回滚，
+需要同时选回原卷**和** PG16 镜像；一旦 PG17 已接受写入，切回去就会丢失这些写入。
+
+## 验证部署
+
+1. `dc ps` 显示 `app` 和 `db`（启用时还有 `lan-https`）处于健康状态。
+2. 健康检查端点报告数据库状态：
+
+   ```bash
+   curl --fail --silent --show-error http://localhost:18637/api/health
+   ```
+
+   预期返回 `status: ok` 和 `database: connected`。
+3. 在浏览器中登录，创建一个临时项目和想法，刷新后确认数据仍在。通过 HTTPS 访问时，检查会话
+   Cookie 带有 Secure 和 HttpOnly。
+4. 用超级管理员账号登录 `/admin`。
+5. 可选：创建一个测试 Agent API Key，在客户端把 `CHORUS_URL` 设为该地址后运行
+   `chorus mcp whoami`，参见[chorus 命令行工具](/zh/reference/cli/)。
+6. 运行 `dc up -d --force-recreate app`，确认你仍处于登录状态。这证明 `app-data` 中的签名密钥
+   得到了持久化。
+
+## 备份与恢复
+
+数据库位于 `db-data`，`/app/data`（包括生成的签名密钥）位于 `app-data`。`dc down` 会保留这两个卷；
+**`dc down -v` 会销毁它们**。在维护窗口内，停止应用、做逻辑导出、归档 `app-data`，并复制私有 env：
+
+```bash
+BACKUP_DIR="$HOME/chorus-backups/$PROJECT/$(date -u +%Y%m%dT%H%M%SZ)"
+mkdir -p "$BACKUP_DIR"
+chmod 700 "$BACKUP_DIR"
+dc stop app
+dc exec -T db pg_dump -U chorus -d chorus -Fc > "$BACKUP_DIR/database.dump"
+dc run --rm --no-deps -T --entrypoint tar app \
+  -C /app/data -czf - . > "$BACKUP_DIR/app-data.tar.gz"
+cp "$ENV_FILE" "$BACKUP_DIR/env"
+dc start app
+```
+
+保持备份目录私有（`0700`），发送到其他主机前先加密。请把恢复演练做在一个**新的** Compose 项目
+和端口上，绝不要覆盖原项目。上游指南详细介绍了恢复演练。
+
+## 故障排查
+
+| 现象 | 检查 |
+| --- | --- |
+| 安装提示私有目录、脚本或项目资源已存在 | 这是已有安装。运行它的包装脚本；若要另起实例，请换一个新的 `--project` 和 `CHORUS_DEPLOY_CONFIG`。 |
+| Compose 报告缺少变量 | 使用私有的绝对路径 `--env-file`，保持 `DEFAULT_USER` 和 `DEFAULT_PASSWORD` 非空，并只选择一种主模式。 |
+| 端口被占用 | 换一个 `--port` 或 `--https-port`。不要通过删除已有卷来解决。 |
+| 切换到 PostgreSQL 17 后 `db` 立即失败 | 卷里仍是 PG16 数据。保留它，并按上文迁移。 |
+| 修改 env 后数据库认证失败 | 已有的卷保留旧的角色密码；修改 `POSTGRES_PASSWORD` 并不会改变它。 |
+| HTTP 登录立即失败 | 本地模式需要 `COOKIE_SECURE=false`（来自 `compose.local.yml`）；把它设为 `true` 的私有 `https.yml` 会阻止局域网 HTTP 登录。 |
+| 一个月后浏览器拒绝 HTTPS 入口 | 30 天证书已过期；续期后重建 `lan-https`。 |
+| OIDC 报 `redirect_uri_mismatch` | 在身份提供方注册包含端口的精确 HTTPS 回调地址。 |
+| 重建后用户被登出 | `app-data` 卷或显式的 `NEXTAUTH_SECRET` 发生了变化。 |
+| Tunnel 健康但主机名报错 | 检查发布的主机名、`http://app:8637` 源站、应用健康状态以及 token 文件是否可读。 |
+| CLI 从 tunnel 主机名收到 HTML | Access 质询、缓存或 Worker 规则，或 `/api/mcp` 地址错误。 |
+
+排查时绝不要分享 env 文件、token、Cookie 或未脱敏的日志，也不要运行全主机范围的 Docker prune 命令。

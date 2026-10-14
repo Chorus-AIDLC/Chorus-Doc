@@ -75,6 +75,17 @@ recovery procedure, see [Interrupt and resume a session](/guides/session-recover
 
 Open the failed conversation turn and read **Agent wake failed**. Expand **Show error details** if offered; no reply does not mean no diagnostic was recorded. See [failed-turn diagnostics](/guides/session-recovery/#read-a-failed-turns-diagnostics) before retrying.
 
+**A `--chorus-only` violation (Claude Code, Chorus 0.22.2 and later).** If the details say
+`--chorus-only is not being enforced by this Claude Code build` and list tools that are still
+available, the daemon found tools outside the Chorus allowlist when the wake started. It
+killed the process tree and forwarded nothing further, so restricted wakes cannot run on
+that Claude Code build. The daemon's own remedy is `--yolo`; switch to it only if you intend
+to give the agent its full toolset. Otherwise keep `--chorus-only` and try a different Claude Code version. See
+[What `--chorus-only` enforces](/guides/daemon-operations/#what---chorus-only-enforces).
+
+Known credentials in the error details are replaced with `[redacted]`. Other text is not
+redacted, so review it before sharing.
+
 If the Linux daemon goes offline after SSH logout or reboot, check `chorus daemon status` and the [lingering setup](/guides/daemon-operations/#keep-the-linux-daemon-running-after-logout). For Codex that still uses old credentials after setup, follow the [safe App Server restart](/reference/agents/codex/#apply-configuration-to-an-existing-app-server), not just `chorus daemon restart`.
 
 ## Collect useful diagnostics

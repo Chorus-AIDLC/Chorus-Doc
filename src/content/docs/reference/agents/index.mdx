@@ -12,6 +12,7 @@ on that agent remotely.
 | --- | --- | --- | --- | --- |
 | [Claude Code](./claude-code/) | Chorus team | Claude Code users who want the complete Chorus workflow | Yes, with the Chorus daemon | Chorus daemon |
 | [Codex](./codex/) | Chorus team | Codex users who want the complete Chorus workflow | Yes, with the Chorus daemon | Chorus daemon |
+| [TRAE CLI](./trae/) | Chorus team | TRAE CLI users who want the complete Chorus workflow | Yes, with the Chorus daemon | Chorus daemon |
 | [Kiro](./kiro/) | Chorus team | Kiro CLI users who want the complete Chorus workflow | Yes, with the Chorus daemon | Chorus daemon |
 | [OpenClaw](./openclaw/) | Chorus team | OpenClaw users who already run its gateway | Yes, through OpenClaw | OpenClaw gateway |
 | [Hermes Agent](./hermes/) | Chorus team | Hermes users with a gateway serving a repository | Yes, through Hermes | Hermes gateway |
@@ -20,12 +21,12 @@ on that agent remotely.
 | [Pi](./pi/) | Chorus team | Pi users who want the complete Chorus workflow | Yes, with the Chorus daemon | Chorus daemon |
 | [Generic MCP client](./generic-mcp/) | MCP compatibility only | Calling Chorus tools from another MCP client | No | No |
 
-Claude Code, Codex, Kiro, Pi, and DeepSeek Harness are the supported Chorus daemon backends.
+Claude Code, Codex, TRAE CLI, Kiro, Pi, and DeepSeek Harness are the supported Chorus daemon backends.
 OpenClaw stays online through its own gateway and plugin. OpenCode and generic MCP clients
 connect interactively and cannot be selected as a Chorus daemon backend.
 
 For API keys and permissions, start with [Prepare agent access](/guides/administrator-setup/).
-To make Claude Code, Codex, Kiro, Pi, or DeepSeek Harness available for remote work, complete
+To make Claude Code, Codex, TRAE CLI, Kiro, Pi, or DeepSeek Harness available for remote work, complete
 the platform setup, then continue with [Operate the Chorus daemon](/guides/daemon-operations/).
 
 [Hermes](/reference/agents/hermes/) stays online through its own gateway, not the Chorus daemon. It supports comment-based command approvals and interrupt/resume; research and idea-creation operation turns are not supported by its gateway.
@@ -83,6 +84,14 @@ loads at startup) and sets `bearer_token_env_var = "CHORUS_API_KEY"` in
 settings (`userConfig`), so reviewer and OpenSpec behavior is controlled by the skills rather
 than plugin toggles.
 
+### TRAE CLI
+
+From Chorus 0.22.2, TRAE CLI installs the **same Codex plugin package**
+(`chorus@chorus-plugins`) through its own `traecli plugin` commands, so it gets the same
+workflow skills and hooks. The MCP server is configured the same keyless
+way, in `$TRAE_HOME/traecli.toml` and `$TRAE_HOME/.env` (default `~/.trae`). traecli runs the
+plugin hooks only after you trust them. See [TRAE CLI](/reference/agents/trae/).
+
 ### Other first-party integrations: OpenClaw, Kiro, and Pi
 
 These runtimes have first-party integrations, but their capabilities differ from Claude
@@ -98,16 +107,18 @@ Code and Codex. Treat the notes below as pointers, not a parity claim.
 ## Upgrade the plugin
 
 Upgrades happen in place; your agent key and Chorus URL are unaffected. For configured Claude
-Code, Codex, Kiro, and Pi profiles, `chorus upgrade --plugins` updates the CLI and Chorus
+Code, Codex, TRAE CLI, Kiro, and Pi profiles, `chorus upgrade --plugins` updates the CLI and Chorus
 plugins without re-registering agents or rotating credentials. See
 [CLI upgrade scope and completion](/reference/cli/#upgrade-the-cli-and-plugins). The setup
 flow below is still useful for selecting agents or changing credentials.
 
-- **Any agent** — run setup with `--update-installed` and select the agents to refresh.
-  Without that flag, a complete existing installation may be skipped:
+- **Any agent** — re-run setup and select the agents to refresh. When a Chorus plugin is
+  already installed, setup asks `Update installed Chorus plugins to the latest available
+  versions? [y/N]`; `--yes` or a non-TTY run updates without asking. If you answer no, a
+  complete existing installation is skipped:
 
   ```bash
-  chorus agents add --update-installed
+  chorus agents add
   ```
 
 - **Claude Code** — you can also manage the plugin from the `/plugin` menu, or re-run the
@@ -120,10 +131,10 @@ flow below is still useful for selecting agents or changing credentials.
 
   Restart Claude Code, then run `/plugin list` and confirm the new version is enabled.
 
-- **Codex** — re-running `chorus agents add --update-installed` refreshes the plugin and the
-  `~/.codex/.env` credential, and is also how you rotate the agent key. Finish with `/plugins` inside Codex.
+- **Codex** — re-running `chorus agents add --agents codex` refreshes the `~/.codex/.env` credential (and the plugin, when you accept the update prompt or
+  pass `--yes`), and is also how you rotate the agent key. Finish with `/plugins` inside Codex.
 
-For OpenClaw, Kiro, and Pi, re-run `chorus agents add --update-installed` or upgrade through
+For OpenClaw, Kiro, and Pi, re-run `chorus agents add` and accept the plugin update, or upgrade through
 the same mechanism you installed with, as described on each platform page above.
 
 ## Uninstall the plugin

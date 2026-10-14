@@ -60,16 +60,9 @@ chorus agents add --agents codex
 
 ### 受限模式与工具授权
 
-`--chorus-only` 让 Codex 保持只读，禁用交互审批，并关闭该回合的网络访问。原生审批或用户输入请求会被拒绝；无法安全拒绝的请求会使唤醒失败。需要提问时，请通过 Chorus 评论或需求细化。在已验证的 Codex 版本中，需要审批的 Chorus MCP 工具也可能被拒绝，包括 `chorus_checkin`。回合完成不代表其中的 MCP 调用成功。
+`--chorus-only` 让 Codex 保持只读，禁用交互审批，并关闭该回合的网络访问。原生审批或用户输入请求会被拒绝；无法安全拒绝的请求会使唤醒失败。需要提问时，请通过 Chorus 评论或需求细化。回合完成不代表其中的 MCP 调用成功。
 
-如果你决定允许签到，可在 `~/.codex/config.toml`（或该智能体的 `CODEX_HOME/config.toml`）中明确添加：
-
-```toml
-[mcp_servers.chorus.tools.chorus_checkin]
-approval_mode = "approve"
-```
-
-该配置已在 0.157.1 的新建和恢复线程中验证，验证时只读模式和禁用交互审批仍然生效。它只允许签到；评论和任务更新需要各自明确授权并验证。规则应写在 Codex 配置中，不要放进后台服务的 `args`。后台服务不会代替你批准请求。
+从 Chorus 0.22.2 起，当 `~/.codex/config.toml`（或该智能体的 `CODEX_HOME/config.toml`）中声明了 `[mcp_servers.chorus]` 时，后台服务会为每个新建或恢复的线程只预先批准 Chorus MCP 服务器，方式是按线程覆盖 `mcp_servers.chorus.default_tools_approval_mode`。这样，`chorus_checkin`、评论和任务更新等 Chorus 工具无需在配置中逐个授权即可使用。其他 MCP 服务器、shell 命令和文件修改仍会被拒绝，沙箱也保持只读。如果没有该条目，后台服务会记录一条警告，唤醒将在没有 Chorus MCP 工具的情况下运行。`--yolo` 保持不变。TRAE CLI 唤醒使用 `traecli.toml`，行为相同。
 
 ### 中断与排障
 
@@ -107,5 +100,6 @@ Codex 会自行生成线程 ID，因此复制到的是这个线程 ID，而不�
 
 - **找不到 `codex`**：全局安装 `@openai/codex`，然后重新运行 `chorus agents add`。
 - **配置后仍用旧凭据或缺少 `CHORUS_API_KEY`**：检查实际 `CODEX_HOME` 下的 `.env`，重新运行 `chorus agents add --agents codex`，并按上文安全重启 App Server。只有密钥无效或已撤销时才需更换。
+- **后台服务唤醒时智能体身份不对**：多个 Codex 智能体共用同一个 `CODEX_HOME`。其中的 `.env` 会覆盖后台服务导出的凭据，因此请为每个智能体分配独立的 `CODEX_HOME`。参见[各后端如何拿到自己的密钥](/zh/guides/daemon-operations/#各后端如何拿到自己的密钥)。
 - **插件或钩子未启用**：在 `/plugins` 和 `/hooks` 中启用它们，然后重新启动 Codex。
 - **后台服务离线**：运行 `chorus daemon status`，然后参阅[排查智能体连接故障](/zh/guides/troubleshooting/)。

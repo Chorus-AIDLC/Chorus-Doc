@@ -54,8 +54,14 @@ export CHORUS_API_KEY="cho_REDACTED"
 每次唤醒仍启动一个 `claude -p` 进程，回合结束后退出。Chorus 现在使用双向 **stream-json** 输入输出，保持连接以处理控制响应。已有会话与 `claude --resume` 仍可使用；没有纯文本回退或传输切换选项。该行为已在 Linux 上用 Claude Code **2.1.283 和 2.1.284** 实际验证；请把它们视为已测试的版本，而不是对所有 Claude Code 版本的最低版本保证。
 
 - **打断**：后台服务先发送协议中断。若进程未在 `sigintTimeoutMs` 内停止，则强制终止进程树。默认值仍为 10 秒。
-- **受限工具**：`--chorus-only` 模式会明确拒绝非 Chorus 工具，并提示智能体使用 Chorus 工具或通过 Chorus 评论提问。日志只标出被拒绝的工具名称，不记录其输入。YOLO 行为不变。
+- **受限工具**：`--chorus-only` 模式会明确拒绝非 Chorus 工具，并提示智能体使用 Chorus 工具或通过 Chorus 评论提问。日志只标出被拒绝的工具名称，不记录其输入。YOLO 行为不变。从 Chorus 0.22.2 起，这些工具还会被移除，详见下文。
 - **提问**：所有后台服务唤醒（包括 YOLO）都会禁用 `AskUserQuestion`，因为终端前无人回答。智能体应通过 Chorus 评论或需求细化提问；交互式 Claude Code 会话仍保留正常的提问流程。
+
+### `--chorus-only` 的强制执行（0.22.2）
+
+`--allowedTools` 只会自动批准工具，并不会移除它们。从 Chorus 0.22.2 起，`--chorus-only` 唤醒会传入 `--tools "mcp__chorus__*,Task,Agent"` 和 `--strict-mcp-config`，因此智能体只保留本后台服务的 Chorus MCP 工具和子智能体派发（`Task` / `Agent`）。Bash、文件编辑等内置工具会被移除，你自己的 MCP 服务器不会被加载，`Edit`、`Write` 和 `NotebookEdit` 也会按名称被拒绝。子智能体继承同样的工具集，因此也无法使用 shell。
+
+每次唤醒时，后台服务都会将 stream-json init 帧中的工具列表与该允许列表进行比对。如果出现任何其他工具，它会强制终止进程树（POSIX 上对进程组发送 `SIGKILL`，Windows 上使用 `taskkill /T /F`），从 init 帧起不再转发任何帧，并记录一次失败的唤醒，其中会列出泄漏的工具。如果 init 帧中没有工具列表，后台服务会记录一条警告，说明无法验证该限制，然后继续运行。
 
 升级后，请用主机上实际安装的 Claude Code 版本验证签到、追加一轮对话，以及中断和恢复。协议故障可通过[后台服务日志](/zh/guides/daemon-operations/)排查；如何继续会话，见[中断与恢复会话](/zh/guides/session-recovery/)。
 

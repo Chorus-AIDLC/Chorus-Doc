@@ -17,6 +17,10 @@ const routes = [
   '/zh/reference/agents/hermes/',
   '/ja/reference/agents/hermes/',
   '/ko/reference/agents/hermes/',
+  '/reference/agents/trae/',
+  '/zh/reference/agents/trae/',
+  '/ja/reference/agents/trae/',
+  '/ko/reference/agents/trae/',
 ];
 const resources = [
   ['/index.md', '## The reversed conversation'],
@@ -35,6 +39,10 @@ const resources = [
   ...['', '/zh', '/ja', '/ko'].map((locale) => [
     `${locale}/reference/agents/hermes.md`,
     'VERSION=0.22.0',
+  ]),
+  ...['', '/zh', '/ja', '/ko'].map((locale) => [
+    `${locale}/reference/agents/trae.md`,
+    'chorus agents add --agents trae',
   ]),
 ];
 

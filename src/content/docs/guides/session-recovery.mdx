@@ -61,7 +61,11 @@ DeepSeek Harness (`dsh`) defaults to 30 minutes per turn, configurable through
 
 From Chorus 0.21.0, a failed startup or execution shows an **Agent wake failed** summary in its conversation turn, even when the agent produced no reply. Select **Show error details** when available to inspect captured diagnostic output, exit code, or signal. These diagnostics are saved with the turn and remain available after refreshing or reopening the conversation.
 
-Details are not always available. Older turns or failures without captured diagnostics show a fallback explanation; a user-requested interrupt is not a crash. Use the summary to check the working directory, backend login/model configuration, or credentials, and consult `chorus daemon logs` if needed. Inspect partial changes before resuming: failure does not undo files or external actions. Diagnostic text can contain sensitive information; redact it before sharing.
+Details are not always available. Older turns or failures without captured diagnostics show a fallback explanation; a user-requested interrupt is not a crash. Use the summary to check the working directory, backend login/model configuration, or credentials, and consult `chorus daemon logs` if needed. Inspect partial changes before resuming: failure does not undo files or external actions. From Chorus 0.22.2, the daemon replaces known credentials, such as the agent's Chorus key and credential-like environment values, with `[redacted]` before it saves the details, including a key cut at the truncation boundary. This covers known credentials only. Diagnostic text can still contain other sensitive information, so review and redact it before sharing.
+
+## Mention recovery (0.22.1)
+
+If a comment or mention reaches the daemon but fetching or routing it fails, the daemon keeps the wake context and retries with bounded backoff, independently of the SSE connection's health. When the server is reachable again the wake is queued once; you do not need to send a chat message or restart the daemon. Each wake's status is recorded on the exact turn that triggered it, so a later chat message and the original comment keep separate turns and transcripts. See [daemon operations](/guides/daemon-operations/).
 
 ## Inspect the partial result
 

@@ -68,10 +68,26 @@ Claude Code release.
   10 seconds.
 - **Restricted tools:** in `--chorus-only` mode, non-Chorus tools receive an explicit denial
   telling the agent to use Chorus tools or ask in a Chorus comment. Logs identify the denied
-  tool by name without its input. YOLO behavior is unchanged.
+  tool by name without its input. YOLO behavior is unchanged. From Chorus 0.22.2 the tools
+  are also removed, as described below.
 - **Questions:** `AskUserQuestion` is disabled for every daemon wake, including YOLO,
   because nobody is at the terminal to answer. The agent should ask through Chorus comments
   or elaboration. Interactive Claude Code sessions retain their normal question flow.
+
+### `--chorus-only` enforcement (0.22.2)
+
+`--allowedTools` only auto-approves tools; it does not remove them. From Chorus 0.22.2, a
+`--chorus-only` wake passes `--tools "mcp__chorus__*,Task,Agent"` and `--strict-mcp-config`,
+so the agent keeps only this daemon's Chorus MCP tools and sub-agent dispatch (`Task` /
+`Agent`). Built-in tools such as Bash and file edits are removed, your own MCP servers are
+not loaded, and `Edit`, `Write`, and `NotebookEdit` are also denied by name. A sub-agent
+inherits the same tool set, so it cannot reach a shell either.
+
+On every wake, the daemon checks the tool list in the stream-json init frame against that
+allowlist. If any other tool is present, it force-kills the process tree (a process-group
+`SIGKILL` on POSIX, `taskkill /T /F` on Windows), forwards no frame from init onward, and
+records a failed wake that names the leaked tools. If the init frame has no tool list, the
+daemon logs a warning that the restriction could not be verified and continues.
 
 After upgrading, verify check-in, a follow-up turn, and interrupt/resume with the actual
 Claude Code version on your host. Use [daemon logs](/guides/daemon-operations/) to diagnose

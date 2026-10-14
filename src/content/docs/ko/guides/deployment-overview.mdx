@@ -7,7 +7,7 @@ sidebar:
   order: 20
 ---
 
-이 페이지는 Chorus를 실행하고 셀프 호스팅하는 지원되는 방법들을 소개하고, 각 방법에 필요한 것을 나열하며, 하나를 고르도록 돕습니다. 고르고 나면 [Docker](/ko/guides/deploy-docker/), [프로덕션 배포](/ko/guides/deploy-production/), [운영](/ko/guides/deploy-operations/) 가이드가 나머지 길을 안내합니다.
+이 페이지는 Chorus를 실행하고 셀프 호스팅하는 지원되는 방법들을 소개하고, 각 방법에 필요한 것을 나열하며, 하나를 고르도록 돕습니다. 고르고 나면 [Docker](/ko/guides/deploy-docker/), [로컬 셀프 호스팅](/ko/guides/deploy-local/), [프로덕션 배포](/ko/guides/deploy-production/), [운영](/ko/guides/deploy-operations/) 가이드가 나머지 길을 안내합니다.
 
 ## 배포 형태
 
@@ -21,9 +21,13 @@ Chorus는 같은 애플리케이션을 로컬과 프로덕션, 두 가지 형태
 
 로컬 형태는 Docker의 **스탠드얼론 컨테이너**로도 실행할 수 있습니다. 같은 내장 데이터베이스를 쓰며, 데이터는 Docker 볼륨에 보관됩니다. [스탠드얼론(내장 데이터베이스)](/ko/guides/deploy-docker/#스탠드얼론내장-데이터베이스)를 참고하세요.
 
+### 단일 호스트 셀프 호스팅
+
+내 Linux 또는 macOS 호스트에서 상시 운영하는 인스턴스로, 내장 데이터베이스 대신 Docker Compose 안의 실제 **PostgreSQL 17** 데이터베이스를 사용합니다. Chorus 0.22.2 이상에서는 `bash install.sh --target local`로 설정합니다. 설치 프로그램이 앱 이미지를 받거나 빌드하고, 보호된 계정 설정을 작성하며, 반복 가능한 재배포용 래퍼를 저장합니다. 앱은 LAN에서 HTTP로 접근할 수 있고, 선택적으로 자체 서명 LAN HTTPS나 Cloudflare Named Tunnel을 쓸 수 있습니다. Redis 없는 단일 인스턴스 구성입니다. [로컬 머신에 셀프 호스팅](/ko/guides/deploy-local/)을 참고하세요.
+
 ### 프로덕션
 
-팀을 위한 공유 설치로, 직접 관리하고 백업하는 **외부 PostgreSQL 16** 데이터베이스가 뒷받침하며, 하나 이상의 애플리케이션 인스턴스가 서비스합니다. **Redis 7**은 단일 인스턴스에서는 선택 사항이지만, 두 개 이상을 실행할 때는 **필수**입니다. 인스턴스들이 Redis를 통해 서로 실시간 업데이트(Server-Sent Events)를 전파하기 때문입니다. Redis가 없으면 Chorus는 메모리 내 이벤트 방식으로 폴백하는데, 이는 단일 인스턴스에서만 동작합니다.
+팀을 위한 공유 설치로, 직접 관리하고 백업하는 **외부 PostgreSQL** 데이터베이스가 뒷받침하며(저장소의 Compose 파일은 기본으로 PostgreSQL 17을 사용), 하나 이상의 애플리케이션 인스턴스가 서비스합니다. **Redis 7**은 단일 인스턴스에서는 선택 사항이지만, 두 개 이상을 실행할 때는 **필수**입니다. 인스턴스들이 Redis를 통해 서로 실시간 업데이트(Server-Sent Events)를 전파하기 때문입니다. Redis가 없으면 Chorus는 메모리 내 이벤트 방식으로 폴백하는데, 이는 단일 인스턴스에서만 동작합니다.
 
 프로덕션 형태는 컨테이너로 실행하거나([Docker로 배포](/ko/guides/deploy-docker/) 참고), 글로벌 npm 패키지에서 자체 PostgreSQL과 Redis에 연결해 실행하거나, 함께 제공되는 AWS CDK 스택 위에서 실행할 수 있습니다([프로덕션 배포](/ko/guides/deploy-production/) 참고).
 
@@ -31,7 +35,7 @@ Chorus는 같은 애플리케이션을 로컬과 프로덕션, 두 가지 형태
 
 - **Node.js 22 이상**: Chorus는 Node.js 22 런타임을 대상으로 합니다(Docker 이미지는 `node:22-alpine` 위에 빌드됩니다).
 - **`8637` 포트**: 애플리케이션은 여기서 수신 대기합니다. UI와 MCP 엔드포인트에 도달하려면 이 포트를 공개하거나 리버스 프록시하세요.
-- **데이터베이스**: 로컬 형태에서는 준비할 것이 없습니다(내장 PGlite). 프로덕션에서는 연결 문자열로 도달할 수 있는 외부 **PostgreSQL 16** 데이터베이스가 필요합니다.
+- **데이터베이스**: 로컬 형태에서는 준비할 것이 없습니다(내장 PGlite). 프로덕션에서는 연결 문자열로 도달할 수 있는 외부 **PostgreSQL** 데이터베이스가 필요합니다. 저장소의 Compose 파일과 셀프 호스팅 스택은 기본으로 **PostgreSQL 17**을 사용하며, 기존 PostgreSQL 16 데이터 볼륨은 전환하기 전에 마이그레이션해야 합니다([로컬 머신에 셀프 호스팅](/ko/guides/deploy-local/#postgresql-17과-기존-postgresql-16-볼륨) 참고).
 - **캐시**: 단일 인스턴스에서는 필요 없습니다. 다중 인스턴스 프로덕션 배포에서는 인스턴스 간 이벤트 전파를 위한 **Redis 7** 엔드포인트가 필요합니다.
 
 ## 선택하는 방법
@@ -42,7 +46,8 @@ Chorus는 같은 애플리케이션을 로컬과 프로덕션, 두 가지 형태
   | --- | --- | --- | --- |
   | Chorus를 시험하거나 한 대의 머신에서 혼자 작업하기 | 로컬 단일 머신 | 내장 PGlite | 없음 |
   | 가장 적은 구성 요소로 공유 인스턴스 실행하기 | 스탠드얼론 컨테이너의 로컬 형태 | 내장 PGlite(볼륨에 저장) | 없음 |
-  | 공유, 고가용성 또는 다중 인스턴스 설치 운영하기 | 프로덕션(Docker, npm 또는 AWS CDK) | 외부 PostgreSQL 16 | Redis 7(2개 이상 인스턴스에서 필수) |
+  | 내 호스트에서 상시 운영하고 LAN에서 접근하기 | [단일 호스트 셀프 호스팅](/ko/guides/deploy-local/)(`install.sh --target local`) | PostgreSQL 17(Compose 안) | 없음 |
+  | 공유, 고가용성 또는 다중 인스턴스 설치 운영하기 | 프로덕션(Docker, npm 또는 AWS CDK) | 외부 PostgreSQL(기본 17) | Redis 7(2개 이상 인스턴스에서 필수) |
 
 </div>
 
@@ -51,6 +56,8 @@ Chorus는 같은 애플리케이션을 로컬과 프로덕션, 두 가지 형태
 - **[Docker로 배포](/ko/guides/deploy-docker/)**: 공개된 `chorusaidlc/chorus-app`
   이미지. 스탠드얼론과 프로덕션 Compose 파일, `docker run` 예시, 전체 환경 변수
   참고, 그리고 시작 시 동작.
+- **[로컬 머신에 셀프 호스팅](/ko/guides/deploy-local/)**: `install.sh` 로컬 설정, 재배포 래퍼,
+  선택적 자체 서명 LAN HTTPS 또는 Cloudflare Tunnel, 그리고 PostgreSQL 16 → 17 마이그레이션.
 - **[프로덕션 배포](/ko/guides/deploy-production/)**: 자체 PostgreSQL과 Redis에 연결해
   실행하기, 다중 인스턴스 요구 사항, 그리고 전체 AWS CDK 안내.
 - **[셀프 호스팅 Chorus 운영하기](/ko/guides/deploy-operations/)**: 첫 로그인 부트스트랩, 배포 측 인증, 자동
