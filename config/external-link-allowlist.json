@@ -1,4 +1,6 @@
 {
+  "https://pi.dev/": "Canonical Pi agent homepage, verified with HTTP 200 during the 0.22.2 docs review; automated Node HEAD requests intermittently time out. Recheck this destination when updating Pi integration docs.",
+  "https://github.com/etnperlong/opencode-chorus": "Canonical community OpenCode integration repository, verified public via GitHub API and HTTP 200 during the 0.22.2 docs review; automated HEAD requests intermittently time out. Recheck when updating OpenCode docs.",
   "https://github.com/Chorus-AIDLC/Chorus": "GitHub intermittently rejects automated HEAD requests; this canonical repository URL is maintained by the project.",
   "https://www.postgresql.org/docs/current/backup.html": "Authoritative PostgreSQL backup documentation linked from the operations guide's back-up-before-upgrade reminder instead of re-teaching per-engine restore recipes.",
   "https://aws.amazon.com/certificate-manager/": "AWS Certificate Manager product page linked from the production guide's AWS CDK prerequisites for obtaining the ACM certificate the load balancer requires.",

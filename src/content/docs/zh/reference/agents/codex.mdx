@@ -62,7 +62,11 @@ chorus agents add --agents codex
 
 `--chorus-only` 让 Codex 保持只读，禁用交互审批，并关闭该回合的网络访问。原生审批或用户输入请求会被拒绝；无法安全拒绝的请求会使唤醒失败。需要提问时，请通过 Chorus 评论或需求细化。回合完成不代表其中的 MCP 调用成功。
 
-从 Chorus 0.22.2 起，当 `~/.codex/config.toml`（或该智能体的 `CODEX_HOME/config.toml`）中声明了 `[mcp_servers.chorus]` 时，后台服务会为每个新建或恢复的线程只预先批准 Chorus MCP 服务器，方式是按线程覆盖 `mcp_servers.chorus.default_tools_approval_mode`。这样，`chorus_checkin`、评论和任务更新等 Chorus 工具无需在配置中逐个授权即可使用。其他 MCP 服务器、shell 命令和文件修改仍会被拒绝，沙箱也保持只读。如果没有该条目，后台服务会记录一条警告，唤醒将在没有 Chorus MCP 工具的情况下运行。`--yolo` 保持不变。TRAE CLI 唤醒使用 `traecli.toml`，行为相同。
+从 Chorus 0.22.2 起，如果配置中有普通的 `[mcp_servers.chorus]` 表头，后台服务会为每个新建或恢复的线程设置 `mcp_servers.chorus.default_tools_approval_mode = "approve"`，但不写入配置文件。不识别内联表和点号键声明；未检测到该表时会警告并省略覆盖项。工具级审批规则仍然适用。
+
+沙箱阻止本地写入和网络访问，不会禁止只读 shell 命令。后台服务不改变其他 MCP 服务器的审批设置；仍需审批的请求会被拒绝。Chorus MCP 调用可在密钥权限范围内修改服务器数据，因此请使用最小权限密钥。
+
+`--yolo` 保持不变。[TRAE CLI](/zh/reference/agents/trae/) 使用相同策略，配置文件为 `traecli.toml`。
 
 ### 中断与排障
 

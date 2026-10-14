@@ -103,9 +103,9 @@ chorus daemon --agent trae
 "config": { "mcp_servers.chorus.default_tools_approval_mode": "approve" }
 ```
 
-- 沙箱仍然只读，写入和其他有副作用的命令依旧被阻止。其他 MCP 服务器的工具，以及 Shell、文件修改和权限审批，仍会被拒绝。
+- 沙箱阻止本地写入和网络访问，不会禁止只读 shell 命令。后台服务不改变其他 MCP 服务器的审批设置；仍需审批的请求会被拒绝。Chorus MCP 调用可在密钥权限范围内修改服务器数据，因此请使用最小权限密钥。
 - 该覆盖项从不写入你的配置文件，YOLO 模式也不会发送它。没有声明 `[mcp_servers.chorus]` 表时不会发送。只识别普通的 `[mcp_servers.chorus]` 表头，不识别内联表或点号键写法。
-- 名为 `chorus` 的服务器的所有工具都会被预先批准，包括写入和管理类工具。被唤醒的智能体能在 Chorus 中改动什么，只受其密钥权限限制，因此请为受限后台服务使用只具备必要权限的密钥。
+- Chorus 的写入和管理类工具默认也会被预先批准，但显式的工具级审批规则仍然适用。服务器端操作还需满足智能体密钥权限，请使用最小权限密钥。
 - 后台服务信任 `[mcp_servers.chorus]` 指向的任何地址。请让该条目保持指向你的 Chorus MCP 端点，即 `chorus agents add` 写入的值。
 
 ## 验证连接

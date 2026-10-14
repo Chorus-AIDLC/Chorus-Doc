@@ -156,15 +156,16 @@ one MCP server, the Chorus one, for the woken thread only:
 "config": { "mcp_servers.chorus.default_tools_approval_mode": "approve" }
 ```
 
-- The sandbox stays read-only, so writes and other side-effecting commands are still blocked.
-  Tools of other MCP servers, and shell, file-change, and permission approvals, are still
-  refused.
+- The sandbox blocks local writes and network access, not read-only shell commands.
+  The daemon does not change other MCP servers' approval settings; requests that still
+  require approval are refused. Chorus MCP calls can modify server data within the key's
+  permissions, so use a least-privilege key.
 - The override is never written to your config file, and YOLO mode does not send it. Without a
   declared `[mcp_servers.chorus]` table it is omitted. Only the plain `[mcp_servers.chorus]`
   table header is detected, not inline-table or dotted-key forms.
-- Every tool of the server named `chorus` is pre-approved, including write and admin tools.
-  What the woken agent can change in Chorus is bounded only by its key's permissions, so give a
-  restricted daemon a key with only the permissions it needs.
+- Chorus tools, including write and admin tools, are pre-approved by default; explicit
+  per-tool approval rules still apply. Server-side actions also require the agent key's
+  permissions. Use a least-privilege key.
 - The daemon trusts whatever `[mcp_servers.chorus]` points at. Keep that entry pointed at your
   Chorus MCP endpoint, as `chorus agents add` writes it.
 

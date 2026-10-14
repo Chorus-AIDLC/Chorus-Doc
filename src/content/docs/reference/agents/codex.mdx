@@ -88,14 +88,18 @@ disabled for the turn. Native requests for approval or user input are denied; re
 cannot be safely rejected fail the wake. Questions should go through Chorus
 comments or elaboration. A completed turn does not prove that its MCP calls succeeded.
 
-From Chorus 0.22.2, when `[mcp_servers.chorus]` is declared in `~/.codex/config.toml` (or the
-agent's `CODEX_HOME/config.toml`), the daemon pre-approves only the Chorus MCP server for each
-new or resumed thread, using a per-thread `mcp_servers.chorus.default_tools_approval_mode`
-override. Chorus tools such as `chorus_checkin`, comments, and task updates then work
-without per-tool allowances in your config. Other MCP servers, shell commands, and file
-changes stay refused, and the sandbox stays read-only. Without that entry, the daemon logs a
-warning and the wake runs without Chorus MCP tools. `--yolo` is unchanged. TRAE CLI wakes
-behave the same way with `traecli.toml`.
+From Chorus 0.22.2, the daemon sets
+`mcp_servers.chorus.default_tools_approval_mode = "approve"` for each new or resumed thread
+when the config declares a plain `[mcp_servers.chorus]` table. The override is not saved to
+disk. Inline-table and dotted-key declarations are not detected; without a detected table,
+the daemon warns and omits the override. Per-tool approval rules still apply.
+
+The sandbox blocks local writes and network access, not read-only shell commands.
+The daemon does not change other MCP servers' approval settings; requests that still
+require approval are refused. Chorus MCP calls can modify server data within the key's
+permissions, so use a least-privilege key.
+
+`--yolo` is unchanged. [TRAE CLI](/reference/agents/trae/) uses the same policy with `traecli.toml`.
 
 ### Interrupts and troubleshooting
 

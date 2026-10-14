@@ -47,13 +47,13 @@ chorus daemon --browse-root /home/demo/workspace
 
 ## `--chorus-only` 的强制范围
 
-从 Chorus 0.22.2 开始，`--chorus-only` 会移除工具，而不只是自动批准 Chorus 工具。对于 Claude Code，如果无法确认限制已生效，唤醒会被终止。
+从 Chorus 0.22.2 开始，`--chorus-only` 对不同后端施加不同限制：
 
-- **Claude Code**：每次唤醒都会传入 `--tools "mcp__chorus__*,Task,Agent"` 和 `--strict-mcp-config`。被唤醒的智能体只保留本后台服务的 Chorus MCP 工具和子智能体派发（`Task` / `Agent`）。Bash、文件编辑等内置工具会被移除，你自己的 MCP 服务器不会被加载，`Edit`、`Write` 和 `NotebookEdit` 也会按名称被拒绝。每次唤醒时，后台服务都会将 Claude Code 启动（init）帧中的工具列表与该允许列表进行比对。如果出现任何其他工具，后台服务会强制终止整个进程树，此后不再转发任何输出，并记录一次失败的唤醒，其中会列出泄漏的工具。如果 Claude Code 没有报告工具列表，后台服务会记录一条警告，说明无法验证该限制，唤醒继续进行。
-- **Codex 和 TRAE CLI**：回合在只读沙箱中运行，并关闭审批。当后端配置中声明了 `[mcp_servers.chorus]` 时，后台服务只会为该线程预先批准 Chorus MCP 服务器，因此 Chorus 工具可以正常使用。其他 MCP 服务器、shell 命令和文件修改仍会被拒绝。如果没有该条目，后台服务会记录一条警告，唤醒将在没有 Chorus MCP 工具的情况下运行。
+- **Claude Code** 移除内置工具和其他 MCP 服务器，只保留本后台服务的 Chorus MCP 工具及子智能体派发（`Task` / `Agent`）。启动工具列表中出现越界工具时，会终止进程树并使唤醒失败；缺少工具列表时仅警告，唤醒仍会继续，但限制未经验证。详见 [Claude Code](/zh/reference/agents/claude-code/)。
+- **Codex 和 TRAE CLI** 使用只读沙箱，禁用网络访问和交互审批，但仍可执行只读 shell 命令。后台服务为该线程预先批准已配置的 Chorus MCP 服务器，不会移除其他工具，也不会覆盖其他服务器的审批设置。详见 [Codex](/zh/reference/agents/codex/) 和 [TRAE CLI](/zh/reference/agents/trae/)。
 - **`--yolo`** 保持不变：被唤醒的智能体获得完整的本地工具集。
 
-违规时会显示为一个 **Agent 唤醒失败**回合。参见[排查智能体连接故障](/zh/guides/troubleshooting/#智能体尚未回复回合就失败了)。
+Chorus MCP 调用仍可按智能体密钥的权限修改服务器端数据，请使用最小权限密钥。检测到工具越界时会显示为 **Agent 唤醒失败**；参见[排查智能体连接故障](/zh/guides/troubleshooting/#智能体尚未回复回合就失败了)。
 
 ## 配置 `daemon.json`
 

@@ -29,11 +29,28 @@ so no manual setup is needed to get in.
 
 ### Turn the built-in login off
 
-The built-in login is a bootstrap mechanism, not a permanent account system. Once real
-accounts exist — or once single sign-on is configured — turn it off by unsetting both
-`DEFAULT_USER` and `DEFAULT_PASSWORD` and restarting Chorus. With the pair removed, the
-built-in email/password form no longer appears and access goes through your configured
-identity provider instead.
+After verifying OIDC and super admin sign-in, remove `DEFAULT_USER` and `DEFAULT_PASSWORD`
+from the application's environment and recreate or restart it. This hides the bootstrap
+email/password form; it does not revoke sessions that were already issued.
+
+For the [installer-managed Compose stack](/guides/deploy-local/), **keep both values nonempty
+in the private env file**: the base Compose file requires them during interpolation. Instead,
+save this container-environment override as `oidc-only.yml` in the private directory:
+
+```yaml
+services:
+  app:
+    environment:
+      DEFAULT_USER: ""
+      DEFAULT_PASSWORD: ""
+```
+
+Add `-f "$HOME/.config/chorus-self-host/$PROJECT/oidc-only.yml"` to your complete `dc`
+command, before `"$@"`, then run `dc config --quiet` and
+`dc up -d --wait --force-recreate app`. Preserve this override in every later start or upgrade.
+The saved local wrapper does **not** load `oidc-only.yml`; do not use it unchanged after this
+step. Prepare the desired app image and use the full Compose invocation instead. The tunnel
+recipe in the local guide already includes this file when present.
 
 ## Configure deployment-side authentication
 
@@ -84,11 +101,11 @@ To upgrade:
    the new container image for a Docker deployment.
 3. Restart Chorus. Migrations apply automatically on boot, then the app starts.
 
-For an installation set up with `install.sh --target local`, steps 2 and 3 are one command: run
-the saved wrapper `bash ./default_deploy_local.sh` (after updating `CHORUS_IMAGE` in the private
-env for a pull-mode install). Upgrading Chorus never upgrades the PostgreSQL major version; moving
-an existing PostgreSQL 16 volume to 17 is a separate offline migration. See
-[Self-host on a local machine](/guides/deploy-local/#redeploy-with-the-saved-wrapper).
+For local-mode installations whose required overrides the wrapper loads, run
+`bash ./default_deploy_local.sh` (update `CHORUS_IMAGE` first for pull mode). For tunnel mode
+or `oidc-only.yml`/other custom overrides, prepare the desired app image and use your complete
+Compose invocation instead. Never rerun the installer to upgrade. PostgreSQL major upgrades
+remain a separate offline migration. See [Self-host on a local machine](/guides/deploy-local/).
 
 :::caution[Back up before upgrading]
 Always back up the database (or the data volume for embedded/volume-backed storage) before

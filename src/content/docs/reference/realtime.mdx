@@ -124,8 +124,13 @@ The daemon reads it at three moments:
    a reconnect), the daemon immediately sweeps for pending turns.
 2. **Every 30 seconds while connected.** The periodic sweep recovers a lost delivery even on
    a connection that never dropped.
-3. **On a `deliver_turn` ping.** A live ping triggers a targeted read of just the announced
-   turn.
+3. **On a `deliver_turn` ping.** The daemon reads pending turns for the connection, then
+   selects the announced turn for dispatch (or also sweeps if a periodic recovery is due).
+
+Automatic registration and periodic sweeps replay only turns with supported durable wake
+context or an operation payload. Older pending turns without either are skipped with
+`automatic historical replay blocked`; waiting or reconnecting does not replay them. A
+live `deliver_turn` can still select a specific pending turn for dispatch.
 
 Recovery and the SSE connection work together:
 

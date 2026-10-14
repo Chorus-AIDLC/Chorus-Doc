@@ -21,6 +21,10 @@ const routes = [
   '/zh/reference/agents/trae/',
   '/ja/reference/agents/trae/',
   '/ko/reference/agents/trae/',
+  '/guides/deploy-local/',
+  '/zh/guides/deploy-local/',
+  '/ja/guides/deploy-local/',
+  '/ko/guides/deploy-local/',
 ];
 const resources = [
   ['/index.md', '## The reversed conversation'],
@@ -32,7 +36,7 @@ const resources = [
   ['/ja/guides/getting-started.md', '## Chorus をインストールして起動する'],
   ['/ko/guides/getting-started.md', '## Chorus 설치하고 실행하기'],
   ['/reference/workflow.md', '## Task states'],
-  ['/zh/reference/workflow.md', '## Task 状态'],
+  ['/zh/reference/workflow.md', '## 任务状态'],
   ['/llms.txt', '# Chorus Docs'],
   ['/sitemap-index.xml', 'sitemapindex'],
   ['/sitemap-0.xml', 'urlset'],
@@ -43,6 +47,10 @@ const resources = [
   ...['', '/zh', '/ja', '/ko'].map((locale) => [
     `${locale}/reference/agents/trae.md`,
     'chorus agents add --agents trae',
+  ]),
+  ...['', '/zh', '/ja', '/ko'].map((locale) => [
+    `${locale}/guides/deploy-local.md`,
+    'bash install.sh --target local',
   ]),
 ];
 
@@ -137,37 +145,53 @@ try {
     }
 
     for (const test of [
-      { route: '/guides/getting-started/', query: 'workflow', result: /Workflow reference/i },
-      { route: '/zh/guides/getting-started/', query: '工作流', result: /工作流参考/ },
+      { route: '/guides/getting-started/', query: 'workflow', result: /Workflow reference/i, target: '/reference/workflow/' },
+      { route: '/zh/guides/getting-started/', query: '工作流', result: /工作流参考/, target: '/zh/reference/workflow/' },
       // Search localized getting-started pages. Use the Korean title because
       // generic login guidance can fill the first page of search results.
       { route: '/ja/guides/getting-started/', query: 'サインイン', result: /はじめに/ },
       { route: '/ko/guides/getting-started/', query: '시작하기', result: /시작하기/ },
+      ...['', '/zh', '/ja', '/ko'].flatMap((locale) => [
+        { route: `${locale}/reference/agents/trae/`, query: 'TRAE CLI', result: /TRAE CLI/ },
+        {
+          route: `${locale}/guides/deploy-local/`,
+          query: 'install.sh',
+          result: /Self-host on a local machine|在本机自托管|ローカルマシンでセルフホストする|로컬 머신에 셀프 호스팅/,
+        },
+      ]),
     ]) {
       const page = await context.newPage();
       await page.goto(new URL(test.route, baseUrl).href, { waitUntil: 'networkidle' });
       await page.getByRole('button', { name: /Search|搜索|検索|검색/ }).click();
       await page.locator('input[type="text"]:visible').fill(test.query);
-      await page.getByRole('link', { name: test.result }).first().waitFor();
+      await page.waitForFunction(({ target, pattern, flags }) => {
+        const dialog = document.querySelector('dialog[open]');
+        return [...(dialog?.querySelectorAll('a[href]') ?? [])].some((link) =>
+          new URL(link.href).pathname === target &&
+          new RegExp(pattern, flags).test(link.textContent ?? ''),
+        );
+      }, {
+        target: test.target ?? test.route,
+        pattern: test.result.source,
+        flags: test.result.flags,
+      });
       await page.close();
     }
 
-    for (const target of [
-      '/zh/guides/getting-started/',
-      '/ja/guides/getting-started/',
-      '/ko/guides/getting-started/',
-    ]) {
-      const localePage = await context.newPage();
-      await localePage.goto(new URL('/guides/getting-started/', baseUrl).href);
-      const localeSelect = localePage.locator(
-        `select:has(option[value="${target}"]):visible`,
-      );
-      if ((await localeSelect.count()) === 0) {
-        await localePage.getByRole('button', { name: 'Menu' }).click();
+    for (const route of ['/guides/getting-started/', '/guides/deploy-local/', '/reference/agents/trae/']) {
+      for (const target of ['zh', 'ja', 'ko'].map((locale) => `/${locale}${route}`)) {
+        const localePage = await context.newPage();
+        await localePage.goto(new URL(route, baseUrl).href);
+        const localeSelect = localePage.locator(
+          `select:has(option[value="${target}"]):visible`,
+        );
+        if ((await localeSelect.count()) === 0) {
+          await localePage.getByRole('button', { name: 'Menu' }).click();
+        }
+        await localeSelect.selectOption(target);
+        await localePage.waitForURL(`**${target}`);
+        await localePage.close();
       }
-      await localeSelect.selectOption(target);
-      await localePage.waitForURL(`**${target}`);
-      await localePage.close();
     }
     await context.close();
   }

@@ -60,6 +60,10 @@ try {
       '/zh/reference/agents/trae/',
       '/ja/reference/agents/trae/',
       '/ko/reference/agents/trae/',
+      '/guides/deploy-local/',
+      '/zh/guides/deploy-local/',
+      '/ja/guides/deploy-local/',
+      '/ko/guides/deploy-local/',
     ]) {
       const page = await context.newPage();
       await page.goto(`http://127.0.0.1:${address.port}${route}`, {
@@ -74,6 +78,9 @@ try {
       // an intermittent `scrollable-region-focusable` violation. Wait until no
       // overflowing code block is missing its focus affordance.
       await page.evaluate(() => document.fonts?.ready).catch(() => {});
+      await page.locator('main details').evaluateAll((details) => {
+        for (const disclosure of details) disclosure.open = true;
+      });
       await page
         .waitForFunction(
           () =>
@@ -121,6 +128,7 @@ try {
       const reachable = [];
       let visibleFocus = false;
       let navigationReachable = false;
+      let localeReachable = false;
       for (let count = 0; count < 40; count += 1) {
         await page.keyboard.press('Tab');
         const state = await page.evaluate(() => {
@@ -137,6 +145,7 @@ try {
               active.matches('a[href]') &&
               (Boolean(active.closest('nav')) ||
                 /^\/(?:zh\/|ja\/|ko\/)?(?:guides|reference)\//.test(active.getAttribute('href') ?? '')),
+            locale: active.matches('starlight-lang-select select'),
             visible:
               style.outlineStyle !== 'none' ||
               (style.boxShadow !== 'none' && style.boxShadow !== ''),
@@ -145,21 +154,43 @@ try {
         reachable.push(state.label);
         visibleFocus ||= state.visible;
         navigationReachable ||= state.navigation;
+        localeReachable ||= state.locale;
       }
       if (!reachable.some((label) => /search|搜索|検索|검색/i.test(label))) {
         throw new Error(`${route} search is not keyboard reachable`);
       }
-      if (
-        !reachable.some((label) =>
-          /language|语言|中文|english|言語|日本語|언어|한국어/i.test(label),
-        )
-      ) {
+      const menuButton = page.locator('starlight-menu-button button');
+      if (!localeReachable && await menuButton.isVisible()) {
+        await menuButton.focus();
+        await page.keyboard.press('Enter');
+        const tabBudget = await page.locator('a[href], button, select, input, summary, [tabindex]').count();
+        for (let count = 0; count < tabBudget && !localeReachable; count += 1) {
+          await page.keyboard.press('Tab');
+          localeReachable = await page.evaluate(() =>
+            document.activeElement?.matches('starlight-lang-select select'),
+          );
+        }
+        await menuButton.focus();
+        await page.keyboard.press('Enter');
+      }
+      if (!localeReachable) {
         throw new Error(`${route} locale control is not keyboard reachable`);
       }
       if (!navigationReachable) {
         throw new Error(`${route} navigation is not keyboard reachable`);
       }
       if (!visibleFocus) throw new Error(`${route} has no visible keyboard focus treatment`);
+      for (const summary of await page.locator('main details > summary').all()) {
+        await summary.focus();
+        await page.keyboard.press('Enter');
+        if (await summary.evaluate((element) => element.parentElement.open)) {
+          throw new Error(`${route} disclosure did not close from the keyboard`);
+        }
+        await page.keyboard.press('Enter');
+        if (!await summary.evaluate((element) => element.parentElement.open)) {
+          throw new Error(`${route} disclosure did not open from the keyboard`);
+        }
+      }
       await page.close();
     }
     await context.close();

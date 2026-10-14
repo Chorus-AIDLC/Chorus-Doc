@@ -13,12 +13,16 @@ sidebar:
 
 ## 이 방법을 선택할 때
 
-| 원하는 것 | 사용할 방법 |
-| --- | --- |
-| Docker 없이 혼자 Chorus를 써 보기 | 내장 PGlite를 쓰는 npm 패키지: [시작하기](/ko/guides/getting-started/) |
-| 내 Linux 또는 macOS 호스트에서 상시 운영하고, LAN에서 접근하며, 실제 PostgreSQL을 사용 | **이 가이드** |
-| 게시된 이미지로 나만의 Compose 파일 작성 | [Docker로 배포](/ko/guides/deploy-docker/) |
-| 다중 인스턴스, 관리형 PostgreSQL과 Redis, 또는 AWS | [프로덕션 배포](/ko/guides/deploy-production/) |
+<div class="table-scroll" role="region" aria-label="배포 방식 선택" tabindex="0">
+
+  | 원하는 것 | 사용할 방법 |
+  | --- | --- |
+  | Docker 없이 혼자 Chorus를 써 보기 | 내장 PGlite를 쓰는 npm 패키지: [시작하기](/ko/guides/getting-started/) |
+  | 내 Linux 또는 macOS 호스트에서 상시 운영하고, LAN에서 접근하며, 실제 PostgreSQL을 사용 | **이 가이드** |
+  | 게시된 이미지로 나만의 Compose 파일 작성 | [Docker로 배포](/ko/guides/deploy-docker/) |
+  | 다중 인스턴스, 관리형 PostgreSQL과 Redis, 또는 AWS | [프로덕션 배포](/ko/guides/deploy-production/) |
+
+</div>
 
 이 구성은 단일 인스턴스용입니다. Redis는 의도적으로 비활성화되어 있어(`REDIS_URL`이 비어 있음) 실시간 업데이트는 메모리 내 전달을 사용하며, 앱 컨테이너가 하나일 때만 동작합니다.
 
@@ -33,20 +37,6 @@ sidebar:
 :::caution[Docker 권한과 LAN 노출]
 Docker를 사용할 수 있는 권한은 사실상 호스트 root 권한입니다. 호스트와 Docker 소켓을 보호하세요. 로컬 모드는 다른 LAN 기기가 접근할 수 있도록 앱을 `0.0.0.0`에 게시합니다. 이 포트는 신뢰할 수 있는 네트워크에서만 허용하고, 절대 공용 인터넷에 노출하지 마세요. Docker가 게시한 포트는 UFW 규칙을 우회할 수 있으므로 Docker를 고려한 방화벽 규칙이나 상위 방화벽으로 제한하세요. PostgreSQL은 게시되지 않으며 항상 내부의 `db:5432`에만 있습니다.
 :::
-
-## 스택 구성
-
-| `deploy/self-host/`의 파일 | 역할 |
-| --- | --- |
-| `compose.yml` | 기본 스택: 서비스 `app`과 `db`(기본값 `postgres:17-alpine`), 명명된 볼륨 `app-data`와 `db-data`, 헬스 체크, `restart: unless-stopped`. 포트를 게시하지 않습니다. |
-| `compose.local.yml` | 로컬 모드: `0.0.0.0:${CHORUS_PORT}:8637`을 게시하고 `NEXTAUTH_URL=http://localhost:${CHORUS_PORT}`와 `COOKIE_SECURE=false`를 설정합니다. |
-| `compose.lan-https.yml` | 선택 애드온: 자체 서명 TLS를 종료하고 `http://app:8637`로 전달하는 Nginx 서비스 `lan-https`. |
-| `nginx.lan-https.conf` | `lan-https`에 읽기 전용으로 마운트되는 Nginx 설정. |
-| `compose.tunnel.yml` | 로컬 모드의 선택적 대안: `cloudflared` 서비스와 `COOKIE_SECURE=true`. |
-| `install-local.sh` | 새 로컬 설정. `install.sh --target local`로 실행됩니다. |
-| `deploy-local.sh` | 반복 가능한 재배포. 저장된 래퍼가 호출합니다. |
-| `migrate-pg16-to-17.sh` | 오프라인 PostgreSQL 16 → 17 마이그레이션 헬퍼. |
-| `.env.example` | Compose 파일이 읽는 모든 설정을 나열한 템플릿. |
 
 ## `install.sh`로 설치하기
 
@@ -90,27 +80,35 @@ bash install.sh --target local --image-source build \
 
 `--dry-run`을 추가하고 두 비밀번호 파일 옵션을 빼면, 해시 계산·Docker 호출·파일 쓰기 없이 계획만 출력합니다. 터미널이 아닌 입력에서는 설치 프로그램이 답을 기다리지 않으며, 필수 값이 없으면 실패합니다. 옵션 요약은 `bash install.sh --help`로 볼 수 있습니다.
 
-| 옵션 | 대응 환경 변수 | 기본값 |
-| --- | --- | --- |
-| `--target local` | `CHORUS_INSTALL_TARGET=local` | `aws` |
-| `--image-source pull\|build` | `CHORUS_IMAGE_SOURCE` | `pull` |
-| `--image` | `CHORUS_IMAGE` | pull에서는 필수, build에서는 `chorus-local:<project>` |
-| `--project` | `CHORUS_LOCAL_PROJECT` | `chorus-local` |
-| `--port` | `CHORUS_PORT` | `18637` |
-| `--email`, `--admin-email` | `DEFAULT_USER`, `SUPER_ADMIN_EMAIL` | 없음 |
-| `--password-file`, `--admin-password-file` | `DEFAULT_PASSWORD`, `SUPER_ADMIN_PASSWORD` | 없음 |
-| `--non-interactive`, `--dry-run` | `CHORUS_INSTALL_NONINTERACTIVE=1`, `CHORUS_INSTALL_DRY_RUN=1` | 꺼짐 |
+<div class="table-scroll" role="region" aria-label="설치 프로그램 옵션" tabindex="0">
+
+  | 옵션 | 대응 환경 변수 | 기본값 |
+  | --- | --- | --- |
+  | `--target local` | `CHORUS_INSTALL_TARGET=local` | `aws` |
+  | `--image-source pull\|build` | `CHORUS_IMAGE_SOURCE` | `pull` |
+  | `--image` | `CHORUS_IMAGE` | pull에서는 필수, build에서는 `chorus-local:<project>` |
+  | `--project` | `CHORUS_LOCAL_PROJECT` | `chorus-local` |
+  | `--port` | `CHORUS_PORT` | `18637` |
+  | `--email`, `--admin-email` | `DEFAULT_USER`, `SUPER_ADMIN_EMAIL` | 없음 |
+  | `--password-file`, `--admin-password-file` | `DEFAULT_PASSWORD`, `SUPER_ADMIN_PASSWORD` | 없음 |
+  | `--non-interactive`, `--dry-run` | `CHORUS_INSTALL_NONINTERACTIVE=1`, `CHORUS_INSTALL_DRY_RUN=1` | 꺼짐 |
+
+</div>
 
 명령줄 옵션이 환경 변수보다 우선하고, 비밀번호 파일이 비밀번호 변수보다 우선합니다. 명령줄에서 평문 비밀번호를 받는 옵션은 없습니다.
 
 ### 설치가 만드는 것
 
-| 경로 | 내용 |
-| --- | --- |
-| `~/.config/chorus-self-host/<project>/` | 새 비공개 디렉터리, 모드 `0700`. |
-| `…/<project>/env` | 모드 `0600`. 이미지 참조(`CHORUS_IMAGE`, `POSTGRES_IMAGE=postgres:17-alpine`), 무작위 `POSTGRES_PASSWORD`, `DEFAULT_USER`와 **평문** 일반 `DEFAULT_PASSWORD`, `CHORUS_PORT`, `SUPER_ADMIN_EMAIL`, 그리고 bcrypt 해시만 담은 `SUPER_ADMIN_PASSWORD_HASH`. 비밀로 취급하세요. |
-| `…/<project>/lan-tls/`, `…/<project>/lan-https.yml` | LAN HTTPS를 선택한 경우에만. |
-| 체크아웃의 `default_deploy_local.sh` | 모드 `0700`, 비밀이 없는 재배포 래퍼. `CHORUS_DEPLOY_CONFIG`로 다른 경로를 지정할 수 있으며, 부모 디렉터리가 이미 있어야 합니다. |
+<div class="table-scroll" role="region" aria-label="생성되는 구성" tabindex="0">
+
+  | 경로 | 내용 |
+  | --- | --- |
+  | `~/.config/chorus-self-host/<project>/` | 새 비공개 디렉터리, 모드 `0700`. |
+  | `…/<project>/env` | 모드 `0600`. 이미지 참조(`CHORUS_IMAGE`, `POSTGRES_IMAGE=postgres:17-alpine`), 무작위 `POSTGRES_PASSWORD`, `DEFAULT_USER`와 **평문** 일반 `DEFAULT_PASSWORD`, `CHORUS_PORT`, `SUPER_ADMIN_EMAIL`, 그리고 bcrypt 해시만 담은 `SUPER_ADMIN_PASSWORD_HASH`. 비밀로 취급하세요. |
+  | `…/<project>/lan-tls/`, `…/<project>/lan-https.yml` | LAN HTTPS를 선택한 경우에만. |
+  | 체크아웃의 `default_deploy_local.sh` | 모드 `0700`, 비밀이 없는 재배포 래퍼. `CHORUS_DEPLOY_CONFIG`로 다른 경로를 지정할 수 있으며, 부모 디렉터리가 이미 있어야 합니다. |
+
+</div>
 
 설치는 **새** 설치 전용입니다. 해당 프로젝트의 비공개 디렉터리, 래퍼 파일, 또는 Docker 컨테이너·볼륨·네트워크가 이미 있으면 설치 프로그램은 거부하고 아무것도 바꾸지 않습니다. 비밀번호를 교체하거나 데이터베이스를 재사용하지 않습니다. 시작에 실패하면 새 프로젝트의 컨테이너와 설정은 조사를 위해 남겨 둡니다.
 
@@ -128,7 +126,7 @@ bash install.sh --target local --image-source build \
 
 ## 저장된 래퍼로 재배포하기
 
-기존 설치에서는 **설치를 다시 실행하지 말고 저장된 래퍼를 실행**합니다.
+저장된 래퍼는 **로컬 모드**에서 필요한 오버라이드를 모두 불러올 때만 설치 프로그램 대신 사용하세요. 터널 모드나 `oidc-only.yml` 등 사용자 설정이 있다면 원하는 앱 이미지를 준비하고 완전한 Compose 호출을 사용해야 합니다. 래퍼는 해당 설정을 누락합니다.
 
 ```bash
 bash ./default_deploy_local.sh --dry-run
@@ -201,18 +199,34 @@ Cloudflare 계정, 도메인, 원격 관리형 Named Tunnel은 직접 준비해�
 
 1. 커넥터 토큰을 비공개 파일에 저장합니다(예: 비공개 디렉터리의 `tunnel-token`, `0700` 디렉터리 안에서 모드 `0444`). 셸 인수나 기록에 남기지 마세요.
 2. 비공개 env에서 `CHORUS_PUBLIC_URL`을 외부 `https://` 오리진(끝 슬래시 없음)으로, `CLOUDFLARED_IMAGE`를 고정한 `cloudflare/cloudflared` 릴리스(**2025.4.0 이상**)로, `CLOUDFLARED_TOKEN_FILE`을 토큰 파일의 절대 경로로 설정합니다.
-3. `dc down`으로 로컬 모드 스택을 중지하고(볼륨은 유지됨), `dc`를 tunnel 파일로 바꿔 시작합니다.
+3. 롤백을 위해 현재의 완전한 `dc` 정의를 보관하세요. 터널 호출을 준비하고 검증한 뒤 커넥터 이미지만 먼저 가져오고 로컬 스택을 중지합니다. 설치된 앱과 데이터베이스 이미지를 재사용하므로 공개되지 않은 로컬 빌드에도 적용됩니다.
+
+데이터베이스 볼륨과 인증 오버라이드는 유지하세요. 이 예시는 기존 `pg17.yml`과 `oidc-only.yml`을 포함한 뒤 터널 정책을 마지막에 적용합니다. `https.yml`이나 `lan-https.yml`은 자동으로 가져오지 마세요. 다른 사용자 설정은 확인 후 필요한 비노출 설정만 별도로 유지하고, 호스트 포트 매핑이나 터널 URL·쿠키 정책 변경은 포함하지 마세요.
 
 ```bash
-dc() {
+PRIVATE_DIR="$HOME/.config/chorus-self-host/$PROJECT"
+tunnel_dc() {
+  local compose_files=(-f "$REPO/deploy/self-host/compose.yml")
+  local override
+  for override in pg17.yml oidc-only.yml; do
+    if [ -f "$PRIVATE_DIR/$override" ]; then
+      compose_files+=(-f "$PRIVATE_DIR/$override")
+    fi
+  done
+  compose_files+=(-f "$REPO/deploy/self-host/compose.tunnel.yml")
   docker compose --project-name "$PROJECT" --env-file "$ENV_FILE" \
-    -f "$REPO/deploy/self-host/compose.yml" \
-    -f "$REPO/deploy/self-host/compose.tunnel.yml" "$@"
+    "${compose_files[@]}" "$@"
 }
-dc config --quiet
-dc pull
-dc up -d --wait
-dc ps
+tunnel_dc config --quiet &&
+tunnel_dc pull cloudflared &&
+dc down &&
+tunnel_dc up -d --pull never --wait
+```
+
+전환에 성공하면 이후 모든 `dc` 명령에 터널 호출을 사용하세요.
+
+```bash
+dc() { tunnel_dc "$@"; }
 ```
 
 커넥터는 `tunnel --no-autoupdate run --token-file /run/secrets/tunnel_token`을 실행하고, 이 오버라이드는 `NEXTAUTH_URL`을 `CHORUS_PUBLIC_URL`로, `COOKIE_SECURE`를 `true`로 설정합니다. 저장된 래퍼는 항상 `compose.local.yml`을 사용하므로, Tunnel 모드 스택은 이 명시적인 `dc` 명령으로 관리하세요. 되돌릴 때는 먼저 tunnel 버전 함수로 `down`한 다음 로컬 버전으로 `up`합니다. `down -v`는 절대 쓰지 마세요.
@@ -226,27 +240,31 @@ Cloudflare 쪽에서는 다음을 확인합니다.
 
 ## 구성 예: LAN HTTPS와 별도의 Cloudflare 커넥터
 
+<details>
+<summary>고급 구성: LAN 접속을 유지하면서 별도 커넥터로 공개</summary>
+
 단일 호스트에서 검증된 구성 중 하나입니다. LAN에는 **로컬 모드**를 그대로 쓰고, `compose.tunnel.yml`로 바꾸지
 않은 채 같은 앱을 Cloudflare로도 공개합니다. 컨테이너는 네 개입니다.
 
-| 컨테이너 | 출처 | 역할 |
-| --- | --- | --- |
-| `<project>-app-1` | `compose.yml` + `compose.local.yml` | Chorus, 호스트 포트 `18637`(컨테이너 `8637`) |
-| `<project>-db-1` | `compose.yml`(마이그레이션 후에는 비공개 `pg17.yml`도) | PostgreSQL 17, 내부 전용 |
-| `<project>-lan-https-1` | 비공개 LAN HTTPS 오버라이드 | Nginx, 호스트 포트 `18638`에서 `http://app:8637`로 전달 |
-| `chorus-cloudflare` | 별도의 `docker run` | Cloudflare 커넥터, 공개 호스트 이름을 `http://app:8637`로 전달 |
+<div class="table-scroll" role="region" aria-label="혼합 배포의 컨테이너" tabindex="0">
 
-비공개 디렉터리에는 `env`, 저장된 래퍼, LAN HTTPS 오버라이드(`lan-https.yml`, 수동 구성에서는 `https.yml` 같은 다른 이름일 수 있음), `lan-tls/`(인증서와 개인 키), 그리고
-PG16 마이그레이션 후에는 `pg17.yml`(`db-data` 볼륨을 마이그레이션된 외부 볼륨으로 지정)이 들어 있습니다. 래퍼가
-모든 오버라이드를 `-f`로 넘기므로 `dc ps`에는 세 개의 Compose 서비스가 나옵니다.
+  | 컨테이너 | 출처 | 역할 |
+  | --- | --- | --- |
+  | `<project>-app-1` | `compose.yml` + `compose.local.yml` | Chorus, 호스트 포트 `18637`(컨테이너 `8637`) |
+  | `<project>-db-1` | `compose.yml`(마이그레이션 후에는 비공개 `pg17.yml`도) | PostgreSQL 17, 내부 전용 |
+  | `<project>-lan-https-1` | 비공개 LAN HTTPS 오버라이드 | Nginx, 호스트 포트 `18638`에서 `http://app:8637`로 전달 |
+  | `chorus-cloudflare` | 별도의 `docker run` | Cloudflare 커넥터, 공개 호스트 이름을 `http://app:8637`로 전달 |
+
+</div>
+
+설치 프로그램은 `env`, `lan-https.yml`, `lan-tls/`를 비공개 디렉터리에 둡니다. `default_deploy_local.sh`는 `CHORUS_DEPLOY_CONFIG`로 다른 위치를 지정하지 않으면 체크아웃에 저장됩니다. 마이그레이션 후에는 비공개 `pg17.yml`로 새 데이터베이스 볼륨을 선택할 수 있습니다. 수동 `dc` 함수에도 래퍼와 같은 오버라이드를 포함하세요.
 
 구성 순서:
 
 1. 위 설명대로 LAN HTTPS를 켠 로컬 모드로 설치하고 `http://<host>:18637/api/health`와
    `https://<host>:18638/api/health`를 모두 확인합니다.
 2. Cloudflare 대시보드에서 터널의 공개 호스트 이름의 오리진 서비스를 **`http://app:8637`** 으로 설정합니다.
-3. 사용자와 OIDC 콜백이 공개 호스트 이름을 써야 한다면 비공개 오버라이드의 `app.environment`에서
-   `NEXTAUTH_URL`을 그 `https://` 오리진으로 설정하고 다시 배포합니다.
+3. 공개하기 전에 비공개 `lan-https.yml`의 `app.environment`에서 `NEXTAUTH_URL`을 공개 `https://` 오리진으로 지정하고 `COOKIE_SECURE: "true"`를 설정하되 기존 프록시 서비스는 유지하세요. `oidc-only.yml` 등 사용자 설정이 있다면 완전한 Compose 호출로, 그렇지 않으면 래퍼로 재배포한 뒤 LAN HTTPS 로그인을 먼저 확인합니다.
 4. 터널 절과 같이 커넥터 토큰을 비공개 파일에 저장한 뒤, 커넥터를 스택의 기본 네트워크 `<project>_default`에
    연결합니다.
 
@@ -268,10 +286,10 @@ docker run -d --name chorus-cloudflare --restart unless-stopped \
   cloudflared 2025.4.0 이상의 `--token-file`을 쓰고, 토큰을 인수로 넘긴 적이 있다면 Cloudflare에서 교체하세요.
 - **호스트 포트는 계속 공개됩니다.** 터널 모드와 달리 `18637`과 `18638`이 `0.0.0.0`에 열려 있으므로 Docker를
   인식하는 방화벽 규칙으로 신뢰할 수 있는 네트워크에만 허용하세요.
-- **쿠키.** 로컬 모드는 LAN의 일반 HTTP 로그인을 위해 `COOKIE_SECURE=false`를 유지합니다. Nginx 프록시는 LAN
-  HTTPS 경로에서 쿠키에 Secure를 붙이지만, 터널을 거쳐 설정된 쿠키에는 붙지 않습니다. HTTPS 클라이언트만 남았다면
-  비공개 오버라이드의 `app.environment`에 `COOKIE_SECURE: "true"`를 설정하세요. LAN HTTPS와 터널은 계속 동작하지만 `18637`의 일반 HTTP 로그인은 되지 않습니다.
+- **HTTPS 로그인이 필수입니다.** 커넥터는 LAN 프록시를 우회하므로 앱 자체에서 Secure 쿠키를 설정해야 합니다. 이 재정의는 `18637`의 일반 HTTP 로그인을 비활성화합니다. LAN HTTPS나 공개 HTTPS 호스트 이름을 사용하세요.
 - 터널 절의 Cloudflare 캐시, Server-Sent Events, Access 관련 안내는 그대로 적용됩니다.
+
+</details>
 
 ## PostgreSQL 17과 기존 PostgreSQL 16 볼륨
 
@@ -313,8 +331,11 @@ volumes:
 1. `dc ps`에서 `app`과 `db`(활성화했다면 `lan-https`도)가 healthy 상태인지 확인합니다.
 2. 헬스 엔드포인트가 데이터베이스 상태를 보고하는지 확인합니다.
 
+   로컬 모드에서는 선택한 포트를 사용하세요. 호스트 포트를 공개하지 않는 터널 모드에서는 공개 HTTPS 오리진을 사용하도록 `BASE_URL`을 설정합니다.
+
    ```bash
-   curl --fail --silent --show-error http://localhost:18637/api/health
+   BASE_URL=http://localhost:18637
+   curl --fail --silent --show-error "$BASE_URL/api/health"
    ```
 
    `status: ok`와 `database: connected`가 나와야 합니다.
@@ -328,33 +349,43 @@ volumes:
 데이터베이스는 `db-data`에, `/app/data`(생성된 서명 키 포함)는 `app-data`에 있습니다. `dc down`은 둘 다 유지하지만 **`dc down -v`는 이를 삭제합니다**. 유지 보수 시간에 앱을 중지하고, 논리 덤프를 만들고, `app-data`를 보관하고, 비공개 env를 복사합니다.
 
 ```bash
-BACKUP_DIR="$HOME/chorus-backups/$PROJECT/$(date -u +%Y%m%dT%H%M%SZ)"
-mkdir -p "$BACKUP_DIR"
-chmod 700 "$BACKUP_DIR"
-dc stop app
-dc exec -T db pg_dump -U chorus -d chorus -Fc > "$BACKUP_DIR/database.dump"
-dc run --rm --no-deps -T --entrypoint tar app \
-  -C /app/data -czf - . > "$BACKUP_DIR/app-data.tar.gz"
-cp "$ENV_FILE" "$BACKUP_DIR/env"
-dc start app
+(
+  set -euo pipefail
+  umask 077
+  BACKUP_DIR="$HOME/chorus-backups/$PROJECT/$(date -u +%Y%m%dT%H%M%SZ)"
+  mkdir -p "$BACKUP_DIR"
+  chmod 700 "$BACKUP_DIR"
+  dc stop app
+  dc exec -T db pg_dump -U chorus -d chorus -Fc > "$BACKUP_DIR/database.dump"
+  dc run --rm --no-deps -T --entrypoint tar app \
+    -C /app/data -czf - . > "$BACKUP_DIR/app-data.tar.gz"
+  cp "$ENV_FILE" "$BACKUP_DIR/env"
+  dc start app
+)
 ```
+
+서브셸은 어느 단계든 실패하면 멈추며, 일부 파일만 있는 디렉터리는 유효한 백업이 아닙니다. 원인을 해결하고 백업을 완료한 뒤 업그레이드하세요. 앱이 계속 멈춰 있다면 오류를 처리한 다음 명시적으로 `dc start app`을 실행하세요. 복원 시 인증과 저장소 구성을 유지할 수 있도록 Compose 오버라이드와 이미지 버전도 보관하세요.
 
 백업 디렉터리는 비공개(`0700`)로 유지하고, 다른 호스트로 보내기 전에 암호화하세요. 복원 리허설은 **새** Compose 프로젝트와 포트에서 하고, 원래 프로젝트를 덮어쓰지 마세요. 원본 가이드에 복원 리허설이 자세히 나와 있습니다.
 
 ## 문제 해결
 
-| 증상 | 확인할 것 |
-| --- | --- |
-| 비공개 디렉터리, 스크립트, 프로젝트 리소스가 이미 있다고 나옴 | 기존 설치입니다. 그 래퍼를 실행하거나, 별도 인스턴스라면 새 `--project`와 `CHORUS_DEPLOY_CONFIG`를 선택하세요. |
-| Compose가 변수 누락을 보고함 | 비공개 절대 경로 `--env-file`을 쓰고, `DEFAULT_USER`와 `DEFAULT_PASSWORD`를 비우지 말고, 기본 모드는 하나만 선택하세요. |
-| 포트가 이미 사용 중 | 다른 `--port`나 `--https-port`를 선택하세요. 기존 볼륨을 지워서 해결하지 마세요. |
-| PostgreSQL 17로 바꾼 직후 `db`가 실패 | 볼륨에 아직 PG16 데이터가 있습니다. 그대로 두고 위의 마이그레이션을 따르세요. |
-| env를 수정한 뒤 데이터베이스 인증 실패 | 기존 볼륨은 이전 역할 비밀번호를 유지하며, `POSTGRES_PASSWORD`를 바꿔도 변하지 않습니다. |
-| HTTP 로그인이 즉시 실패 | 로컬 모드에는 `COOKIE_SECURE=false`(`compose.local.yml`에서 설정)가 필요합니다. 이를 `true`로 설정하는 비공개 `https.yml`이 있으면 LAN HTTP 로그인이 막힙니다. |
-| 한 달 뒤 브라우저가 HTTPS 엔드포인트를 거부 | 30일 인증서가 만료되었습니다. 갱신한 뒤 `lan-https`를 다시 만드세요. |
-| OIDC가 `redirect_uri_mismatch`로 실패 | 포트를 포함한 정확한 HTTPS 콜백을 공급자에 등록하세요. |
-| 재생성 후 사용자가 로그아웃됨 | `app-data` 볼륨이나 명시적 `NEXTAUTH_SECRET`이 바뀌었습니다. |
-| Tunnel은 healthy인데 호스트 이름이 오류 | 게시된 호스트 이름, `http://app:8637` 오리진, 앱 상태, 토큰 파일 읽기 가능 여부를 확인하세요. |
-| CLI가 Tunnel 호스트 이름에서 HTML을 받음 | Access 챌린지, 캐시나 Worker 규칙, 또는 잘못된 `/api/mcp` URL입니다. |
+<div class="table-scroll" role="region" aria-label="배포 문제 해결" tabindex="0">
+
+  | 증상 | 확인할 것 |
+  | --- | --- |
+  | 비공개 디렉터리, 스크립트, 프로젝트 리소스가 이미 있다고 나옴 | 기존 설치입니다. 그 래퍼를 실행하거나, 별도 인스턴스라면 새 `--project`와 `CHORUS_DEPLOY_CONFIG`를 선택하세요. |
+  | Compose가 변수 누락을 보고함 | 비공개 절대 경로 `--env-file`을 쓰고, `DEFAULT_USER`와 `DEFAULT_PASSWORD`를 비우지 말고, 기본 모드는 하나만 선택하세요. |
+  | 포트가 이미 사용 중 | 다른 `--port`나 `--https-port`를 선택하세요. 기존 볼륨을 지워서 해결하지 마세요. |
+  | PostgreSQL 17로 바꾼 직후 `db`가 실패 | 볼륨에 아직 PG16 데이터가 있습니다. 그대로 두고 위의 마이그레이션을 따르세요. |
+  | env를 수정한 뒤 데이터베이스 인증 실패 | 기존 볼륨은 이전 역할 비밀번호를 유지하며, `POSTGRES_PASSWORD`를 바꿔도 변하지 않습니다. |
+  | HTTP 로그인이 즉시 실패 | 로컬 모드에는 `COOKIE_SECURE=false`(`compose.local.yml`에서 설정)가 필요합니다. 이를 `true`로 설정하는 비공개 `https.yml`이 있으면 LAN HTTP 로그인이 막힙니다. |
+  | 한 달 뒤 브라우저가 HTTPS 엔드포인트를 거부 | 30일 인증서가 만료되었습니다. 갱신한 뒤 `lan-https`를 다시 만드세요. |
+  | OIDC가 `redirect_uri_mismatch`로 실패 | 포트를 포함한 정확한 HTTPS 콜백을 공급자에 등록하세요. |
+  | 재생성 후 사용자가 로그아웃됨 | `app-data` 볼륨이나 명시적 `NEXTAUTH_SECRET`이 바뀌었습니다. |
+  | Tunnel은 healthy인데 호스트 이름이 오류 | 게시된 호스트 이름, `http://app:8637` 오리진, 앱 상태, 토큰 파일 읽기 가능 여부를 확인하세요. |
+  | CLI가 Tunnel 호스트 이름에서 HTML을 받음 | Access 챌린지, 캐시나 Worker 규칙, 또는 잘못된 `/api/mcp` URL입니다. |
+
+</div>
 
 문제를 해결하는 동안 env 파일, 토큰, 쿠키, 마스킹하지 않은 로그를 공유하지 말고, 호스트 전체에 영향을 주는 Docker prune 명령을 실행하지 마세요.

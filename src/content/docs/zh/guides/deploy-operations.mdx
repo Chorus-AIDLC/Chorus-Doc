@@ -22,7 +22,19 @@ DEFAULT_PASSWORD='choose-a-strong-password'
 
 ### 关闭内置登录
 
-内置登录是一种引导机制，而非长期使用的账号体系。一旦已有真实账号，或已经配置了单点登录，就应取消设置 `DEFAULT_USER` 和 `DEFAULT_PASSWORD` 这两个变量并重启 Chorus，以关闭内置登录。移除这一对变量后，内置的邮箱／密码表单不再出现，访问将改为经由你配置的身份提供方。
+验证 OIDC 和超级管理员登录后，从应用进程环境中移除 `DEFAULT_USER` 和 `DEFAULT_PASSWORD`，再重建或重启应用。这样会隐藏引导用的邮箱/密码表单，但不会撤销已签发的会话。
+
+对于[安装器管理的 Compose 栈](/zh/guides/deploy-local/)，**私有 env 文件中的这两个值必须保持非空**，因为基础 Compose 文件在变量插值时需要它们。请在私有目录中保存以下容器环境覆盖文件 `oidc-only.yml`：
+
+```yaml
+services:
+  app:
+    environment:
+      DEFAULT_USER: ""
+      DEFAULT_PASSWORD: ""
+```
+
+在完整的 `dc` 命令中、`"$@"` 之前加入 `-f "$HOME/.config/chorus-self-host/$PROJECT/oidc-only.yml"`，然后运行 `dc config --quiet` 和 `dc up -d --wait --force-recreate app`。以后每次启动或升级都必须保留该覆盖文件。保存的本地包装脚本**不会**加载 `oidc-only.yml`，完成此步骤后不要直接使用未修改的包装脚本；应先准备目标应用镜像，再使用完整的 Compose 调用。本机部署指南中的隧道示例已包含对此文件的按需加载。
 
 ## 配置部署侧的认证
 
@@ -65,10 +77,7 @@ Chorus 在启动时会自动应用待执行的数据库迁移（`prisma migrate 
 2. 拉取新版本，npm 包使用 `npm update -g @chorus-aidlc/chorus`，Docker 部署则拉取新的容器镜像。
 3. 重启 Chorus。迁移会在启动时自动应用，随后应用开始运行。
 
-对于用 `install.sh --target local` 安装的实例，第 2、3 步合并为一条命令：运行保存的包装脚本
-`bash ./default_deploy_local.sh`（pull 模式的安装需先修改私有 env 中的 `CHORUS_IMAGE`）。升级
-Chorus 从不会升级 PostgreSQL 大版本；把已有的 PostgreSQL 16 卷迁到 17 是一次单独的离线迁移。参见
-[在本机自托管](/zh/guides/deploy-local/#用保存的包装脚本重新部署)。
+对于包装脚本能加载全部必要覆盖文件的本地模式实例，运行 `bash ./default_deploy_local.sh`（pull 模式先更新 `CHORUS_IMAGE`）。若使用隧道模式、`oidc-only.yml` 或其他自定义覆盖文件，请先准备目标应用镜像，再使用完整的 Compose 调用。不要通过重跑安装器升级。PostgreSQL 大版本升级仍需单独进行离线迁移。参见[在本机自托管](/zh/guides/deploy-local/)。
 
 :::caution[升级前先备份]
 升级前务必备份数据库（内嵌或基于卷的存储则备份数据卷）。迁移会自动运行并可能修改表结构，备份是你唯一可靠的回滚点。请按照标准的 [PostgreSQL 备份文档](https://www.postgresql.org/docs/current/backup.html)，为你的环境制定备份方案。

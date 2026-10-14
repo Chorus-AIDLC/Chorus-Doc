@@ -56,27 +56,22 @@ agent receives the filesystem and tool permissions of the user running the daemo
 
 ## What `--chorus-only` enforces
 
-From Chorus 0.22.2, `--chorus-only` removes tools instead of only auto-approving Chorus
-tools. A restriction that cannot be confirmed for Claude Code stops the wake.
+From Chorus 0.22.2, `--chorus-only` applies different restrictions by backend:
 
-- **Claude Code** — every wake passes `--tools "mcp__chorus__*,Task,Agent"` and
-  `--strict-mcp-config`. The woken agent keeps only this daemon's Chorus MCP tools and
-  sub-agent dispatch (`Task` / `Agent`). Built-in tools such as Bash and file edits are
-  removed, your own MCP servers are not loaded, and `Edit`, `Write`, and `NotebookEdit` are
-  also denied by name. On every wake, the daemon checks the tool list in Claude Code's
-  startup (init) frame against that allowlist. If any other tool is present, the daemon
-  force-kills the process tree, forwards no output from that point on, and records a failed
-  wake that names the leaked tools. If Claude Code reports no tool list, the daemon logs a
-  warning that the restriction could not be verified, and the wake continues.
-- **Codex and TRAE CLI** — the turn runs in a read-only sandbox with approvals turned off.
-  When `[mcp_servers.chorus]` is declared in the backend's config, the daemon pre-approves
-  only the Chorus MCP server for that thread, so Chorus tools work. Other MCP servers, shell
-  commands, and file changes stay refused. Without that entry, the daemon logs a warning and
-  the wake runs without Chorus MCP tools.
+- **Claude Code** removes built-in tools and other MCP servers, retaining only this
+  daemon's Chorus MCP tools and sub-agent dispatch (`Task` / `Agent`). An unexpected tool
+  in the startup list kills the process tree and fails the wake. A missing tool list only
+  produces a warning; the wake continues unverified. See [Claude Code](/reference/agents/claude-code/).
+- **Codex and TRAE CLI** use a read-only sandbox with network access and interactive
+  approvals disabled. Read-only shell commands remain available. The daemon pre-approves
+  the configured Chorus MCP server for the thread; it does not remove other tools or
+  overwrite other servers' approval settings. See [Codex](/reference/agents/codex/) and
+  [TRAE CLI](/reference/agents/trae/).
 - **`--yolo`** is unchanged: the woken agent gets its full local toolset.
 
-A violation looks like an **Agent wake failed** turn. See
-[Troubleshoot agent connections](/guides/troubleshooting/#a-turn-fails-before-the-agent-replies).
+Chorus MCP calls can still change server-side data according to the agent key's permissions.
+Use a least-privilege key. A detected tool violation appears as **Agent wake failed**;
+see [Troubleshoot agent connections](/guides/troubleshooting/#a-turn-fails-before-the-agent-replies).
 
 ## Configure `daemon.json`
 
