@@ -148,6 +148,24 @@ pi install npm:@chorus-aidlc/chorus-pi
 详见 [OpenSpec 模式](/zh/guides/openspec-mode/)与 [Spec-lite 模式](/zh/guides/spec-lite-mode/)。
 评审开关仍是 `CHORUS_ENABLE_{PROPOSAL,TASK,CODE}_REVIEWER`（默认 `true`）。
 
+## 可选的提交前回读检查
+
+`chorus-pi` 扩展提供可选的调用顺序提醒，默认关闭。在启动 Pi 的进程环境中设置变量，然后重启 Pi：
+
+```bash
+CHORUS_SUBMIT_GATE=warn pi
+```
+
+- `off`（未设置或无法识别的值也一样）：不执行检查。
+- `warn`：显示警告，但仍执行工具调用。
+- `block`：阻止识别到的提交调用，直到补齐或刷新回读。
+
+后台服务唤醒时，在 `~/.chorus/daemon.json` 中 Pi 智能体现有的 `env` 对象里加入 `"CHORUS_SUBMIT_GATE": "block"`，然后重启后台服务。这是 Pi 进程环境设置，不是 MCP 服务器配置项，也不是 `CHORUS_ENABLE_*_REVIEWER` 开关。无人值守时不要依赖可见警告，需要阻止提交就使用 `block`。
+
+在 `chorus_submit_for_verify` 前，必须在该任务最近一次变更后用 `chorus_get_task` 回读同一个任务，确认是 `in_progress`；列表或指派查询不算回读。在 `chorus_pm_submit_proposal` 前调用 `chorus_pm_validate_proposal`，之后编辑草稿会使校验凭据失效。返回 `valid: false` 会触发检查失败，建议性警告仍需自行判断。带 `status` 的工作报告会使任务回读失效，不带则不会。提交会消耗凭据，再次提交需要重新回读。变更前启动的读取即使稍后完成，也不能证明变更后的状态。
+
+这只是本地调用顺序追踪，不是服务器校验、授权边界或验收评审。它监听 Pi 事件中可识别的外层工具名，包括原生 MCP（`mcp__chorus__…`）和旧版直接工具（`chorus_chorus_…`），不检查 shell 命令或通用分发器内嵌的调用，也无法感知其他客户端的修改。状态检查依赖可解析的结果，最终仍由服务器判定。它不会自动修复状态、自检验收标准或启动评审者。汇报 → 自检 → 回读 → 显式提交的顺序，以及误改状态后的恢复方法，参阅[运行任务](/zh/guides/run-tasks/)。
+
 ## 将 Pi 作为可唤醒的后台服务后端运行
 
 Pi 是完整支持的**可唤醒后台服务后端**，有工作被远程发给它时（分配给你的智能体的想法/任务、

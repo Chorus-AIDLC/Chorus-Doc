@@ -39,9 +39,9 @@ Chorus が本番実行で読み取る変数：
 | `NEXTAUTH_SECRET` | 複数インスタンスで必須 | 全レプリカが共有する署名用の秘密鍵。単一 npm インスタンスでは省略でき、`chorus` が既定で `~/.chorus-data/.secret` に生成・保存します。環境変数の既知のプレースホルダーは警告して無視します。保存済みの鍵が空または公開プレースホルダーなら起動を停止します。 |
 | `SUPER_ADMIN_EMAIL` | はい | `/admin` のスーパー管理者パネルをブートストラップするメール。 |
 | `SUPER_ADMIN_PASSWORD_HASH` | はい | スーパー管理者パスワードの bcrypt ハッシュ。 |
-| `DEFAULT_USER` | 任意 | 初回アクセス用の組み込みメール／パスワードログインを有効にします。 |
+| `DEFAULT_USER` | 任意 | 任意の従来型 Default Auth のメール。`DEFAULT_PASSWORD` も必要です。必要なユーザーとワークスペースを作成しますが、管理対象のローカルアカウントやローカル管理者ロールにはなりません。 |
 | `DEFAULT_PASSWORD` | 任意 | 組み込みログインのパスワード。 |
-| `REDIS_URL` | 任意 | Redis 接続文字列。複数のインスタンスを実行する場合は必須です（下記参照）。 |
+| `REDIS_URL` | 任意 | SSE と認証カウンター用の共有 Redis。複数インスタンスの一貫性に必要です。`REDIS_HOST` と個別 Redis 変数でも設定できます。 |
 
 </div>
 
@@ -59,7 +59,11 @@ Chorus は Redis を通じて、インスタンス間でライブ更新（SSE �
 REDIS_URL='redis://default:password@redis.internal:6379'
 ```
 
-**インスタンス間のイベント伝播には Redis が必須です。** `REDIS_URL` がないと、Chorus は単一プロセス内でのみ機能するメモリ内のイベントバスにフォールバックします。あるインスタンスで行われた更新は、他のインスタンスには決して届きません。単一インスタンスのデプロイなら、このメモリ内フォールバックを使って Redis なしで実行できますが、複数のインスタンスで動かすデプロイでは共有の Redis が必須です。
+Redis は別々の接続でインスタンス間 SSE と共有認証カウンターを提供します。空でない `REDIS_URL` が優先され、それ以外は `REDIS_HOST` で TLS（`rediss`）を使います。ポートは既定で `6379`、ユーザー名は `default` で、ユーザー名は `REDIS_PASSWORD` の指定時に使われます。非 TLS には明示的な `redis://` を使います。URL と host の両方がない場合だけイベントと制限がプロセス内に限定されます。Redis 障害時はプロセスごとの予備制限になり、共有枠や全ログイン拒否にはなりません。予期しない制限エラーは許可側に倒れる場合があります。詳細は[共有認証レート制限](/ja/guides/deploy-operations/#共有認証レート制限)を参照してください。
+
+`AUTH_TRUST_PROXY` は既定で無効で、`true` の場合だけ有効です。`AUTH_TRUST_PROXY_HOPS` は既定で `1`、範囲は 1～16 の整数で、`X-Forwarded-For` の右から数えます。強制され迂回できないプロキシチェーンのみを信頼してください。HTTPS だけでは不十分です。同梱 CDK の ALB モードは `true` / `1`、CloudFront モードは `false` / `2` です。VPC トラフィックが CloudFront を迂回してプライベートオリジンに到達できるためです。
+
+管理対象のローカルアカウントはデータベースに保存され、`DEFAULT_USER` / `DEFAULT_PASSWORD` では設定しません。アプリに `SUPER_ADMIN_EMAIL` と `SUPER_ADMIN_PASSWORD_HASH` を渡し、管理パネルで専用ワークスペースを作成して最初のワークスペース管理者を招待します。ID プロバイダーやメールサービスは不要です。同一ワークスペースで OIDC と併用できず、既存ワークスペースの変換もできません。`NEXTAUTH_SECRET` を永続化して全レプリカで共有し、共有アクセスには HTTPS と `COOKIE_SECURE=true` を使います。設定と従来の Default Auth のみを無効にする手順は[運用ガイド](/ja/guides/deploy-operations/)を参照してください。
 
 全インスタンスに同じ安全な `NEXTAUTH_SECRET` も設定し、どのインスタンスでも Chorus 署名のセッションを検証できるようにしてください。
 
@@ -135,7 +139,7 @@ Chorus には `packages/chorus-cdk` に AWS CDK スタックが同梱されて�
 | CloudFront | `cloudfront` モードのみで作成する公開 HTTPS 入口。 | プライベート VPC origin、キャッシュ無効、任意のカスタムドメイン。 |
 | ECS Fargate サービス | プライベートサブネットで Chorus コンテナを実行します。 | 希望数 2、1024 CPU ユニット／2048 MiB、自動ロールバック付きのデプロイサーキットブレーカー。 |
 | Aurora Serverless v2（PostgreSQL） | マネージドの PostgreSQL クラスター。 | 暗号化ストレージ。認証情報は自動生成され Secrets Manager に格納。バックアップ保持 1 日。 |
-| ElastiCache Serverless（Redis） | インスタンス間イベント用のマネージド Redis。 | RBAC ユーザー。パスワードは Secrets Manager に格納。 |
+| ElastiCache Serverless（Redis） | インスタンス間イベントと共有認証カウンター用のマネージド Redis。 | RBAC ユーザー。パスワードは Secrets Manager に格納。 |
 | Secrets Manager | 生成されたデータベースおよび Redis の認証情報と、アプリの秘密情報を保持します。 | 実行時に ECS タスクへ注入されます。 |
 
 </div>

@@ -30,8 +30,7 @@ The full upstream reference is `docs/SELF_HOST.md` in the repository (Chinese:
 
 </div>
 
-This is a single-instance setup. Redis is deliberately disabled (`REDIS_URL` is empty), so live
-updates use in-memory delivery, which only works with one app container.
+This is a single-instance setup. Redis is deliberately unconfigured (`REDIS_URL` is empty and `REDIS_HOST` is not set), so live updates and authentication counters stay process-local. Do not scale this stack to multiple app containers expecting shared events or shared login limits. See [authentication throttling](/guides/deploy-operations/#shared-authentication-throttling).
 
 ## Prerequisites
 
@@ -159,11 +158,7 @@ command, and a project-scoped `docker compose … stop` command.
 - Sign in with the ordinary login you chose. The **`/admin` panel** uses the separate super
   admin account.
 
-The built-in email/password login is a bootstrap and demo path, not team SSO. For a team,
-configure OIDC per company in the admin panel; see
-[Operate a self-hosted Chorus](/guides/deploy-operations/). Plain LAN HTTP does not encrypt
-credentials or sessions, and browsers withhold the Web Crypto API that the OIDC client needs
-for PKCE on insecure HTTP origins, so OIDC needs HTTPS.
+Installer credentials enable legacy Default Auth, not managed local accounts. For a team, create a local-account workspace and invite its first Workspace Admin from the Super Admin panel, or configure a separate OIDC workspace. There is no new local-auth environment switch. Before disabling Default Auth, see [operations](/guides/deploy-operations/): the private env values must remain nonempty for Compose interpolation, while an override empties the app-container values. Use HTTPS for shared access; plain LAN HTTP encrypts neither credentials nor sessions, and OIDC also needs a secure origin for Web Crypto/PKCE.
 
 ## Redeploy with the saved wrapper
 

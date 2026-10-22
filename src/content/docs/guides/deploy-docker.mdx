@@ -62,6 +62,8 @@ docker compose -f docker-compose.local.yml up -d
 Open `http://localhost:8637` and sign in with `admin@example.com` / `changeme` (or override
 via the `DEFAULT_USER` / `DEFAULT_PASSWORD` environment variables).
 
+The standalone example enables legacy Default Auth with `admin@example.com` / `changeme`; replace these before sharing access. The production Compose and `docker run` examples also opt into this demo path explicitly, whereas the repository production Compose file leaves both credentials empty unless supplied. To use managed local accounts, inject Super Admin credentials and follow the setup below; the demo login is not a managed team account.
+
 In standalone mode the container:
 
 - Starts PGlite on an internal port (`5433`), not exposed externally.
@@ -99,7 +101,7 @@ services:
       # first start and persists it in the chorus-app-data volume (single
       # replica only). For production, or more than one app container, set it
       # explicitly in .env or the environment:  openssl rand -base64 32
-      # Changing the secret invalidates Default Auth and Super Admin sessions.
+      # Changing the secret invalidates Default Auth, local-account and Super Admin sessions.
       - NEXTAUTH_SECRET=${NEXTAUTH_SECRET:-}
       - COOKIE_SECURE=${COOKIE_SECURE:-false}
       - DEFAULT_USER=admin@example.com
@@ -208,6 +210,8 @@ If `DATABASE_URL` is not set, the entrypoint builds it from these individual var
 
 ### Redis
 
+Redis provides cross-instance SSE and shared authentication counters over separate connections. A nonempty `REDIS_URL` wins; otherwise `REDIS_HOST` uses TLS (`rediss`), with port `6379` and username `default` unless overridden. The username is used with `REDIS_PASSWORD`. For non-TLS Redis use `redis://` explicitly. Only when both URL and host are absent are events and limits process-local. Redis failures use per-process insurance limits, not a shared budget or an all-login block; unexpected limiter errors can fail open. See [shared authentication throttling](/guides/deploy-operations/#shared-authentication-throttling) for exact limits and recovery behavior.
+
 | Variable | Description |
 | --- | --- |
 | `REDIS_URL` | Full Redis connection string. Format: `redis://username:password@host:port`. Takes precedence over the individual variables. |
@@ -218,10 +222,14 @@ If `DATABASE_URL` is not set, the entrypoint builds it from these individual var
 
 ### Authentication
 
+Managed local accounts are database-backed, not configured by `DEFAULT_USER` / `DEFAULT_PASSWORD`. Inject `SUPER_ADMIN_EMAIL` and `SUPER_ADMIN_PASSWORD_HASH` into the app, then create a local-account workspace and invite its first Workspace Admin from the admin panel. No identity provider or mail service is required. Local accounts and OIDC are mutually exclusive per workspace; existing workspaces cannot be converted. Persist `NEXTAUTH_SECRET`, share it across replicas, and use HTTPS with `COOKIE_SECURE=true` for shared access. See [operations](/guides/deploy-operations/) for account setup and disabling only legacy Default Auth.
+
+`AUTH_TRUST_PROXY` defaults off (only `true` enables it). `AUTH_TRUST_PROXY_HOPS` defaults to `1`, accepts integers 1–16, and counts from the right of `X-Forwarded-For`. Trust only an enforced proxy chain with no bypass; HTTPS alone does not establish trust. The bundled CDK sets ALB mode to `true` / `1`, but CloudFront mode to `false` / `2` because VPC traffic can bypass CloudFront at the private origin.
+
 | Variable | Description |
 | --- | --- |
-| `DEFAULT_USER` | Email address for built-in login (bypasses OIDC). Automatically creates the user and their workspace on first sign-in. |
-| `DEFAULT_PASSWORD` | Password for the default user (plain text, compared via bcrypt at runtime). |
+| `DEFAULT_USER` | Optional legacy Default Auth email; requires `DEFAULT_PASSWORD`. Creates its user and workspace as needed, not a managed local account or local Workspace Admin. |
+| `DEFAULT_PASSWORD` | Plaintext legacy Default Auth password, compared directly at runtime, not via bcrypt. Separate from database-backed local account passwords. |
 | `NEXTAUTH_URL` | Public-facing base URL of the app (default: `http://localhost:8637`). Set this when running behind a reverse proxy. |
 | `COOKIE_SECURE` | Set to `"false"` to disable secure cookies for HTTP-only deployments (default: `"false"` in docker-compose). Set to `"true"` when deploying with HTTPS in production. |
 
@@ -266,6 +274,8 @@ upgrading — see [Operate a self-hosted Chorus](/guides/deploy-operations/).
 :::
 
 ## Session secret (`NEXTAUTH_SECRET`)
+
+Managed local-account sessions also use `NEXTAUTH_SECRET` and are invalidated when it rotates.
 
 `NEXTAUTH_SECRET` signs the sign-in sessions Chorus issues itself: built-in email/password
 logins and Super Admin sessions. OIDC tokens are signed by the identity provider, and agent

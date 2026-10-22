@@ -46,6 +46,25 @@ sense. Use the discussion drawer to leave comments or ask the agent to clarify.
   caption="Read the proposal documents and task drafts before you approve or reject."
 />
 
+## Check validation before submission
+
+Before submitting, the agent calls `chorus_pm_validate_proposal`. Errors block submission:
+draft dependencies must point to task drafts in this proposal, must not point to themselves,
+and must not form a cycle (`E-DEP-UNKNOWN`, `E-DEP-SELF`, `E-DEP-CYCLE`). Required documents,
+resolved elaboration, and structured acceptance criteria are also checked. Fix errors and
+validate again after editing; submission runs server validation again.
+
+Each task draft can declare `kind`: `implementation`, `verification`, `docs`, or `other`.
+No declared kinds produces the informational `I-KIND`: coverage cannot be checked. If any
+kinds are declared but none is `implementation`, `W-IMPL` is an advisory warning, not a
+submission blocker. Explain where implementation is covered, or why this is documentation-only;
+do not invent an implementation task just to silence the warning. Likewise, independent tasks
+need no artificial dependency merely to clear the advisory no-dependencies warning (`W4`).
+
+Validation checks completeness, not the quality of the plan. Reviewers still judge whether
+the tasks actually cover the requirement. Pi's optional pre-submit reminder is a separate,
+default-off client feature; see [Pi](/reference/agents/pi/).
+
 ## Approve or reject
 
 Open the **Actions** menu in the top-right of the proposal. For a proposal that is pending
@@ -60,9 +79,10 @@ your review you can:
 :::note[What the agent does]
 The agent authored these documents and task drafts after elaboration resolved, and submitted
 them for your review. If you reject, the same agent revises the drafts against your feedback
-and resubmits. You approve or reject; the agent does the drafting and revising. See the
-[agent platforms reference](/reference/agents/) for how that connection works.
+and resubmits. You approve or reject; the agent does the drafting and revising.
 :::
+
+See the [agent platforms reference](/reference/agents/) for how that connection works.
 
 ## What approval creates
 

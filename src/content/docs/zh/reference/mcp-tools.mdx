@@ -68,10 +68,7 @@ MCP 传输会话与 Chorus 的**智能体会话**无关。智能体会话用于�
 
 </div>
 
-不带任何请求头时，结果覆盖所有项目（默认行为）。当**两个**请求头同时出现时，
-`X-Chorus-Project-Group` 优先生效。只有 `chorus_get_my_assignments` 遵循这些请求头，它返回按项目分组、
-限定在所选项目内的追踪器。`chorus_checkin` 的 `ideaTracker` **不**受请求头过滤，它始终返回该
-智能体跨所有项目最近更新的想法（上限十条）。其他所有工具接受显式的 `projectUuid` 参数，不受请求头过滤。
+只有 `chorus_get_my_assignments` 遵循范围请求头。不带请求头时覆盖可访问项目，同时设置时 `X-Chorus-Project-Group` 优先。`chorus_checkin` 返回不受请求头过滤的 `activeProjects` 分布，不是近期想法列表。其他工具使用各自显式的范围参数，这些请求头不是通用项目访问过滤器。
 
 ```json
 {
@@ -167,26 +164,23 @@ MCP 传输会话与 Chorus 的**智能体会话**无关。智能体会话用于�
 
 ### chorus_checkin（公共）
 
-建议在一次运行开始时调用。返回智能体的身份与所有者、其有效权限集合、按项目分组的想法追踪器，
-以及通知摘要。`ideaTracker` 上限为最近更新的十条想法且跨所有项目，它**不**受上文过滤请求头
-限制（如需被限定范围且无上限的追踪器，请用 `chorus_get_my_assignments`）。
+概览最多包含 10 个项目，按各项目最近更新的活跃想法排序。每个已列项目的活跃想法计数不截断；完整跟踪列表请使用 `chorus_get_my_assignments`。
+
+返回身份、所有者、有效权限、角色设定及 `activeProjects`：项目 UUID 对应名称和 `activeIdeaCount`。计数是未截断的活跃想法总数，不包含逐条想法或任务。最多返回五条近期未读通知并自动标为已读，`notifications.unread` 是标记后的剩余未读数。范围请求头不会缩小该分布。
 
 ```text
-输入：（无）
-返回：{ agent: { uuid, name, permissions, owner },
-       ideaTracker: { <projectUuid>: { name, ideas[] } },
-       notifications: { unread, recent[] } }
+{ checkinTime, agent: { uuid, name, permissions, persona, systemPrompt, owner },
+  activeProjects: { <projectUuid>: { name, activeIdeaCount } },
+  notifications: { unread, recent[] } }
 ```
 
 ### chorus_get_my_assignments（公共）
 
-智能体完整的想法/任务追踪器，按项目分组。结构与 `chorus_checkin` 的 `ideaTracker` 相同，但
-没有近期想法的数量上限，并额外带有一个关于未完成任务的 `taskTracker`。遵循过滤请求头。
+返回按项目分组的完整活跃想法/任务追踪器，遵循范围请求头。`ideaTracker` 包含逐条想法的派生状态及提案/任务计数；`taskTracker` 包含未进入终态的任务及验收进度。需要完整列表时使用它，而非 `activeProjects`。
 
 ```text
-输入：（无）
-返回：{ ideaTracker: { <projectUuid>: { name, ideas[] } },
-       taskTracker: { <projectUuid>: { name, tasks[] } } }
+{ ideaTracker: { <projectUuid>: { name, ideas[] } },
+  taskTracker: { <projectUuid>: { name, tasks[] } } }
 ```
 
 ### chorus_claim_task（`task:write`）
@@ -204,8 +198,10 @@ MCP 传输会话与 Chorus 的**智能体会话**无关。智能体会话用于�
 
 ```text
 输入：{ taskUuid, summary? }
-返回：更新后的 Task
+返回： { uuid, status: "to_verify" }
 ```
+
+先用不带 `status` 的 `chorus_report_work` 汇报完成，再记录 `chorus_report_criteria_self_check`，然后用 `chorus_get_task` 回读并确认 `in_progress`，最后显式提交。先汇报 `status: "to_verify"` 会导致提交失败。误改后退回 `in_progress` 会清空开发侧与管理侧的验收标记及依据，提交前必须重做自检。不要重开已经正常提交的任务。参阅[运行任务](/zh/guides/run-tasks/)。
 
 ### chorus_pm_create_proposal（`proposal:write`）
 
@@ -225,11 +221,23 @@ MCP 传输会话与 Chorus 的**智能体会话**无关。智能体会话用于�
 被拒绝。
 
 ```text
-输入：{ proposalUuid, title, description?, priority?, storyPoints?,
+输入：{ proposalUuid, title, description?, priority?, storyPoints?, kind?,
        acceptanceCriteriaItems: [{ description, required? }],  // 必需，非空
        dependsOnDraftUuids?[] }
 返回：更新后的 Proposal
 ```
+
+### 提案校验与草稿类型
+
+`chorus_pm_add_task_draft` 和 `chorus_pm_update_task_draft` 接受可选 `kind`：`implementation`、`verification`、`docs` 或 `other`。编辑后先调用 `chorus_pm_validate_proposal`，再调用 `chorus_pm_submit_proposal`；提交时服务器会再次校验。结果为 `{ valid, issues[] }`，级别有 `error`、`warning`、`info`。只有错误才使 `valid` 为 false。
+
+- `E-DEP-UNKNOWN`：依赖不在本提案的任务草稿内。
+- `E-DEP-SELF`：依赖自身。
+- `E-DEP-CYCLE`：依赖形成环。
+- `I-KIND`：没有声明类型，无法检查实现覆盖。
+- `W-IMPL`：有类型声明，但没有 `implementation`。仅为建议，应说明已有实现覆盖或纯文档范围，不要虚构工作。无依赖警告（`W4`）也只是建议。
+
+可选的 [Pi 检查](/zh/reference/agents/pi/)只追踪本地回读/校验顺序，不是服务器授权。参阅[评审提案](/zh/guides/review-a-proposal/)。
 
 ### chorus_admin_verify_task（`task:admin`）
 

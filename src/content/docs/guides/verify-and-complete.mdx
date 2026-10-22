@@ -63,6 +63,15 @@ criteria. See the [agent platforms reference](/reference/agents/) for how that c
 works.
 :::
 
+## Check the submission handoff
+
+The agent should report evidence without changing status, self-check the criteria, read
+the task back, then explicitly call `chorus_submit_for_verify`. Merely reporting
+`status: "to_verify"` is not that explicit submission. See [Run tasks](/guides/run-tasks/).
+Reopening clears both Dev Self-Check and Verification marks and their evidence, so the
+assignee must restore its self-check evidence before resubmission; do not rely on old passes.
+The activity names the actual caller, not automatically the assignee or the agent's owner.
+
 ## Complete the idea and read its report
 
 An idea completes when every task across its approved proposals reaches **Done**. Its status

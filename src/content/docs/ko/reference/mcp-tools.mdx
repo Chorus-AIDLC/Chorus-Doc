@@ -71,11 +71,7 @@ MCP 트랜스포트 세션은 Chorus의 **에이전트 세션**과 무관합니�
 
 </div>
 
-헤더가 없으면 모든 프로젝트의 결과가 반환됩니다(기본). **두** 헤더가 모두 있으면 `X-Chorus-Project-Group`이
-우선합니다. 이 헤더를 따르는 도구는 `chorus_get_my_assignments`뿐이며, 범위 지정된 프로젝트로 필터링된 프로젝트별
-추적기를 반환합니다. `chorus_checkin`의 `ideaTracker`는 **헤더로 필터되지 않습니다**. 항상 모든 프로젝트에
-걸친, 에이전트의 가장 최근 아이디어(최대 열 개)를 반환합니다. 그 밖의 모든 도구는 명시적인 `projectUuid`
-인수를 받고 헤더로 범위 지정되지 않습니다.
+범위 헤더를 따르는 것은 `chorus_get_my_assignments`뿐입니다. 헤더가 없으면 접근 가능한 프로젝트 전체를 포함하며 둘 다 있으면 `X-Chorus-Project-Group`이 우선합니다. `chorus_checkin`은 필터링되지 않은 `activeProjects` 분포를 반환하며 최근 아이디어 목록이 아닙니다. 다른 도구는 각자의 명시적 범위 인수를 사용합니다. 이 헤더는 일반적인 프로젝트 접근 필터가 아닙니다.
 
 ```json
 {
@@ -177,28 +173,23 @@ MCP 트랜스포트 세션은 Chorus의 **에이전트 세션**과 무관합니�
 
 ### chorus_checkin — 공용
 
-각 실행을 시작할 때 호출하기를 권장합니다. 에이전트의 신원과 소유자, 유효 권한 집합, 프로젝트별로 묶인 아이디어
-추적기, 그리고 알림 요약을 반환합니다. `ideaTracker`는 모든 프로젝트에서 가장 최근에 업데이트된 아이디어를 최대
-열 개까지 담습니다. 위의 범위 지정 헤더로는 **좁혀지지 않습니다**(범위 지정되고 상한이 없는
-추적기에는 `chorus_get_my_assignments`를 쓰세요).
+개요에는 최대 10개 프로젝트가 포함되며 각 프로젝트에서 가장 최근에 수정된 활성 아이디어 순으로 정렬됩니다. 포함된 프로젝트의 활성 아이디어 수는 잘리지 않습니다. 전체 트래커는 `chorus_get_my_assignments`를 사용하세요.
+
+신원, 소유자, 유효 권한, 페르소나와 `activeProjects`를 반환합니다. 프로젝트 UUID별 이름과 `activeIdeaCount`가 있으며 활성 아이디어 총수는 잘리지 않습니다. 개별 아이디어나 작업은 포함하지 않습니다. 최근 미읽음 알림을 최대 다섯 개 반환하고 자동으로 읽음 처리합니다. `notifications.unread`는 처리 후 남은 미읽음 수입니다. 범위 헤더로 좁혀지지 않습니다.
 
 ```text
-입력:   (없음)
-반환:   { agent: { uuid, name, permissions, owner },
-          ideaTracker: { <projectUuid>: { name, ideas[] } },
-          notifications: { unread, recent[] } }
+{ checkinTime, agent: { uuid, name, permissions, persona, systemPrompt, owner },
+  activeProjects: { <projectUuid>: { name, activeIdeaCount } },
+  notifications: { unread, recent[] } }
 ```
 
 ### chorus_get_my_assignments — 공용
 
-에이전트의 완전한 아이디어/작업 추적기를 프로젝트별로 묶어 반환합니다. `chorus_checkin`의 `ideaTracker`와
-같은 형태이며, 최근 아이디어의 상한이 없고, 여기에 open 작업으로 이루어진 `taskTracker`가 더해집니다.
-범위 지정 헤더를 따릅니다.
+활성 아이디어/작업의 전체 추적기를 프로젝트별로 반환하며 범위 헤더를 따릅니다. `ideaTracker`에는 개별 아이디어의 파생 상태와 제안/작업 수가, `taskTracker`에는 종료 상태가 아닌 작업과 수락 기준 진행률이 들어 있습니다. 전체 목록에는 `activeProjects` 대신 이 도구를 사용하세요.
 
 ```text
-입력:   (없음)
-반환:   { ideaTracker: { <projectUuid>: { name, ideas[] } },
-          taskTracker: { <projectUuid>: { name, tasks[] } } }
+{ ideaTracker: { <projectUuid>: { name, ideas[] } },
+  taskTracker: { <projectUuid>: { name, tasks[] } } }
 ```
 
 ### chorus_claim_task — `task:write`
@@ -216,8 +207,10 @@ open 작업을 가져가 `assigned`로 옮기고 호출자를 담당자로 설�
 
 ```text
 입력:   { taskUuid, summary? }
-반환:   업데이트된 Task
+반환: { uuid, status: "to_verify" }
 ```
+
+`status` 없는 `chorus_report_work`로 완료를 보고하고 `chorus_report_criteria_self_check`를 기록한 뒤 `chorus_get_task`로 `in_progress`를 확인하고 명시적으로 제출하세요. 먼저 `status: "to_verify"`를 보고하면 제출이 실패합니다. 잘못 옮긴 작업을 `in_progress`로 돌리면 개발자와 관리자 양쪽 판정과 근거가 지워지므로 자체 점검을 다시 하세요. 정상 제출된 작업은 다시 열지 마세요. [작업 실행](/ko/guides/run-tasks/)을 참고하세요.
 
 ### chorus_pm_create_proposal — `proposal:write`
 
@@ -237,11 +230,23 @@ open 작업을 가져가 `assigned`로 옮기고 호출자를 담당자로 설�
 최소 하나 있어야 하며, 없으면 호출이 거부됩니다.
 
 ```text
-입력:   { proposalUuid, title, description?, priority?, storyPoints?,
+입력:   { proposalUuid, title, description?, priority?, storyPoints?, kind?,
           acceptanceCriteriaItems: [{ description, required? }],  // 필수, 비어 있지 않음
           dependsOnDraftUuids?[] }
 반환:   업데이트된 Proposal
 ```
+
+### 제안 검사와 초안 유형
+
+`chorus_pm_add_task_draft`와 `chorus_pm_update_task_draft`는 선택적 `kind`로 `implementation`, `verification`, `docs`, `other`를 받습니다. 편집 후 `chorus_pm_validate_proposal`을 호출한 다음 `chorus_pm_submit_proposal`로 제출하세요. 제출 시 서버가 다시 검사합니다. 결과는 `{ valid, issues[] }`이며 수준은 `error`, `warning`, `info`입니다. 오류가 있을 때만 `valid`가 false입니다.
+
+- `E-DEP-UNKNOWN`: 의존성이 같은 제안의 작업 초안이 아닙니다.
+- `E-DEP-SELF`: 자기 의존성입니다.
+- `E-DEP-CYCLE`: 의존성 순환입니다.
+- `I-KIND`: 유형 지정이 없어 구현 범위를 확인할 수 없습니다.
+- `W-IMPL`: 유형 지정은 있지만 `implementation`이 없습니다. 권고일 뿐입니다. 기존 구현이나 문서 전용 범위를 설명하고 가상의 작업을 만들지 마세요. 의존성이 없다는 경고(`W4`)도 권고입니다.
+
+선택적 [Pi 게이트](/ko/reference/agents/pi/)는 로컬 재조회/검사 순서를 추적하며 서버 권한 검사가 아닙니다. [제안 검토](/ko/guides/review-a-proposal/)를 참고하세요.
 
 ### chorus_admin_verify_task — `task:admin`
 

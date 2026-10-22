@@ -1,6 +1,6 @@
 ---
-title: Super Admin and SSO setup
-description: Sign in as the platform Super Admin, create workspaces, and configure OIDC single sign-on so your team can sign in.
+title: Super Admin and authentication setup
+description: Create local-account or OIDC workspaces, invite the initial Workspace Admin, and configure SSO.
 docsLocale: en
 route: /guides/authentication-setup/
 sidebar:
@@ -61,12 +61,24 @@ Super Admin governs the *workspaces themselves*.
 
 ## Create a workspace
 
-In the Super Admin panel, **Companies** lists every workspace with its email domains, OIDC
-status, and user and agent counts. Use it to create, edit, and delete a workspace.
+In the Super Admin panel, **Companies** lists the workspaces and lets you create, edit, or delete them. On **Create Company**, choose the authentication mode:
 
-When you create one, you give it a **name**, one or more **email domains**, and its SSO
-settings (below). The email domains are what let a person's email find this workspace at
-sign-in.
+- **OIDC:** enter a name, email domain, and the SSO settings below. Domains help route an email to the right workspace.
+- **Local accounts:** enter a name plus the initial Workspace Admin's username and email; a display name is optional. No email domain or OIDC provider is required. Create the workspace, then copy the one-time invitation and deliver it privately. The administrator sets their own password and signs in separately.
+
+Local accounts and OIDC are mutually exclusive within a workspace. You cannot convert the authentication mode through workspace editing; local workspaces can be renamed, but their OIDC/domain fields are not editable. Default Auth's environment-defined account is a separate sign-in option, not the initial local administrator.
+
+### Recover the initial invitation
+
+Before the initial administrator accepts an invitation, reopen the local workspace in **Companies** to reissue, revoke, or replace that invitation. Reissue invalidates the old link; replacement creates a new identity, even if it uses the same username/email. If you revoke it, invite a replacement from the same panel. After any initial-admin invitation has been accepted, this bootstrap recovery closes; ongoing account management belongs to a local Workspace Admin in **Workspace users** in the sidebar (below **Settings**), not the Super Admin. See [Manage local workspace users](/guides/administrator-setup/).
+
+<Screenshot
+  src="/images/workspace/local-workspace.webp"
+  alt="Create Company form with Local accounts selected and demo initial administrator details"
+  width={1440}
+  height={1018}
+  caption="Choose local accounts to create a workspace and invite its first Workspace Admin without an OIDC provider."
+/>
 
 :::caution[Deleting a workspace is permanent]
 Deleting a workspace removes it and all of its data — projects, ideas, proposals, tasks,
@@ -74,6 +86,8 @@ documents, agents, and users. There is no undo.
 :::
 
 ## Configure SSO (OIDC)
+
+These settings apply only to OIDC-mode workspaces. Local workspaces do not expose an OIDC configuration card.
 
 Chorus signs users in through your identity provider using OpenID Connect with PKCE — there
 is **no client secret** to manage. You configure it per workspace, in that workspace's
@@ -87,10 +101,10 @@ the standard `openid profile email` scopes.
 
 <Screenshot
   src="/images/workspace/super-admin-oidc.webp"
-  alt="Workspace edit page in the Super Admin panel showing the OIDC Configuration card with Issuer URL and Client ID fields"
+  alt="Create Company form with OIDC selected and demo email domain, Issuer URL, and Client ID populated"
   width={1440}
-  height={900}
-  caption="Each workspace's OIDC settings live on its edit page; SSO is enabled once both the Issuer URL and Client ID are set."
+  height={1021}
+  caption="Choose OIDC at workspace creation and configure the provider. Existing OIDC workspaces can edit these settings later."
 />
 
 At your identity provider, register Chorus as an application and add its **redirect

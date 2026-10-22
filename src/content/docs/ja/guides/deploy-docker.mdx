@@ -55,6 +55,8 @@ docker compose -f docker-compose.local.yml up -d
 
 `http://localhost:8637` を開き、`admin@example.com` / `changeme` でサインインします（`DEFAULT_USER` / `DEFAULT_PASSWORD` 環境変数で変更できます）。
 
+スタンドアロンの例は `admin@example.com` / `changeme` で従来の Default Auth を有効にします。共有前に変更してください。下記の本番 Compose と `docker run` の例もこのデモ経路を明示的に有効にしますが、リポジトリの本番 Compose は指定しない限り両方の資格情報を空にします。管理対象のローカルアカウントにはスーパー管理者の資格情報を渡し、下記の設定を行ってください。デモログインを管理対象のチームアカウントとして扱わないでください。
+
 スタンドアロンモードでは、コンテナは次のことを行います。
 
 - PGlite を内部ポート（`5433`）で起動し、外部には公開しません。
@@ -84,7 +86,7 @@ services:
       # first start and persists it in the chorus-app-data volume (single
       # replica only). For production, or more than one app container, set it
       # explicitly in .env or the environment:  openssl rand -base64 32
-      # Changing the secret invalidates Default Auth and Super Admin sessions.
+      # Changing the secret invalidates Default Auth, local-account and Super Admin sessions.
       - NEXTAUTH_SECRET=${NEXTAUTH_SECRET:-}
       - COOKIE_SECURE=${COOKIE_SECURE:-false}
       - DEFAULT_USER=admin@example.com
@@ -196,6 +198,8 @@ docker run -d \
 
 ### Redis
 
+Redis は別々の接続でインスタンス間 SSE と共有認証カウンターを提供します。空でない `REDIS_URL` が優先され、それ以外は `REDIS_HOST` で TLS（`rediss`）を使います。ポートは既定で `6379`、ユーザー名は `default` で、ユーザー名は `REDIS_PASSWORD` の指定時に使われます。非 TLS には明示的な `redis://` を使います。URL と host の両方がない場合だけイベントと制限がプロセス内に限定されます。Redis 障害時はプロセスごとの予備制限になり、共有枠や全ログイン拒否にはなりません。予期しない制限エラーは許可側に倒れる場合があります。詳細は[共有認証レート制限](/ja/guides/deploy-operations/#共有認証レート制限)を参照してください。
+
 <div class="table-scroll" role="region" aria-label="Redis の環境変数" tabindex="0">
 
   | 変数 | 説明 |
@@ -210,12 +214,16 @@ docker run -d \
 
 ### 認証
 
+管理対象のローカルアカウントはデータベースに保存され、`DEFAULT_USER` / `DEFAULT_PASSWORD` では設定しません。アプリに `SUPER_ADMIN_EMAIL` と `SUPER_ADMIN_PASSWORD_HASH` を渡し、管理パネルで専用ワークスペースを作成して最初のワークスペース管理者を招待します。ID プロバイダーやメールサービスは不要です。同一ワークスペースで OIDC と併用できず、既存ワークスペースの変換もできません。`NEXTAUTH_SECRET` を永続化して全レプリカで共有し、共有アクセスには HTTPS と `COOKIE_SECURE=true` を使います。設定と従来の Default Auth のみを無効にする手順は[運用ガイド](/ja/guides/deploy-operations/)を参照してください。
+
+`AUTH_TRUST_PROXY` は既定で無効で、`true` の場合だけ有効です。`AUTH_TRUST_PROXY_HOPS` は既定で `1`、範囲は 1～16 の整数で、`X-Forwarded-For` の右から数えます。強制され迂回できないプロキシチェーンのみを信頼してください。HTTPS だけでは不十分です。同梱 CDK の ALB モードは `true` / `1`、CloudFront モードは `false` / `2` です。VPC トラフィックが CloudFront を迂回してプライベートオリジンに到達できるためです。
+
 <div class="table-scroll" role="region" aria-label="認証の環境変数" tabindex="0">
 
   | 変数 | 説明 |
   | --- | --- |
-  | `DEFAULT_USER` | 組み込みログイン用のメールアドレス（OIDC をバイパスします）。初回サインイン時にユーザーとそのワークスペースを自動的に作成します。 |
-  | `DEFAULT_PASSWORD` | デフォルトユーザーのパスワード（平文で、実行時に bcrypt で照合します）。 |
+  | `DEFAULT_USER` | 任意の従来型 Default Auth のメール。`DEFAULT_PASSWORD` も必要です。必要なユーザーとワークスペースを作成しますが、管理対象のローカルアカウントやローカル管理者ロールにはなりません。 |
+  | `DEFAULT_PASSWORD` | 従来型 Default Auth の平文パスワード。実行時に直接比較し、bcrypt は使いません。データベース内のローカルアカウントのパスワードとは別です。 |
   | `NEXTAUTH_URL` | アプリの対外的なベース URL（デフォルト：`http://localhost:8637`）。リバースプロキシの背後で実行するときに設定します。 |
   | `COOKIE_SECURE` | HTTP のみのデプロイでセキュア Cookie を無効にするには `"false"` に設定します（docker-compose ではデフォルトで `"false"`）。本番で HTTPS でデプロイするときは `"true"` に設定します。 |
 
@@ -260,6 +268,8 @@ docker run -d \
 :::
 
 ## セッションの秘密鍵（`NEXTAUTH_SECRET`）
+
+管理対象のローカルアカウントのセッションも `NEXTAUTH_SECRET` を使い、鍵を変更すると失効します。
 
 `NEXTAUTH_SECRET` は、Chorus 自身が発行するサインインセッション（組み込みのメール／パスワードログインと
 スーパー管理者のセッション）に署名します。OIDC トークンは ID プロバイダーが署名し、

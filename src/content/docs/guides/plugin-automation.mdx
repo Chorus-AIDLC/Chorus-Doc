@@ -116,6 +116,26 @@ See [What Codex does differently](#what-codex-does-differently) below. Do not re
 toggle difference as a difference in which reviewers exist.
 :::
 
+## Submission checks are not reviewer automation
+
+Before proposal submission, run `chorus_pm_validate_proposal` again after draft edits.
+Dependency errors block submission; `I-KIND` is informational and `W-IMPL` is advisory.
+A documentation-only proposal does not need a fabricated implementation task. Explain
+warnings rather than disguising the work. See [Review a proposal](/guides/review-a-proposal/).
+
+For tasks, report completion without `status`, self-check the acceptance criteria, read
+the task back, and explicitly call `chorus_submit_for_verify` while it is `in_progress`.
+Setting `to_verify` in a report first makes that submit fail. Recovery clears both developer
+and admin acceptance evidence; follow [Run tasks](/guides/run-tasks/), not a blind retry.
+Delegated workers stop after submission; the parent handles independent review and admin verification.
+
+Pi additionally offers `CHORUS_SUBMIT_GATE=warn|block`, default `off`. `warn` only notifies;
+`block` stops recognized submits without a fresh read/validation. Configure it in Pi's
+launch environment (or the Pi agent's `env` in `~/.chorus/daemon.json`) and restart the
+process. It is not a reviewer toggle, does not launch reviewers, and cannot inspect shell
+commands or nested dispatcher calls. Server validation and permissions still apply.
+See [Pi](/reference/agents/pi/) for the exact scope and configuration.
+
 ## Session lifecycle hooks
 
 A second group of hooks manages the agent's Chorus **session** automatically, so neither you

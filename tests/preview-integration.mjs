@@ -25,6 +25,15 @@ const routes = [
   '/zh/guides/deploy-local/',
   '/ja/guides/deploy-local/',
   '/ko/guides/deploy-local/',
+  ...['', '/zh', '/ja', '/ko'].flatMap((locale) => [
+    `${locale}/guides/account-and-workspace/`,
+    `${locale}/guides/administrator-setup/`,
+    `${locale}/guides/authentication-setup/`,
+    `${locale}/guides/deploy-production/`,
+    `${locale}/guides/review-a-proposal/`,
+    `${locale}/reference/mcp-tools/`,
+    `${locale}/reference/agents/pi/`,
+  ]),
 ];
 const resources = [
   ['/index.md', '## The reversed conversation'],
@@ -51,6 +60,10 @@ const resources = [
   ...['', '/zh', '/ja', '/ko'].map((locale) => [
     `${locale}/guides/deploy-local.md`,
     'bash install.sh --target local',
+  ]),
+  ...['', '/zh', '/ja', '/ko'].flatMap((locale) => [
+    [`${locale}/reference/agents/pi.md`, 'CHORUS_SUBMIT_GATE'],
+    [`${locale}/reference/mcp-tools.md`, 'activeProjects'],
   ]),
 ];
 
@@ -149,7 +162,7 @@ try {
       { route: '/zh/guides/getting-started/', query: '工作流', result: /工作流参考/, target: '/zh/reference/workflow/' },
       // Search localized getting-started pages. Use the Korean title because
       // generic login guidance can fill the first page of search results.
-      { route: '/ja/guides/getting-started/', query: 'サインイン', result: /はじめに/ },
+      { route: '/ja/guides/getting-started/', query: 'はじめに', result: /はじめに/ },
       { route: '/ko/guides/getting-started/', query: '시작하기', result: /시작하기/ },
       ...['', '/zh', '/ja', '/ko'].flatMap((locale) => [
         { route: `${locale}/reference/agents/trae/`, query: 'TRAE CLI', result: /TRAE CLI/ },

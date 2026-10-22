@@ -49,9 +49,15 @@ for a single instance and **required** when you run more than one, because insta
 live updates (Server-Sent Events) to each other through Redis. Without Redis, Chorus falls back
 to in-memory eventing, which only works for a single instance.
 
+Redis provides cross-instance SSE and shared authentication counters over separate connections. A nonempty `REDIS_URL` wins; otherwise `REDIS_HOST` uses TLS (`rediss`), with port `6379` and username `default` unless overridden. The username is used with `REDIS_PASSWORD`. For non-TLS Redis use `redis://` explicitly. Only when both URL and host are absent are events and limits process-local. Redis failures use per-process insurance limits, not a shared budget or an all-login block; unexpected limiter errors can fail open. See [shared authentication throttling](/guides/deploy-operations/#shared-authentication-throttling) for exact limits and recovery behavior.
+
 You can run the production form as a container (see [Deploy with Docker](/guides/deploy-docker/)),
 from the global npm package against your own PostgreSQL and Redis, or on the bundled AWS CDK
 stack (see [Deploy in production](/guides/deploy-production/)).
+
+### Choose account management separately
+
+Managed local accounts are database-backed, not configured by `DEFAULT_USER` / `DEFAULT_PASSWORD`. Inject `SUPER_ADMIN_EMAIL` and `SUPER_ADMIN_PASSWORD_HASH` into the app, then create a local-account workspace and invite its first Workspace Admin from the admin panel. No identity provider or mail service is required. Local accounts and OIDC are mutually exclusive per workspace; existing workspaces cannot be converted. Persist `NEXTAUTH_SECRET`, share it across replicas, and use HTTPS with `COOKIE_SECURE=true` for shared access. See [operations](/guides/deploy-operations/) for account setup and disabling only legacy Default Auth.
 
 ## Prerequisites
 

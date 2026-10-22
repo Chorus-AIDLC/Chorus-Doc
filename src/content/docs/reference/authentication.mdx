@@ -25,7 +25,7 @@ operates across workspaces.
 
 | Context type | `type` | Key fields | Produced by |
 | --- | --- | --- | --- |
-| User | `user` | `companyUuid`, `actorUuid`, `email`, `name` | OIDC, Default Auth |
+| User | `user` | `companyUuid`, `actorUuid`, `email`, `name` | OIDC, local accounts, Default Auth |
 | Agent | `agent` | `companyUuid`, `actorUuid`, `roles[]` (preset selector), `permissions[]` (effective set), `agentName`, `ownerUuid` | API key |
 | Super Admin | `super_admin` | `email` (no `companyUuid`) | Super Admin session |
 
@@ -54,7 +54,7 @@ self-signed session token when it is `HS256`.
 
 ## Session signing secret
 
-`NEXTAUTH_SECRET` signs Default Auth's `user_session` and Super Admin's `admin_session`
+`NEXTAUTH_SECRET` signs local-account and Default Auth `user_session` tokens and Super Admin's `admin_session`
 JWTs. Super Admin routes verify `admin_session` separately from normal user authentication.
 OIDC tokens are verified with the provider's keys; agent API keys are checked against their stored hash.
 Rotating `NEXTAUTH_SECRET` invalidates Chorus-signed sessions, not API keys or OIDC tokens.
@@ -121,19 +121,30 @@ After the provider redirects back, Chorus looks up the user by
 Access tokens are verified against the provider's JWKS (cached), and edge middleware renews
 an expiring access token transparently before requests reach the app.
 
-### Default Auth (development)
+### Local workspace accounts
 
-A single email/password sign-in for development and demo deployments without OIDC. Enabled
-only when `DEFAULT_USER` and `DEFAULT_PASSWORD` are both set:
+Local accounts are managed per workspace, independently of Default Auth. A Super Admin creates a local-only workspace and invites its initial Workspace Admin; that active local administrator manages users in **Workspace users** in the sidebar (below **Settings**). Ordinary users, OIDC/Default Auth users, and agent admin permission bits do not grant this role. Local authentication and OIDC cannot be enabled together in one workspace, and editing a workspace cannot convert its mode.
+
+The unified login first discovers methods from an email or local username, then selects a workspace/identity before accepting a password. Usernames and emails are normalized case-insensitively and unique only within a workspace. There is no open registration or self-service reset. Administrators share one-use invitation/reset links privately; links expire in 24 hours and are not emailed automatically. Passwords require at least 8 characters and at most 72 UTF-8 bytes and are stored as bcrypt hashes. Accepting a link sets the password but does not create a session.
+
+A successful local login issues a signed `user_session` valid for one hour, without a refresh-token flow. Requests check the account's active state and session version. Account edits, credential-link reissue, and password acceptance invalidate prior sessions/links. Disabled or removed owners cannot authenticate their agent API keys; password reset itself retains the keys. Removed usernames/emails can be reused only for a fresh identity that inherits no history, ownership, privileges, or credentials. The last effective Workspace Admin is protected from removal, disabling, or demotion.
+
+See [local user management](/guides/administrator-setup/) for operations and [account settings](/guides/account-and-workspace/) for invitations, display names, and avatars. Profile edits are self-service for authenticated users, not agents or platform administrators. Names and generated avatars are saved explicitly and independently; changing a display name does not change login credentials.
+
+### Authentication throttling
+
+Identity discovery, local password login, and local invitation/reset acceptance are rate-limited. A `429` response includes `Retry-After`; wait before retrying rather than repeatedly submitting credentials. Redis shares limits across replicas; without Redis or during an outage, per-instance in-memory limits apply instead. Unexpected errors outside that fallback are logged and fail open. See [deployment operations](/guides/deploy-operations/) for configuration; this is separate from SSE connection limits.
+
+### Default Auth (single-user setup)
+
+A single environment-defined email/password account for personal, development, or demo use without an OIDC provider. It is enabled when both variables are set, not by development mode alone:
 
 ```bash
-DEFAULT_USER="dev@example.local"
-DEFAULT_PASSWORD="change-me"
+DEFAULT_USER="you@example.com"
+DEFAULT_PASSWORD="choose-a-strong-password"
 ```
 
-On sign-in Chorus auto-provisions the workspace and user and issues one long-lived self-signed
-JWT in a `user_session` cookie. There is no refresh flow — when it expires, the user signs
-in again. Do not enable Default Auth in production.
+Login auto-provisions the workspace and user and issues a 365-day signed `user_session`, without refresh tokens. Expiry requires signing in again. This account does not provide local Workspace Admin user management or Super Admin access. For a shared workspace, use managed local accounts or OIDC rather than sharing this environment password. The login screen still performs identity discovery first, even when Default Auth is configured.
 
 ### Super Admin
 

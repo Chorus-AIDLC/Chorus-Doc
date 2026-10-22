@@ -55,6 +55,8 @@ docker compose -f docker-compose.local.yml up -d
 
 `http://localhost:8637`을 열고 `admin@example.com` / `changeme`로 로그인합니다(`DEFAULT_USER` / `DEFAULT_PASSWORD` 환경 변수로 바꿀 수 있습니다).
 
+스탠드얼론 예시는 `admin@example.com` / `changeme`로 기존 Default Auth를 활성화합니다. 공유 전에 반드시 변경하세요. 아래 프로덕션 Compose와 `docker run` 예시도 이 데모 경로를 명시적으로 켜지만 저장소의 프로덕션 Compose는 별도 제공이 없으면 두 자격 증명을 비워 둡니다. 관리형 로컬 계정에는 슈퍼 관리자 자격 증명을 주입하고 아래 설정을 따르세요. 데모 로그인을 관리형 팀 계정으로 취급하지 마세요.
+
 스탠드얼론 모드에서 컨테이너는 다음을 수행합니다.
 
 - PGlite를 외부에 노출되지 않는 내부 포트(`5433`)에서 시작합니다.
@@ -84,7 +86,7 @@ services:
       # first start and persists it in the chorus-app-data volume (single
       # replica only). For production, or more than one app container, set it
       # explicitly in .env or the environment:  openssl rand -base64 32
-      # Changing the secret invalidates Default Auth and Super Admin sessions.
+      # Changing the secret invalidates Default Auth, local-account and Super Admin sessions.
       - NEXTAUTH_SECRET=${NEXTAUTH_SECRET:-}
       - COOKIE_SECURE=${COOKIE_SECURE:-false}
       - DEFAULT_USER=admin@example.com
@@ -196,6 +198,8 @@ docker run -d \
 
 ### Redis
 
+Redis는 별도의 연결로 인스턴스 간 SSE와 공유 인증 카운터를 지원합니다. 비어 있지 않은 `REDIS_URL`이 우선하며 그렇지 않으면 `REDIS_HOST`로 TLS(`rediss`)를 사용합니다. 포트 기본값은 `6379`, 사용자 이름은 `default`이며 사용자 이름은 `REDIS_PASSWORD`를 지정할 때 사용됩니다. 비 TLS에는 명시적인 `redis://`를 사용하세요. URL과 host가 모두 없을 때만 이벤트와 제한이 프로세스 내부에 한정됩니다. Redis 장애 시 프로세스별 보조 제한을 사용하므로 공유 한도를 유지하지 못하지만 모든 로그인을 차단하지도 않습니다. 예상치 못한 제한 오류는 허용할 수 있습니다. 정확한 한도와 복구 동작은 [공유 인증 요청 제한](/ko/guides/deploy-operations/#공유-인증-요청-제한)을 참고하세요.
+
 <div class="table-scroll" role="region" aria-label="Redis 환경 변수" tabindex="0">
 
   | 변수 | 설명 |
@@ -210,12 +214,16 @@ docker run -d \
 
 ### 인증
 
+관리형 로컬 계정은 데이터베이스에 저장하며 `DEFAULT_USER` / `DEFAULT_PASSWORD`로 설정하지 않습니다. 앱에 `SUPER_ADMIN_EMAIL`과 `SUPER_ADMIN_PASSWORD_HASH`를 주입한 뒤 관리 패널에서 로컬 계정 워크스페이스를 만들고 첫 워크스페이스 관리자를 초대하세요. ID 제공자나 메일 서비스는 필요하지 않습니다. 같은 워크스페이스에서 OIDC와 혼용하거나 기존 워크스페이스를 전환할 수 없습니다. `NEXTAUTH_SECRET`을 영구 보관하고 모든 레플리카에 공유하며 공유 접근에는 HTTPS와 `COOKIE_SECURE=true`를 사용하세요. 설정과 기존 Default Auth만 비활성화하는 방법은 [운영 가이드](/ko/guides/deploy-operations/)를 참고하세요.
+
+`AUTH_TRUST_PROXY`는 기본적으로 꺼져 있으며 정확히 `true`일 때만 켜집니다. `AUTH_TRUST_PROXY_HOPS`는 기본 `1`, 범위는 1~16의 정수이며 `X-Forwarded-For` 오른쪽부터 셉니다. 강제 적용되고 우회할 수 없는 프록시 체인만 신뢰하세요. HTTPS만으로는 충분하지 않습니다. 번들 CDK의 ALB 모드는 `true` / `1`, CloudFront 모드는 `false` / `2`입니다. VPC 트래픽이 CloudFront를 우회하여 비공개 오리진에 도달할 수 있기 때문입니다.
+
 <div class="table-scroll" role="region" aria-label="인증 환경 변수" tabindex="0">
 
   | 변수 | 설명 |
   | --- | --- |
-  | `DEFAULT_USER` | 내장 로그인용 이메일 주소(OIDC를 우회합니다). 첫 로그인 시 사용자와 해당 워크스페이스를 자동으로 생성합니다. |
-  | `DEFAULT_PASSWORD` | 기본 사용자의 비밀번호(평문으로 지정하며, 런타임에 bcrypt로 비교합니다). |
+  | `DEFAULT_USER` | 선택적인 기존 Default Auth 이메일. `DEFAULT_PASSWORD`도 필요합니다. 필요한 사용자와 워크스페이스를 만들지만 관리형 로컬 계정이나 로컬 관리자 역할은 아닙니다. |
+  | `DEFAULT_PASSWORD` | 기존 Default Auth의 평문 비밀번호. 런타임에 직접 비교하며 bcrypt를 사용하지 않습니다. 데이터베이스의 로컬 계정 비밀번호와는 별개입니다. |
   | `NEXTAUTH_URL` | 앱의 외부 공개 기본 URL(기본값: `http://localhost:8637`). 리버스 프록시 뒤에서 실행할 때 설정합니다. |
   | `COOKIE_SECURE` | HTTP 전용 배포에서 보안 쿠키를 끄려면 `"false"`로 설정합니다(docker-compose에서는 기본값 `"false"`). 프로덕션에서 HTTPS로 배포할 때는 `"true"`로 설정합니다. |
 
@@ -260,6 +268,8 @@ docker run -d \
 :::
 
 ## 세션 비밀 키(`NEXTAUTH_SECRET`)
+
+관리형 로컬 계정 세션도 `NEXTAUTH_SECRET`을 사용하며 키를 교체하면 무효화됩니다.
 
 `NEXTAUTH_SECRET`은 Chorus가 직접 발급하는 로그인 세션(내장 이메일/비밀번호 로그인과 슈퍼 관리자 세션)에
 서명합니다. OIDC 토큰은 ID 제공자가 서명하며, 에이전트 API 키는 별도로 검증됩니다.

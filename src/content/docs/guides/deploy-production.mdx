@@ -39,15 +39,19 @@ does not create the database for you on this path.
 
 The variables Chorus reads in a production run:
 
+<div class="table-scroll" role="region" aria-label="Deployment reference table 1" tabindex="0">
+
 | Variable | Required | Description |
 | --- | --- | --- |
 | `DATABASE_URL` | Yes | PostgreSQL connection string, `postgresql://user:password@host:port/dbname`. |
 | `NEXTAUTH_SECRET` | For multiple instances | Signing secret shared by all replicas. For a single npm instance, it may be omitted: `chorus` persists one in `~/.chorus-data/.secret` by default. Known placeholders in the environment are ignored with a warning; a persisted placeholder or empty key stops startup. |
 | `SUPER_ADMIN_EMAIL` | Yes | Email that bootstraps the `/admin` Super Admin panel. |
 | `SUPER_ADMIN_PASSWORD_HASH` | Yes | Bcrypt hash of the Super Admin password. |
-| `DEFAULT_USER` | Optional | Enables a built-in email/password login for first access. |
+| `DEFAULT_USER` | Optional | Optional legacy Default Auth email; requires `DEFAULT_PASSWORD`. Creates its user and workspace as needed, not a managed local account or local Workspace Admin. |
 | `DEFAULT_PASSWORD` | Optional | Password for the built-in login. |
-| `REDIS_URL` | Optional | Redis connection string. Required once you run more than one instance (see below). |
+| `REDIS_URL` | Optional | Shared Redis for SSE and authentication counters; required for multi-instance consistency. Alternatively set `REDIS_HOST` and the individual Redis variables. |
+
+</div>
 
 See [Operate a self-hosted Chorus](/guides/deploy-operations/) for how these bootstrap
 credentials work, how to generate the bcrypt hash, and how to turn the built-in login off.
@@ -67,11 +71,11 @@ Chorus propagates live updates (the SSE event stream) across instances through R
 REDIS_URL='redis://default:password@redis.internal:6379'
 ```
 
-**Redis is required for cross-instance event propagation.** Without `REDIS_URL`, Chorus
-falls back to an in-memory event bus that is scoped to a single process — updates made on
-one instance never reach the others. A single-instance deployment can run without Redis on
-that in-memory fallback, but any deployment with more than one instance must configure a
-shared Redis.
+Redis provides cross-instance SSE and shared authentication counters over separate connections. A nonempty `REDIS_URL` wins; otherwise `REDIS_HOST` uses TLS (`rediss`), with port `6379` and username `default` unless overridden. The username is used with `REDIS_PASSWORD`. For non-TLS Redis use `redis://` explicitly. Only when both URL and host are absent are events and limits process-local. Redis failures use per-process insurance limits, not a shared budget or an all-login block; unexpected limiter errors can fail open. See [shared authentication throttling](/guides/deploy-operations/#shared-authentication-throttling) for exact limits and recovery behavior.
+
+`AUTH_TRUST_PROXY` defaults off (only `true` enables it). `AUTH_TRUST_PROXY_HOPS` defaults to `1`, accepts integers 1–16, and counts from the right of `X-Forwarded-For`. Trust only an enforced proxy chain with no bypass; HTTPS alone does not establish trust. The bundled CDK sets ALB mode to `true` / `1`, but CloudFront mode to `false` / `2` because VPC traffic can bypass CloudFront at the private origin.
+
+Managed local accounts are database-backed, not configured by `DEFAULT_USER` / `DEFAULT_PASSWORD`. Inject `SUPER_ADMIN_EMAIL` and `SUPER_ADMIN_PASSWORD_HASH` into the app, then create a local-account workspace and invite its first Workspace Admin from the admin panel. No identity provider or mail service is required. Local accounts and OIDC are mutually exclusive per workspace; existing workspaces cannot be converted. Persist `NEXTAUTH_SECRET`, share it across replicas, and use HTTPS with `COOKIE_SECURE=true` for shared access. See [operations](/guides/deploy-operations/) for account setup and disabling only legacy Default Auth.
 
 All instances must also share the same secure `NEXTAUTH_SECRET`, so that Chorus-signed
 sessions remain valid whichever instance receives a request.
@@ -119,6 +123,8 @@ From the repository root:
 
 The installer prompts for the deployment configuration:
 
+<div class="table-scroll" role="region" aria-label="Deployment reference table 2" tabindex="0">
+
 | Prompt | Required | Notes |
 | --- | --- | --- |
 | Deployment mode | No | `alb` (default) or `cloudfront`. |
@@ -128,6 +134,8 @@ The installer prompts for the deployment configuration:
 | Super admin email | Yes | Bootstraps the `/admin` Super Admin account. |
 | Super admin password | Yes | Minimum 8 characters. Hashed with bcrypt at synth time; the plaintext is never stored in the template. |
 | NextAuth secret | No | Generated at each synth if left blank. Supply one persistent value to keep sessions valid across redeployments. |
+
+</div>
 
 The stack shares `NEXTAUTH_SECRET` through Secrets Manager, but does not read the existing
 value back during synth. Reuse the same value in the installer or CDK's `nextAuthSecret`
@@ -142,22 +150,30 @@ the CDK environment, and deploys the stack. It also writes a re-runnable
 
 The stack creates:
 
+<div class="table-scroll" role="region" aria-label="Deployment reference table 3" tabindex="0">
+
 | Component | What it is | Key configuration |
 | --- | --- | --- |
 | Application Load Balancer | Public HTTPS:443 in `alb`; private HTTP:80 origin in `cloudfront`. | Routes to ECS; 60-minute idle timeout. |
 | CloudFront | Public HTTPS endpoint, only in `cloudfront` mode. | Private VPC origin; caching disabled; optional custom domain. |
 | ECS Fargate service | Runs the Chorus container in private subnets. | Desired count 2, 1024 CPU units / 2048 MiB, deployment circuit breaker with automatic rollback. |
 | Aurora Serverless v2 (PostgreSQL) | Managed PostgreSQL cluster. | Encrypted storage; credentials auto-generated into Secrets Manager; 1-day backup retention. |
-| ElastiCache Serverless (Redis) | Managed Redis for cross-instance events. | RBAC user; password stored in Secrets Manager. |
+| ElastiCache Serverless (Redis) | Managed Redis for cross-instance events and shared authentication counters. | RBAC user; password stored in Secrets Manager. |
 | Secrets Manager | Holds the generated database and Redis credentials plus the app secrets. | Injected into the ECS task at runtime. |
 
+</div>
+
 ### Deploy, update, and destroy
+
+<div class="table-scroll" role="region" aria-label="Deployment reference table 4" tabindex="0">
 
 | Action | Command |
 | --- | --- |
 | First deploy | `./install.sh` |
 | Re-deploy or update | `./default_deploy.sh` (or `pnpm cdk:deploy`) |
 | Destroy | `pnpm cdk:destroy` |
+
+</div>
 
 `packages/chorus-cdk` is the authoritative source for the stack. Read it there when you
 need exact resource definitions or want to adjust capacity, retention, or networking.

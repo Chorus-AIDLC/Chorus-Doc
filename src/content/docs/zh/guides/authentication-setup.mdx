@@ -1,6 +1,6 @@
 ---
-title: 超级管理员与 SSO 配置
-description: 以平台超级管理员身份登录、创建工作区，并配置 OIDC 单点登录，让团队成员能够登录。
+title: 超级管理员与认证配置
+description: 创建本地账号或 OIDC 工作区、邀请初始工作区管理员，并配置 SSO。
 docsLocale: zh
 route: /zh/guides/authentication-setup/
 sidebar:
@@ -52,17 +52,32 @@ node -e "console.log(require('bcryptjs').hashSync('your-password', 10))"
 
 ## 创建工作区
 
-在超级管理员面板里，**公司**列表列出每个工作区及其邮箱域名、OIDC 状态、用户数和智能体数。
-你可以在这里创建、编辑和删除工作区。
+超级管理员面板的**公司**列表可用于创建、编辑或删除工作区。在**创建公司**表单中选择认证方式：
 
-创建时，你为它设置**名称**、一个或多个**邮箱域名**，以及它的 SSO 设置（见下文）。用户登录时，
-正是靠邮箱域名找到这个工作区。
+- **OIDC**：填写名称、邮箱域名及下文的 SSO 配置。域名用于将邮箱匹配到工作区。
+- **本地账号**：填写名称，以及初始工作区管理员的用户名和邮箱；显示名称可选。不需要邮箱域名或 OIDC 提供方。创建后复制一次性邀请，通过私密渠道交给管理员，由其自行设置密码并单独登录。
+
+同一工作区的本地账号与 OIDC 互斥，不能通过工作区编辑切换认证方式。本地工作区可改名，但不能编辑 OIDC 或域名字段。由环境变量定义的 Default Auth 账号是另一种登录选项，不是初始本地管理员。
+
+### 恢复初始邀请
+
+在初始管理员接受邀请前，可从**公司**列表重新打开本地工作区，重新签发、撤销或替换该邀请。重新签发会使旧链接失效；替换会创建新身份，即便使用相同用户名或邮箱。撤销后可在同一面板邀请替代管理员。一旦任一初始管理员邀请被接受，这项初始化恢复就会关闭。之后的日常账号管理由本地工作区管理员在侧边栏中**设置**下方的**工作区用户**中完成，而不是由超级管理员处理。参阅[管理本地工作区用户](/zh/guides/administrator-setup/)。
+
+<Screenshot
+  src="/images/workspace/local-workspace.webp"
+  alt="创建公司表单选择了本地账号，并填写演示用初始管理员资料"
+  width={1440}
+  height={1018}
+  caption="选择本地账号即可创建工作区并邀请首位工作区管理员，无需 OIDC 提供方。"
+/>
 
 :::caution[删除工作区不可撤销]
 删除工作区会将其连同全部数据一起移除，包括项目、想法、提案、任务、文档、智能体和用户。此操作无法撤销。
 :::
 
 ## 配置 SSO（OIDC）
+
+以下设置仅适用于 OIDC 模式的工作区。本地工作区不会显示 OIDC 配置卡片。
 
 Chorus 使用带 PKCE 的 OpenID Connect，通过你的身份提供方让用户登录，因此**无需管理客户端密钥**
 （client secret）。SSO 按工作区配置，位于超级管理员面板中该工作区设置的 **OIDC 配置**
@@ -76,10 +91,10 @@ Chorus 使用带 PKCE 的 OpenID Connect，通过你的身份提供方让用户�
 
 <Screenshot
   src="/images/workspace/super-admin-oidc.webp"
-  alt="超级管理员面板中工作区的编辑页，展示含 Issuer URL 和 Client ID 字段的 OIDC Configuration 卡片"
+  alt="创建公司表单选择了 OIDC，并填写演示邮箱域名、Issuer URL 和 Client ID"
   width={1440}
-  height={900}
-  caption="每个工作区的 OIDC 设置都在它的编辑页；填齐 Issuer URL 与 Client ID 后 SSO 即启用。"
+  height={1021}
+  caption="创建工作区时选择 OIDC 并配置提供方，现有 OIDC 工作区也可稍后编辑这些设置。"
 />
 
 在你的身份提供方处，把 Chorus 注册为一个应用，并把它的**重定向（回调）URL** 加入允许列表，即你的

@@ -68,6 +68,14 @@ Claude Code 需要等待评审子智能体的完成通知：即使请求前台�
 Claude Code 与 Codex 都提供全部三个评审子智能体，并触发同样的三处评审提示。仅限 Claude Code 的是 `userConfig` **开关面板**，即上表中的 `enable*` 开关与轮次上限设置。Codex 没有 `userConfig`，因此在 Codex 上这些评审子智能体由它的技能和钩子直接驱动，而不是由安装时的开关控制。见下文[Codex 的差异](#codex-的差异)。不要把开关上的差异误读为“存在哪些评审子智能体”的差异。
 :::
 
+## 提交检查不等于自动评审
+
+提交提案前调用 `chorus_pm_validate_proposal`，编辑草稿后重新调用。依赖错误会阻止提交；`I-KIND` 是信息提示，`W-IMPL` 是建议性警告。纯文档提案无需虚构实现任务，应解释警告而不是伪装工作类型。参阅[评审提案](/zh/guides/review-a-proposal/)。
+
+任务交接应先不带 `status` 汇报完成，再自检验收标准、回读任务，保持 `in_progress` 并显式调用 `chorus_submit_for_verify`。先在报告中设置 `to_verify` 会导致提交失败。恢复状态会清空开发侧与管理侧的验收依据，应按[运行任务](/zh/guides/run-tasks/)恢复，而非盲目重试。受委派的工作者在提交后停止，由父智能体负责独立评审和管理员验证。
+
+Pi 还提供 `CHORUS_SUBMIT_GATE=warn|block`，默认 `off`。`warn` 只提醒，`block` 会阻止缺少新鲜回读或校验的已识别提交。在 Pi 启动环境中配置，或写入 `~/.chorus/daemon.json` 的 Pi 智能体 `env`，然后重启进程。这不是评审开关，不会启动评审者，也无法检查 shell 命令或分发器中的嵌套调用。服务器校验和权限仍然生效。具体配置与范围参阅 [Pi](/zh/reference/agents/pi/)。
+
 ## 会话生命周期钩子
 
 第二组钩子会自动管理智能体的 Chorus **会话**，因此无论是你还是智能体，都不必手工开启、发送心跳或关闭会话。它们自行运行，不涉及任何判断或提示：

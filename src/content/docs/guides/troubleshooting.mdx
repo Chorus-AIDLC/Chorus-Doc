@@ -10,6 +10,24 @@ sidebar:
 Start with the symptom visible in Chorus. Run the daemon in the foreground while
 diagnosing whenever possible, because startup errors are easier to see there.
 
+## Local-account sign-in or invitation fails
+
+- Managed local accounts are not the `DEFAULT_USER` / `DEFAULT_PASSWORD` demo login. Ask the Super Admin to create a local-account workspace and invite its first Workspace Admin; that admin manages later users and resets. No local-auth environment switch or email service enables this workflow.
+- Enter your username or email and choose the intended workspace or role when prompted. Local accounts cannot sign in to an OIDC workspace. A generic invalid-credentials response can mean a wrong password, an unknown account, or an invited, disabled, or deleted account; do not infer account existence from it.
+- An invitation must be accepted before sign-in. Invite/reset links last 24 hours, are single-use, and are invalidated by replacements or relevant account changes. Request a new link through the appropriate admin; Chorus does not email it automatically. After setting a password, sign in separately. Passwords require at least 8 characters and at most 72 UTF-8 bytes.
+- After a password reset or account change, old local sessions may be rejected because their session version is stale. Disabled/deleted users and incompatible workspace modes are denied; a failure to read current account state does not grant access. Restore database connectivity instead of bypassing account checks.
+- If a successful login immediately disappears, check the public origin, cookie policy, and persistent `NEXTAUTH_SECRET` shared by all replicas. Use `COOKIE_SECURE=true` with HTTPS; reserve `false` for trusted HTTP-only trials. Removing Default Auth variables does not disable managed local password login.
+
+See [authentication setup](/guides/authentication-setup/) and [operations](/guides/deploy-operations/). Never share a credential-link URL, token, password, cookie, or signing secret in diagnostics.
+
+## Sign-in returns 429 or limits differ between replicas
+
+HTTP `429` with `RATE_LIMITED` means an authentication limit was reached. Wait for the `Retry-After` number of seconds before retrying; repeated retries are not a recovery procedure. Identity lookup allows 30 attempts per 60 seconds; local password login and invitation/reset acceptance each allow 10 per 60 seconds. With trusted proxy addresses, users sharing an address may share an action limit.
+
+Check that every replica uses the same Redis configuration. A nonempty `REDIS_URL` wins over the host-based TLS configuration. With neither `REDIS_URL` nor `REDIS_HOST`, limits are process-local. During a Redis outage, per-process insurance counters preserve only local limits. Inspect `auth-throttle` and Redis logs for connection or command failures, including READONLY/OOM; a working SSE stream does not prove the separate authentication connection is healthy. Unexpected limiter backend errors can fail open, so keep edge limits in place. A Redis outage is not a deliberate fail-closed login policy.
+
+Check `AUTH_TRUST_PROXY` and `AUTH_TRUST_PROXY_HOPS` against the actual enforced proxy chain, not an assumed client header. Missing or invalid trusted addresses leave identity limits active without an address bucket. Do not enable trust to suppress an error or permit direct access around the proxy. See [shared authentication throttling](/guides/deploy-operations/#shared-authentication-throttling) for exact defaults, timeouts, and recovery boundaries. Collect timestamps and sanitized error codes, not credentials or raw request headers.
+
 ## The agent never comes online
 
 1. Run `chorus agents` to confirm the agent is configured on this machine (it lists each

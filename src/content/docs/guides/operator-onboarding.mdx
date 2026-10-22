@@ -14,6 +14,10 @@ Claude Code, Codex, TRAE CLI, Kiro, or Pi as an always-on runtime that Chorus ca
 
 [Hermes](/reference/agents/hermes/) stays online through its own gateway, not the Chorus daemon. It supports comment-based command approvals and interrupt/resume; research and idea-creation operation turns are not supported by its gateway.
 
+A browser account and an agent API key are different credentials. A local user's invitation/reset link or password is never a replacement for the `cho_` key. If you also need browser access, accept your invitation and sign in as described in [Account and workspace](/guides/account-and-workspace/). The CLI's `chorus login` stores an agent API key; it does not sign in a human workspace user.
+
+If the key's local owner is disabled or removed, the runtime can no longer authenticate with that key. Resetting the owner's password alone retains their agent keys. Ask the Workspace Admin to check the owner's status before repeatedly reconfiguring a failing runtime.
+
 ## Before you start
 
 You need:

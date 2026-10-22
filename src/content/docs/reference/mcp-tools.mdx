@@ -74,12 +74,7 @@ scoping headers on the MCP connection:
 
 </div>
 
-With no header, results span all projects (the default). When **both** headers are present,
-`X-Chorus-Project-Group` wins. Only `chorus_get_my_assignments` honors these headers; it
-returns a per-project tracker filtered to the scoped project(s). `chorus_checkin`'s `ideaTracker` is
-**not** header-filtered — it always returns the agent's most recent ideas across every
-project (capped at ten). Every other tool takes an explicit `projectUuid` argument and is
-not header-scoped.
+Only `chorus_get_my_assignments` honors the scoping headers. With neither header, it spans accessible projects; when both are set, `X-Chorus-Project-Group` wins. `chorus_checkin` returns an unfiltered `activeProjects` distribution, not a recent-idea list. Other tools use their own explicit scope arguments; these headers are not a general project-access filter.
 
 ```json
 {
@@ -187,29 +182,23 @@ complete contract of every tool, see the note at the end of this page.
 
 ### chorus_checkin — public
 
-Recommended at the start of a run. Returns the agent's identity and owner, its effective
-permission set, an idea tracker grouped by project, and a notification summary. The
-`ideaTracker` is capped at the ten most recently updated ideas and spans every project — it
-is **not** narrowed by the scoping headers above (use `chorus_get_my_assignments` for a
-scoped, uncapped tracker).
+The overview includes at most 10 projects, ordered by each project's most recently updated active idea. Each included project's active-idea count is uncapped; use `chorus_get_my_assignments` for the full tracker.
+
+Returns identity, owner, effective permissions, persona, and `activeProjects`: project UUID → name and `activeIdeaCount`. Counts are uncapped active-idea totals, not individual ideas or tasks. Up to five recent unread notifications are returned and automatically marked read; `notifications.unread` is the remaining unread count. Scoping headers do not narrow this distribution.
 
 ```text
-Input:  (none)
-Return: { agent: { uuid, name, permissions, owner },
-          ideaTracker: { <projectUuid>: { name, ideas[] } },
-          notifications: { unread, recent[] } }
+{ checkinTime, agent: { uuid, name, permissions, persona, systemPrompt, owner },
+  activeProjects: { <projectUuid>: { name, activeIdeaCount } },
+  notifications: { unread, recent[] } }
 ```
 
 ### chorus_get_my_assignments — public
 
-The agent's full idea/task tracker, grouped by project. Same shape as `chorus_checkin`'s
-`ideaTracker`, without the recent-idea cap, plus a `taskTracker` of open tasks. Honors the
-scoping headers.
+Returns the full active idea/task tracker grouped by project, honoring the scoping headers. `ideaTracker` lists individual ideas with derived status and proposal/task counts; `taskTracker` lists nonterminal tasks with acceptance-criteria progress. Use this for the full list, not `activeProjects`.
 
 ```text
-Input:  (none)
-Return: { ideaTracker: { <projectUuid>: { name, ideas[] } },
-          taskTracker: { <projectUuid>: { name, tasks[] } } }
+{ ideaTracker: { <projectUuid>: { name, ideas[] } },
+  taskTracker: { <projectUuid>: { name, tasks[] } } }
 ```
 
 ### chorus_claim_task — `task:write`
@@ -227,8 +216,10 @@ Submit a task for human verification, moving it `in_progress → to_verify`.
 
 ```text
 Input:  { taskUuid, summary? }
-Return: updated Task
+Return: { uuid, status: "to_verify" }
 ```
+
+Report completion through `chorus_report_work` without `status`, record `chorus_report_criteria_self_check`, then read `chorus_get_task` and confirm `in_progress` before explicit submission. Reporting `status: "to_verify"` first makes this submit fail. Returning prematurely moved work to `in_progress` clears developer and admin acceptance marks and evidence: redo self-checks before submitting. Do not reopen legitimately submitted work. See [Run tasks](/guides/run-tasks/).
 
 ### chorus_pm_create_proposal — `proposal:write`
 
@@ -249,11 +240,23 @@ Append one task draft to a draft proposal. Acceptance criteria are required — 
 item with a non-blank description, or the call is rejected.
 
 ```text
-Input:  { proposalUuid, title, description?, priority?, storyPoints?,
+Input:  { proposalUuid, title, description?, priority?, storyPoints?, kind?,
           acceptanceCriteriaItems: [{ description, required? }],  // required, non-empty
           dependsOnDraftUuids?[] }
 Return: updated Proposal
 ```
+
+### Proposal validation and draft kinds
+
+`chorus_pm_add_task_draft` and `chorus_pm_update_task_draft` accept optional `kind`: `implementation`, `verification`, `docs`, or `other`. After editing, call `chorus_pm_validate_proposal` before `chorus_pm_submit_proposal`; submission validates again on the server. The result is `{ valid, issues[] }` with levels `error`, `warning`, and `info`. Only errors make `valid` false.
+
+- `E-DEP-UNKNOWN`: dependency outside this proposal’s task drafts.
+- `E-DEP-SELF`: self-dependency.
+- `E-DEP-CYCLE`: dependency cycle.
+- `I-KIND`: no declared kinds, so implementation coverage cannot be checked.
+- `W-IMPL`: some kinds are declared but none is `implementation`. Advisory only: explain existing implementation coverage or documentation-only scope, rather than inventing work. The no-dependencies warning (`W4`) is also advisory.
+
+The optional [Pi gate](/reference/agents/pi/) tracks local read/validation order, not server authorization. See [Review a proposal](/guides/review-a-proposal/).
 
 ### chorus_admin_verify_task — `task:admin`
 

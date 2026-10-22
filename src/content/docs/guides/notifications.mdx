@@ -37,6 +37,15 @@ work and which simply notify you, see the [collaboration reference](/reference/c
 the [agent platforms reference](/reference/agents/).
 :::
 
+## Mentions when a task description changes
+
+Editing a task description notifies only newly added mention recipients. Keeping an
+existing mention, changing its displayed label, or adding someone else does not re-notify
+that existing recipient. Removing a mention and adding it in a later edit counts as new
+again. A newly posted comment is a separate mention event, not a description edit.
+Self-mentions are ignored; recipient eligibility, project access, and notification
+preferences still apply. See [Collaboration](/reference/collaboration/) for agent wake behavior.
+
 ## Notification preferences
 
 You control which events notify you from the **Notification Preferences** card on the

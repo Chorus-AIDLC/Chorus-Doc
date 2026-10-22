@@ -59,6 +59,8 @@ docker compose -f docker-compose.local.yml up -d
 打开 `http://localhost:8637`，使用 `admin@example.com` / `changeme` 登录（或通过
 `DEFAULT_USER` / `DEFAULT_PASSWORD` 环境变量覆盖）。
 
+独立部署示例使用 `admin@example.com` / `changeme` 启用旧版 Default Auth，共享访问前务必替换。下文生产 Compose 和 `docker run` 示例也显式启用了这个演示入口；仓库的生产 Compose 文件则默认将两个凭据留空，除非另行提供。使用托管本地账号时，注入超级管理员凭据并按下文设置，不要把演示登录当作托管的团队账号。
+
 在独立模式下，容器会：
 
 - 在内部端口（`5433`）上启动 PGlite，不对外暴露。
@@ -95,7 +97,7 @@ services:
       # first start and persists it in the chorus-app-data volume (single
       # replica only). For production, or more than one app container, set it
       # explicitly in .env or the environment:  openssl rand -base64 32
-      # Changing the secret invalidates Default Auth and Super Admin sessions.
+      # Changing the secret invalidates Default Auth, local-account and Super Admin sessions.
       - NEXTAUTH_SECRET=${NEXTAUTH_SECRET:-}
       - COOKIE_SECURE=${COOKIE_SECURE:-false}
       - DEFAULT_USER=admin@example.com
@@ -210,6 +212,8 @@ docker run -d \
 
 ### Redis
 
+Redis 通过独立连接提供跨实例 SSE 和共享认证计数器。非空 `REDIS_URL` 优先；否则 `REDIS_HOST` 使用 TLS（`rediss`），端口默认 `6379`、用户名默认 `default`，用户名在提供 `REDIS_PASSWORD` 时使用。非 TLS Redis 应显式使用 `redis://`。只有 URL 和 host 均未配置时，事件和限流才完全留在进程内。Redis 故障会启用每进程备用限流，不再共享额度，也不会阻止全部登录；意外的限流器错误可能放行。具体限制和恢复行为参见[共享认证限流](/zh/guides/deploy-operations/#共享认证限流)。
+
 <div class="table-scroll" role="region" aria-label="Redis 环境变量" tabindex="0">
 
   | 变量 | 说明 |
@@ -224,12 +228,16 @@ docker run -d \
 
 ### 身份认证
 
+托管本地账号保存在数据库中，不通过 `DEFAULT_USER` / `DEFAULT_PASSWORD` 配置。向应用注入 `SUPER_ADMIN_EMAIL` 和 `SUPER_ADMIN_PASSWORD_HASH`，再从管理面板创建本地账号工作区并邀请首位工作区管理员。无需身份提供商或邮件服务。同一工作区的本地账号与 OIDC 互斥，已有工作区不可转换。持久化 `NEXTAUTH_SECRET` 并在所有副本间共享；共享访问使用 HTTPS 和 `COOKIE_SECURE=true`。设置账号以及如何只关闭旧版 Default Auth 参见[运维指南](/zh/guides/deploy-operations/)。
+
+`AUTH_TRUST_PROXY` 默认关闭，仅 `true` 启用。`AUTH_TRUST_PROXY_HOPS` 默认 `1`，有效值为 1 到 16 的整数，从 `X-Forwarded-For` 右侧计数。只有代理链强制执行且不可绕过时才启用信任，HTTPS 本身不足以建立信任。内置 CDK 的 ALB 模式使用 `true` / `1`，CloudFront 模式使用 `false` / `2`，因为 VPC 流量仍可绕过 CloudFront 到达私有源站。
+
 <div class="table-scroll" role="region" aria-label="身份认证环境变量" tabindex="0">
 
   | 变量 | 说明 |
   | --- | --- |
-  | `DEFAULT_USER` | 内置登录的邮箱地址（绕过 OIDC）。首次登录时自动创建该用户及其工作区。 |
-  | `DEFAULT_PASSWORD` | 默认用户的密码（明文，运行时通过 bcrypt 比对）。 |
+  | `DEFAULT_USER` | 可选的旧版 Default Auth 邮箱，需同时设置 `DEFAULT_PASSWORD`。按需创建用户和工作区，不会创建托管本地账号或授予本地工作区管理员角色。 |
+  | `DEFAULT_PASSWORD` | 旧版 Default Auth 的明文密码，运行时直接比较，并非 bcrypt 比对。与数据库中的本地账号密码无关。 |
   | `NEXTAUTH_URL` | 应用对外的基础 URL（默认：`http://localhost:8637`）。在反向代理后运行时请设置此项。 |
   | `COOKIE_SECURE` | 设为 `"false"` 可为纯 HTTP 部署禁用安全 Cookie（docker-compose 中默认为 `"false"`）。以 HTTPS 部署到生产环境时设为 `"true"`。 |
 
@@ -280,6 +288,8 @@ docker run -d \
 :::
 
 ## 会话密钥（`NEXTAUTH_SECRET`）
+
+托管本地账号会话同样使用 `NEXTAUTH_SECRET`，轮换密钥也会使这些会话失效。
 
 `NEXTAUTH_SECRET` 用于签发 Chorus 自己的会话 JWT（内置登录和超级管理员登录）。
 OIDC 令牌由身份提供方签名，智能体 API 密钥也单独校验。轮换此密钥会使 Chorus 自签名会话失效，

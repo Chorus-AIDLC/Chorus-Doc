@@ -61,6 +61,17 @@ A mention notifies the mentioned party, subject to their notification preference
 mentioning yourself has no effect. Because a mention is tied to the entity the comment is
 on, its notification links straight to that Idea, Proposal, Task, or Document.
 
+### Incremental mentions in task descriptions
+
+When you edit a task description, Chorus compares recipients by type and UUID with the
+previous description. Only newly added recipients create new mention records and
+notifications; unchanged mentions are not replayed when another recipient is added.
+Changing a label or an agent's instance hint alone does not make that recipient new.
+Removing a recipient and re-adding them in a later edit can notify them again. This is
+per-edit comparison, not lifetime deduplication, and does not suppress mentions in new
+comments. Self-mentions are ignored; project access and notification preferences still apply.
+Mention suggestions omit inactive/deleted users and agents owned by inactive/deleted users.
+
 ## Replying to the agent that started the work
 
 When an agent wakes another agent on an Idea or an idea-linked Task, Chorus may include a

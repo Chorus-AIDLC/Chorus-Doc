@@ -95,6 +95,25 @@ an agent connects and runs work on your project, see the
 [agent platforms reference](/reference/agents/).
 :::
 
+## Submit safely from an agent
+
+Keep the task `in_progress` while preparing the handoff:
+
+1. Post the completion evidence with `chorus_report_work`, without a `status` field.
+2. Record each acceptance criterion with `chorus_report_criteria_self_check`; finish the
+   work needed for every required criterion to pass.
+3. Read this task with `chorus_get_task` and confirm it is still `in_progress`.
+4. Call `chorus_submit_for_verify` explicitly, with the summary. This is the
+   `in_progress → to_verify` transition; the caller must own the assignment.
+5. Leave independent review and admin verification to the responsible reviewer or parent agent.
+
+Do not first send `status: "to_verify"` through `chorus_report_work` or `chorus_update_task`:
+those can change status, but a subsequent explicit submit fails. If the task is already
+legitimately awaiting review, leave it there. If it was moved prematurely, the assignee can
+return it to `in_progress` with `chorus_update_task`, subject to dependency checks. This
+clears both developer and admin acceptance marks and evidence: redo the self-check, read
+the task again, then submit. See [Pi](/reference/agents/pi/) for its optional readback gate.
+
 ## Next
 
 When a task reaches **To Verify**, continue to

@@ -39,9 +39,9 @@ Chorus 在生产运行中读取的环境变量：
 | `NEXTAUTH_SECRET` | 多实例时必需 | 所有副本共享的签名密钥。单个 npm 实例可省略，`chorus` 默认生成并保存在 `~/.chorus-data/.secret`。环境变量中的已知占位值会被忽略并触发警告；已保存的密钥若为空或为公开占位值，则停止启动。 |
 | `SUPER_ADMIN_EMAIL` | 是 | 用于引导 `/admin` 超级管理员面板的邮箱。 |
 | `SUPER_ADMIN_PASSWORD_HASH` | 是 | 超级管理员密码的 bcrypt 哈希值。 |
-| `DEFAULT_USER` | 可选 | 启用内置的邮箱／密码登录，用于首次访问。 |
+| `DEFAULT_USER` | 可选 | 可选的旧版 Default Auth 邮箱，需同时设置 `DEFAULT_PASSWORD`。按需创建用户和工作区，不会创建托管本地账号或授予本地工作区管理员角色。 |
 | `DEFAULT_PASSWORD` | 可选 | 内置登录使用的密码。 |
-| `REDIS_URL` | 可选 | Redis 连接串。运行多个实例时必需（见下文）。 |
+| `REDIS_URL` | 可选 | 用于 SSE 和认证计数器的共享 Redis，多实例一致性需要它；也可使用 `REDIS_HOST` 和其他独立 Redis 变量。 |
 
 </div>
 
@@ -59,7 +59,11 @@ Chorus 通过 Redis 在多个实例之间传播实时更新（SSE 事件流）�
 REDIS_URL='redis://default:password@redis.internal:6379'
 ```
 
-**跨实例的事件传播必须依赖 Redis。** 未设置 `REDIS_URL` 时，Chorus 会退回到进程内的内存事件总线，其作用范围仅限单个进程，在一个实例上产生的更新不会到达其他实例。单实例部署可以不配置 Redis，依靠这种内存回退运行；但只要部署多于一个实例，就必须配置共享 Redis。
+Redis 通过独立连接提供跨实例 SSE 和共享认证计数器。非空 `REDIS_URL` 优先；否则 `REDIS_HOST` 使用 TLS（`rediss`），端口默认 `6379`、用户名默认 `default`，用户名在提供 `REDIS_PASSWORD` 时使用。非 TLS Redis 应显式使用 `redis://`。只有 URL 和 host 均未配置时，事件和限流才完全留在进程内。Redis 故障会启用每进程备用限流，不再共享额度，也不会阻止全部登录；意外的限流器错误可能放行。具体限制和恢复行为参见[共享认证限流](/zh/guides/deploy-operations/#共享认证限流)。
+
+`AUTH_TRUST_PROXY` 默认关闭，仅 `true` 启用。`AUTH_TRUST_PROXY_HOPS` 默认 `1`，有效值为 1 到 16 的整数，从 `X-Forwarded-For` 右侧计数。只有代理链强制执行且不可绕过时才启用信任，HTTPS 本身不足以建立信任。内置 CDK 的 ALB 模式使用 `true` / `1`，CloudFront 模式使用 `false` / `2`，因为 VPC 流量仍可绕过 CloudFront 到达私有源站。
+
+托管本地账号保存在数据库中，不通过 `DEFAULT_USER` / `DEFAULT_PASSWORD` 配置。向应用注入 `SUPER_ADMIN_EMAIL` 和 `SUPER_ADMIN_PASSWORD_HASH`，再从管理面板创建本地账号工作区并邀请首位工作区管理员。无需身份提供商或邮件服务。同一工作区的本地账号与 OIDC 互斥，已有工作区不可转换。持久化 `NEXTAUTH_SECRET` 并在所有副本间共享；共享访问使用 HTTPS 和 `COOKIE_SECURE=true`。设置账号以及如何只关闭旧版 Default Auth 参见[运维指南](/zh/guides/deploy-operations/)。
 
 所有实例还必须共享同一个安全的 `NEXTAUTH_SECRET`，这样无论请求落到哪个实例，Chorus 签发的会话都保持有效。
 
@@ -132,7 +136,7 @@ CloudFront 地址、ECS 日志或目标组健康状态，并确认部署区域�
 | CloudFront | 仅在 `cloudfront` 模式创建的公网 HTTPS 入口。 | 私有 VPC origin，禁用缓存，可选自定义域名。 |
 | ECS Fargate 服务 | 在私有子网中运行 Chorus 容器。 | 期望副本数 2，1024 CPU 单位／2048 MiB，部署断路器可自动回滚。 |
 | Aurora Serverless v2（PostgreSQL） | 托管的 PostgreSQL 集群。 | 存储加密；凭据自动生成并存入 Secrets Manager；备份保留 1 天。 |
-| ElastiCache Serverless（Redis） | 用于跨实例事件的托管 Redis。 | 使用 RBAC 用户；密码存入 Secrets Manager。 |
+| ElastiCache Serverless（Redis） | 用于跨实例事件与共享认证计数器的托管 Redis。 | 使用 RBAC 用户；密码存入 Secrets Manager。 |
 | Secrets Manager | 保存生成的数据库、Redis 凭据以及应用密钥。 | 在运行时注入到 ECS 任务中。 |
 
 </div>

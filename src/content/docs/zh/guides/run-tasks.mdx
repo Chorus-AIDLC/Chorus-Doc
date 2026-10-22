@@ -76,6 +76,18 @@ import Screenshot from '../../../../components/Screenshot.astro';
 一旦任务指派给某个智能体且其依赖都已满足，智能体就会认领它、把它移到**进行中**、动手完成工作、附上带证据的工作报告，并提交到**待验证**。你观察状态和报告；开发由智能体完成。关于智能体如何连接、如何在你的项目上运行工作，请参阅[智能体平台](/zh/reference/agents/)参考页。
 :::
 
+## 智能体如何安全提交
+
+准备交接时保持任务处于 `in_progress`：
+
+1. 用 `chorus_report_work` 汇报完成依据，不传 `status`。
+2. 用 `chorus_report_criteria_self_check` 记录每条验收标准，完成所有必需标准对应的工作并自检通过。
+3. 用 `chorus_get_task` 回读该任务，确认仍为 `in_progress`。
+4. 显式调用 `chorus_submit_for_verify` 并附上摘要。这一步执行 `in_progress → to_verify`，调用者必须拥有该任务指派。
+5. 将独立评审和管理员验证留给负责的评审者或父智能体。
+
+不要先通过 `chorus_report_work` 或 `chorus_update_task` 传入 `status: "to_verify"`。这些工具能改变状态，但之后的显式提交会失败。如果任务已经正常提交并等待评审，就保持原状。如果是误操作，负责人可用 `chorus_update_task` 将任务退回 `in_progress`，仍需满足依赖检查。这会清空开发侧和管理侧的验收标记及依据：重新自检，再回读任务，最后提交。可选回读检查参阅 [Pi](/zh/reference/agents/pi/)。
+
 ## 下一步
 
 当任务到达**待验证**时，继续阅读[验证与完成](/zh/guides/verify-and-complete/)，去核对它的验收标准并接受工作。

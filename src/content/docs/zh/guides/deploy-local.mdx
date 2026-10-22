@@ -29,8 +29,7 @@ HTTPS 入口，或通过你自己创建的 Cloudflare Named Tunnel 对外发布�
 
 </div>
 
-这是单实例部署。Redis 被刻意禁用（`REDIS_URL` 为空），实时更新使用内存内投递，只适用于
-一个应用容器。
+这是单实例部署。Redis 被刻意留空（`REDIS_URL` 为空且未设置 `REDIS_HOST`），实时更新和认证计数器都只在进程内生效。不要将此栈扩展为多个应用容器并期望共享事件或登录限制。参见[认证限流](/zh/guides/deploy-operations/#共享认证限流)。
 
 ## 前提条件
 
@@ -146,10 +145,7 @@ bash install.sh --target local --image-source build \
 - 在其他局域网设备上：`http://<主机局域网 IP>:18637`。请使用主机的真实地址，而不是 `0.0.0.0`。
 - 使用你设置的普通登录账号登录。**`/admin` 面板**使用独立的超级管理员账号。
 
-内置邮箱/密码登录是引导和演示用途，不是团队 SSO。团队使用时，请在管理面板中按公司配置 OIDC，
-参见[运维自托管的 Chorus](/zh/guides/deploy-operations/)。局域网明文 HTTP 不会加密凭据或会话，
-而且浏览器在不安全的 HTTP 源上不提供 OIDC 客户端做 PKCE 所需的 Web Crypto API，因此 OIDC
-需要 HTTPS。
+安装器凭据启用的是旧版 Default Auth，而不是托管本地账号。团队可以从超级管理员面板创建本地账号工作区并邀请首位工作区管理员，或配置独立的 OIDC 工作区，无需新增本地认证环境变量。关闭 Default Auth 前先阅读[运维指南](/zh/guides/deploy-operations/)：私有 env 的值仍需非空以供 Compose 插值，再通过覆盖文件清空应用容器中的值。共享访问应使用 HTTPS；普通 LAN HTTP 不加密凭据和会话，OIDC 的 Web Crypto/PKCE 也需要安全源。
 
 ## 用保存的包装脚本重新部署
 

@@ -1,6 +1,6 @@
 ---
 title: Account and workspace
-description: Sign in to Chorus, pick a workspace, run first-run onboarding, set your language and theme, and sign out.
+description: Sign in, choose a workspace, accept invitations, and save your display name, avatar, language, and theme.
 docsLocale: en
 route: /guides/account-and-workspace/
 sidebar:
@@ -17,27 +17,22 @@ this page does not repeat it.
 
 ## Sign in
 
-Chorus signs you in by email. Enter your email address and select **Continue** — where you
-go next depends on how your account is set up:
+Enter your email or local username and select **Continue**. Chorus discovers the available sign-in methods before asking for a password:
 
-- **Single sign-on (SSO).** If your email belongs to one workspace that uses an identity
-  provider, Chorus sends you to that provider to authenticate, then back into Chorus. (If
-  you run the deployment and need to turn SSO on, see
-  [Super Admin and SSO setup](/guides/authentication-setup/).)
-- **A choice of identities.** If your email can sign in more than one way, Chorus asks you
-  to pick one — for example password, SSO, or Super Admin.
-- **Pick a workspace.** If your email belongs to several SSO workspaces, Chorus takes you to
-  the workspace chooser described below.
+- **Local workspace account.** Use the username or email from your invitation. Choose the workspace if prompted, then enter your password. Usernames and emails are case-insensitive.
+- **Single sign-on (SSO).** Use your email and complete authentication with your workspace's identity provider.
+- **Default Auth.** The single account configured with `DEFAULT_USER` and `DEFAULT_PASSWORD` uses its email and deployment password. This is separate from managed local workspace accounts.
+- **Multiple identities.** Choose the intended local workspace, SSO workspace, default account, or Super Admin identity. Configuring a default account does not bypass this choice.
 
-If your installation uses built-in email/password sign-in (the local single-user setup from
-[Get started](/guides/getting-started/)), enter your email and password. When your workspace
-also supports SSO, you can switch to it from the same screen.
+A local workspace uses local accounts, not OIDC alongside them. The same email may still have separate identities in other workspaces. For deployment setup, see [Super Admin and authentication setup](/guides/authentication-setup/).
+
+### Accept an invitation or reset a password
+
+Open the link your administrator shares privately and set a password of at least 8 characters and at most 72 UTF-8 bytes. Links expire after 24 hours, work once, and are replaced when a new link is issued. Chorus does not email them automatically. Completing the form does not sign you in: return to sign-in and use your username or email and new password. Ask your Workspace Admin for a fresh invitation or reset link if needed; there is no public registration or self-service password reset.
 
 ## Choose a workspace
 
-One email can belong to more than one workspace. When it does, Chorus shows you a chooser
-listing each workspace by name and identity provider. Pick one and Chorus takes you through
-that workspace's sign-in. You can also switch to a different email from here.
+If only several SSO workspaces match, the chooser lists their names and identity providers. If local accounts or other sign-in methods also match, use the identity picker instead. Verify the workspace before entering a password; matching usernames or emails in different workspaces do not represent one shared account. You can go back and change the identifier.
 
 ## First-run onboarding
 
@@ -60,9 +55,10 @@ You can reopen the wizard any time from **Settings**.
 :::note[What the agent does]
 The **Create an agent** and **Test** steps set up and then verify an AI agent identity. Once
 you create the agent and install its client, the agent connects to Chorus on its own; the
-**Test** step just watches for that connection. For how each client platform connects and
-behaves, see the [agent platforms reference](/reference/agents/).
+**Test** step just watches for that connection.
 :::
+
+For how each client platform connects and behaves, see the [agent platforms reference](/reference/agents/).
 
 <Screenshot
   src="/images/workspace/onboarding-wizard.webp"
@@ -70,6 +66,23 @@ behaves, see the [agent platforms reference](/reference/agents/).
   width={1440}
   height={900}
   caption="The first-run onboarding wizard walks you through connecting your first agent; you can skip it and reopen it from Settings."
+/>
+
+## Display name and avatar
+
+Open **Settings** to edit your own profile. These controls are for signed-in users, including local, OIDC, and Default Auth users, not agent API keys or the Super Admin panel.
+
+- **Display name:** enter 1–32 Unicode code points after trimming surrounding whitespace. Emoji are supported; a composed emoji may count as more than one. Select **Save** or press Enter outside text composition. **Cancel** discards the draft. This changes your visible name, not your login username or email; a customized name is not overwritten by later OIDC sign-ins.
+- **Avatar:** select **Randomize** to preview a generated avatar. Repeat until satisfied, then select **Save**. **Cancel** or leaving the page discards the unsaved preview. This is a generated avatar selector, not an image-upload field.
+
+Typing or randomizing alone never saves. Wait for confirmation; a failed save keeps your previous saved profile and lets you retry. Name and avatar save independently. Saved changes update the current account display and persist after reload; they do not edit another workspace identity.
+
+<Screenshot
+  src="/images/workspace/profile-settings.webp"
+  alt="Settings showing generated avatar controls and an editable display name for a demo user"
+  width={1440}
+  height={1000}
+  caption="Preview an avatar or edit your display name, then save each change explicitly."
 />
 
 ## Language and theme

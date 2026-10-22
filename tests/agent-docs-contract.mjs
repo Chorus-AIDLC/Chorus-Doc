@@ -217,10 +217,13 @@ const screenshotContracts = [
 for (const [sourcePath, assetName, statePattern] of screenshotContracts) {
   const file = path.join(contentRoot, sourcePath);
   const content = await readFile(file, 'utf8');
-  assertMatch(content, new RegExp(`src="/images/agent-operations/${escapeRegExp(assetName)}"`), file, 'screenshot asset');
-  assertMatch(content, /width=\{1440\}/, file, 'stable screenshot width');
-  assertMatch(content, /height=\{900\}/, file, 'stable screenshot height');
-  const caption = content.match(/caption="([^"]+)"/)?.[1] ?? '';
+  const screenshot = [...content.matchAll(/<Screenshot\b[\s\S]*?\/>/g)]
+    .map((match) => match[0])
+    .find((block) => block.includes(`src="/images/agent-operations/${assetName}"`));
+  assert.ok(screenshot, `${sourceLabel(file)}: missing screenshot asset ${assetName}`);
+  assertMatch(screenshot, /width=\{1440\}/, file, 'stable screenshot width');
+  assertMatch(screenshot, /height=\{900\}/, file, 'stable screenshot height');
+  const caption = screenshot.match(/caption="([^"]+)"/)?.[1] ?? '';
   assert.ok(caption.length >= 24, `${sourceLabel(file)}: caption must explain the visible state`);
   assert.match(caption, statePattern, `${sourceLabel(file)}: caption must identify the user-visible state`);
 

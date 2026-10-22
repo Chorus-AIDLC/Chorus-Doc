@@ -162,6 +162,41 @@ OpenSpec when it is usable and spec-lite otherwise. The older `CHORUS_OPENSPEC_M
 [OpenSpec mode](/guides/openspec-mode/) and [Spec-lite mode](/guides/spec-lite-mode/).
 Reviewer toggles remain `CHORUS_ENABLE_{PROPOSAL,TASK,CODE}_REVIEWER` (default `true`).
 
+## Optional pre-submit readback gate
+
+The `chorus-pi` extension has an opt-in call-order reminder, disabled by default. Set the
+environment variable in the process that launches Pi, then restart Pi:
+
+```bash
+CHORUS_SUBMIT_GATE=warn pi
+```
+
+- `off` (also unset or an unrecognized value): no gate checks.
+- `warn`: show a warning but let the tool call proceed.
+- `block`: stop the recognized submit call until the missing or stale read is corrected.
+
+For daemon wakes, put `"CHORUS_SUBMIT_GATE": "block"` in the Pi agent's existing `env`
+object in `~/.chorus/daemon.json`, then restart the daemon. This is a Pi-process environment
+setting, not an MCP-server config key or a `CHORUS_ENABLE_*_REVIEWER` switch. In a headless
+session, do not depend on a visible warning; use `block` if prevention is required.
+
+Before `chorus_submit_for_verify`, call `chorus_get_task` for that exact task after its
+latest change and confirm `in_progress`. List/assignment reads do not count. Before
+`chorus_pm_submit_proposal`, call `chorus_pm_validate_proposal`; draft edits invalidate that
+validation receipt. A reported `valid: false` fails the gate; advisory warnings are still
+for you to evaluate. A status-changing work report invalidates a task read, but a report
+without `status` does not. A submit consumes its receipt, so another submit needs a new read.
+Reads started before a change cannot certify the state afterwards, even if they finish later.
+
+This is local call-order tracking, not a server validator, authorization boundary, or
+acceptance-criteria review. It watches recognized outer tool names in Pi events, including
+native MCP (`mcp__chorus__…`) and legacy direct tools (`chorus_chorus_…`). It does not inspect
+shell commands or nested tool calls in a generic dispatcher, and cannot see another client's
+changes. State checks depend on parseable results; the server remains authoritative. It never
+repairs state, self-checks criteria, or launches a reviewer for you. For the report → self-check
+→ readback → explicit-submit sequence and recovery after a premature status change, see
+[Run tasks](/guides/run-tasks/).
+
 ## Run Pi as a wakeable daemon backend
 
 Pi is a first-class **wakeable daemon backend** — the Chorus daemon wakes a headless Pi session

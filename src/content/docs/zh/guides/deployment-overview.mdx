@@ -44,9 +44,15 @@ sidebar:
 实例之间要通过 Redis 相互传播实时更新（Server-Sent Events）。没有 Redis 时，Chorus 会
 回退到内存事件机制，而它只在单实例下有效。
 
+Redis 通过独立连接提供跨实例 SSE 和共享认证计数器。非空 `REDIS_URL` 优先；否则 `REDIS_HOST` 使用 TLS（`rediss`），端口默认 `6379`、用户名默认 `default`，用户名在提供 `REDIS_PASSWORD` 时使用。非 TLS Redis 应显式使用 `redis://`。只有 URL 和 host 均未配置时，事件和限流才完全留在进程内。Redis 故障会启用每进程备用限流，不再共享额度，也不会阻止全部登录；意外的限流器错误可能放行。具体限制和恢复行为参见[共享认证限流](/zh/guides/deploy-operations/#共享认证限流)。
+
 生产形态可以以容器方式运行（参见[使用 Docker 部署](/zh/guides/deploy-docker/)）、以全局
 npm 包方式对接你自己的 PostgreSQL 与 Redis，或运行在随附的 AWS CDK 栈上（参见
 [生产环境部署](/zh/guides/deploy-production/)）。
+
+### 独立选择账号管理方式
+
+托管本地账号保存在数据库中，不通过 `DEFAULT_USER` / `DEFAULT_PASSWORD` 配置。向应用注入 `SUPER_ADMIN_EMAIL` 和 `SUPER_ADMIN_PASSWORD_HASH`，再从管理面板创建本地账号工作区并邀请首位工作区管理员。无需身份提供商或邮件服务。同一工作区的本地账号与 OIDC 互斥，已有工作区不可转换。持久化 `NEXTAUTH_SECRET` 并在所有副本间共享；共享访问使用 HTTPS 和 `COOKIE_SECURE=true`。设置账号以及如何只关闭旧版 Default Auth 参见[运维指南](/zh/guides/deploy-operations/)。
 
 ## 前置条件
 

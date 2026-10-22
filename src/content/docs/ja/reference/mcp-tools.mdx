@@ -71,11 +71,7 @@ MCP トランスポートのセッションは、Chorus の**エージェント�
 
 </div>
 
-ヘッダーがない場合、結果はすべてのプロジェクトにわたります（既定）。**両方**のヘッダーがある場合は
-`X-Chorus-Project-Group` が優先します。これらのヘッダーに従うのは `chorus_get_my_assignments` だけで、範囲指定された
-プロジェクトに絞ったプロジェクト別トラッカーを返します。`chorus_checkin` の `ideaTracker` は**ヘッダーで
-フィルターされません**。常にすべてのプロジェクトにわたる、エージェントの最も新しい着想（上限十件）を返します。
-それ以外のすべてのツールは明示的な `projectUuid` 引数を取り、ヘッダーの影響を受けません。
+範囲指定ヘッダーに従うのは `chorus_get_my_assignments` だけです。未指定ならアクセス可能なプロジェクト全体を対象とし、両方あれば `X-Chorus-Project-Group` が優先します。`chorus_checkin` は絞り込まれない `activeProjects` の分布を返し、最近の着想一覧ではありません。他のツールはそれぞれの明示的な範囲引数を使います。これらのヘッダーは一般的なアクセスフィルターではありません。
 
 ```json
 {
@@ -177,28 +173,23 @@ MCP トランスポートのセッションは、Chorus の**エージェント�
 
 ### chorus_checkin — 共通
 
-各実行の最初に呼び出すことを推奨します。エージェントの識別情報と所有者、その有効権限セット、プロジェクト別に
-グループ化された着想トラッカー、そして通知の要約を返します。`ideaTracker` は最も新しく更新された十件の
-着想を上限とし、すべてのプロジェクトにわたります。上記の範囲指定ヘッダーでは**絞られません**（範囲指定
-され上限のないトラッカーには `chorus_get_my_assignments` を使ってください）。
+概要には最大 10 プロジェクトが含まれ、各プロジェクトで最後に更新された進行中の着想の順に並びます。掲載された各プロジェクトの着想数は切り詰められません。完全なトラッカーには `chorus_get_my_assignments` を使います。
+
+識別情報、所有者、有効権限、ペルソナと `activeProjects` を返します。プロジェクト UUID ごとに名前と `activeIdeaCount` があり、進行中の着想総数は切り詰められません。個別の着想や課題は含みません。最近の未読通知を最大五件返し、自動で既読にします。`notifications.unread` は既読化後の残りの未読数です。範囲指定ヘッダーでは絞られません。
 
 ```text
-入力：  （なし）
-返り値：{ agent: { uuid, name, permissions, owner },
-          ideaTracker: { <projectUuid>: { name, ideas[] } },
-          notifications: { unread, recent[] } }
+{ checkinTime, agent: { uuid, name, permissions, persona, systemPrompt, owner },
+  activeProjects: { <projectUuid>: { name, activeIdeaCount } },
+  notifications: { unread, recent[] } }
 ```
 
 ### chorus_get_my_assignments — 共通
 
-エージェントの完全な着想／課題トラッカーを、プロジェクト別にグループ化して返します。`chorus_checkin` の
-`ideaTracker` と同じ形ですが、最近の着想の件数上限はなく、加えて open の課題からなる `taskTracker` を持ちます。
-範囲指定ヘッダーに従います。
+進行中の着想／課題の完全なトラッカーをプロジェクト別に返し、範囲指定ヘッダーに従います。`ideaTracker` は個別の着想の派生ステータスと提案／課題数を、`taskTracker` は終端状態でない課題と受け入れ基準の進捗を含みます。完全な一覧には `activeProjects` ではなくこちらを使います。
 
 ```text
-入力：  （なし）
-返り値：{ ideaTracker: { <projectUuid>: { name, ideas[] } },
-          taskTracker: { <projectUuid>: { name, tasks[] } } }
+{ ideaTracker: { <projectUuid>: { name, ideas[] } },
+  taskTracker: { <projectUuid>: { name, tasks[] } } }
 ```
 
 ### chorus_claim_task — `task:write`
@@ -216,8 +207,10 @@ open の課題を担当し、`assigned` に移して呼び出し元を担当者�
 
 ```text
 入力：  { taskUuid, summary? }
-返り値：更新された Task
+返り値： { uuid, status: "to_verify" }
 ```
+
+`status` なしの `chorus_report_work` で完了を報告し、`chorus_report_criteria_self_check` を記録し、`chorus_get_task` で `in_progress` を確認してから明示的に提出します。先に `status: "to_verify"` を報告すると提出は失敗します。誤操作を `in_progress` に戻すと開発側と管理側の判定と根拠が消えるため、自己チェックをやり直します。正しく提出された課題は再開しないでください。[課題を実行する](/ja/guides/run-tasks/)を参照してください。
 
 ### chorus_pm_create_proposal — `proposal:write`
 
@@ -237,11 +230,23 @@ open の課題を担当し、`assigned` に移して呼び出し元を担当者�
 一つ必要で、なければ呼び出しは拒否されます。
 
 ```text
-入力：  { proposalUuid, title, description?, priority?, storyPoints?,
+入力：  { proposalUuid, title, description?, priority?, storyPoints?, kind?,
           acceptanceCriteriaItems: [{ description, required? }],  // 必須、空不可
           dependsOnDraftUuids?[] }
 返り値：更新された Proposal
 ```
+
+### 提案検証とドラフトの種類
+
+`chorus_pm_add_task_draft` と `chorus_pm_update_task_draft` は任意の `kind` として `implementation`、`verification`、`docs`、`other` を受け取ります。編集後に `chorus_pm_validate_proposal` を呼び、その後 `chorus_pm_submit_proposal` で提出します。提出時もサーバーで検証します。結果は `{ valid, issues[] }` で、レベルは `error`、`warning`、`info` です。エラーがある場合のみ `valid` が false になります。
+
+- `E-DEP-UNKNOWN`：依存先が同じ提案の課題ドラフトではありません。
+- `E-DEP-SELF`：自己依存です。
+- `E-DEP-CYCLE`：依存関係の循環です。
+- `I-KIND`：種類が未指定で実装の網羅性を確認できません。
+- `W-IMPL`：種類の指定はありますが `implementation` がありません。助言のみです。既存実装や文書のみの範囲を説明し、架空の作業を作らないでください。依存がない警告（`W4`）も助言です。
+
+任意の [Pi ゲート](/ja/reference/agents/pi/)はローカルの読み直し／検証順序を追跡するもので、サーバーの認可ではありません。[提案をレビューする](/ja/guides/review-a-proposal/)を参照してください。
 
 ### chorus_admin_verify_task — `task:admin`
 

@@ -30,11 +30,15 @@ span the whole lifecycle:
 
 ## Who did what
 
-The actor on each entry is the person or agent responsible, named so human and agent work
-are easy to tell apart. When an agent spawns sub-agents to work in parallel — swarm mode —
-activity is attributed to the specific sub-agent session that performed it, so a busy idea
-still reads as a clear sequence rather than an anonymous blur. For how those sessions are
-created and tracked, see [Manage agents and API keys](/guides/manage-agents/).
+The actor is the authenticated person or agent that performed the operation, not automatically
+the task's assignee or the agent's human owner. Task edits through the UI/API, MCP submission,
+and status-changing work reports preserve that caller in execution-history entries instead
+of labeling the action as System. The name and avatar help distinguish people and agents.
+
+When a worker supplies a valid `sessionUuid` on supported calls such as
+`chorus_update_task` and `chorus_report_work`, session attribution adds context; it does not
+replace the authenticated actor. Not every event carries a sub-agent session. See
+[Manage agents and API keys](/guides/manage-agents/) for session tracking.
 
 If a project is new or quiet, the view simply says there is no activity yet — the log fills
 in as you and your agents work. For notifications about activity that concerns *you*

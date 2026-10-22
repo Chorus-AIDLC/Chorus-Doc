@@ -64,6 +64,15 @@ try {
       '/zh/guides/deploy-local/',
       '/ja/guides/deploy-local/',
       '/ko/guides/deploy-local/',
+      ...['', '/zh', '/ja', '/ko'].flatMap((locale) => [
+        `${locale}/guides/account-and-workspace/`,
+        `${locale}/guides/administrator-setup/`,
+        `${locale}/guides/authentication-setup/`,
+        `${locale}/guides/deploy-production/`,
+        `${locale}/guides/review-a-proposal/`,
+        `${locale}/reference/mcp-tools/`,
+        `${locale}/reference/agents/pi/`,
+      ]),
     ]) {
       const page = await context.newPage();
       await page.goto(`http://127.0.0.1:${address.port}${route}`, {

@@ -15,23 +15,18 @@ reverse-proxy settings that matter behind HTTPS. For how to stand a deployment u
 
 ## Bootstrap first access
 
-A fresh deployment has no accounts yet. Set `DEFAULT_USER` and `DEFAULT_PASSWORD` to
-enable a built-in email/password login that bypasses single sign-on:
+A fresh deployment can use managed local accounts without an identity provider. Configure the Super Admin credentials below, then create a local-account workspace and invite its first Workspace Admin. This differs from the optional Default Auth demo/bootstrap path. To enable that legacy path, set both variables:
 
 ```sh
 DEFAULT_USER='admin@example.com' \
 DEFAULT_PASSWORD='choose-a-strong-password'
 ```
 
-When both variables are set, the sign-in page shows an email/password form. On the first
-successful sign-in, Chorus automatically creates the user and their workspace from the email,
-so no manual setup is needed to get in.
+When both variables are set, the configured email can use Default Auth. On first successful sign-in, Chorus creates the user and workspace as needed, but not a managed local account or local Workspace Admin role. Sign-in starts with an email or username; choose the intended role or workspace if several match.
 
 ### Turn the built-in login off
 
-After verifying OIDC and super admin sign-in, remove `DEFAULT_USER` and `DEFAULT_PASSWORD`
-from the application's environment and recreate or restart it. This hides the bootstrap
-email/password form; it does not revoke sessions that were already issued.
+After verifying managed local-account or OIDC access and Super Admin sign-in, remove `DEFAULT_USER` and `DEFAULT_PASSWORD` from the application environment and recreate or restart it. This disables Default Auth, not managed local-account password login, and does not itself revoke already-issued sessions.
 
 For the [installer-managed Compose stack](/guides/deploy-local/), **keep both values nonempty
 in the private env file**: the base Compose file requires them during interpolation. Instead,
@@ -54,7 +49,7 @@ recipe in the local guide already includes this file when present.
 
 ## Configure deployment-side authentication
 
-Two kinds of authentication are configured at the deployment level.
+Default Auth and Super Admin credentials come from the deployment environment. Managed local accounts and OIDC are configured per workspace in the database, not with a new local-auth environment switch.
 
 ### Super Admin bootstrap
 
@@ -77,6 +72,14 @@ Only the bcrypt hash belongs in your configuration. Keep the plaintext password 
 environment files, shell history, and source control, and inject the hash through a secret
 store where possible.
 :::
+
+### Managed local-account workspaces
+
+Sign in as the Super Admin to create a local-account workspace and invite its first Workspace Admin. Share the one-time link privately; Chorus does not send invitation or password-reset email. The recipient sets a password, then signs in separately. Invitations and reset links expire after 24 hours; generating a replacement invalidates the older link. An active local Workspace Admin manages further users and resets. This role is not the deployment Super Admin and is not granted by `DEFAULT_USER`.
+
+Local accounts and OIDC are mutually exclusive within a workspace. Choose the appropriate type when creating it; existing workspaces cannot be converted by editing their authentication mode. Back up the database and persistent `NEXTAUTH_SECRET`: local passwords are bcrypt hashes in the database (work factor 12), while local sessions use that signing secret. Passwords must have at least 8 characters and at most 72 UTF-8 bytes. Use HTTPS and `COOKIE_SECURE=true` for shared access. See [Authentication setup](/guides/authentication-setup/) for account procedures.
+
+The historical override filename `oidc-only.yml` above only disables Default Auth; it also works for managed local-account workspaces and does not enable OIDC.
 
 ### Single sign-on (OIDC)
 
@@ -146,3 +149,25 @@ Two settings matter when Chorus runs behind TLS termination or a reverse proxy:
 | `COOKIE_SECURE` | `true` | The site is served over HTTPS (including behind a proxy that terminates TLS). Secure cookies are only sent over encrypted connections. |
 | `COOKIE_SECURE` | `false` | Only for trusted, internal HTTP-only networks. Cookies are then sent over unencrypted HTTP, so never use this on the public internet. |
 | `NEXTAUTH_URL` | The public base URL | Chorus runs behind a reverse proxy. Set it to the externally visible address (for example `https://chorus.example.com`) so redirects and links resolve correctly. |
+
+## Shared authentication throttling
+
+Redis serves two separate purposes: Pub/Sub propagates SSE live updates, while a separate request connection stores shared authentication counters. All replicas must use the same Redis for consistent limits; working SSE delivery alone does not prove those counters are healthy.
+
+- Identity lookup allows 30 attempts per 60 seconds; local password login and invitation/reset acceptance each allow 10 per 60 seconds. These are fixed limits, not environment options.
+- Without a trusted client address, limits apply to the normalized identifier, workspace plus identifier for local login, or credential token for acceptance, not one global bucket. With a trusted address, both an address-plus-identity bucket and a separate address bucket apply per action, preventing identifier rotation from bypassing the address limit.
+- Rejection returns HTTP `429`, `RATE_LIMITED`, and `Retry-After` in seconds (rounded up, minimum 1). This does not cover every login/API endpoint; keep edge limits for the full authentication surface.
+
+Configuration and defaults:
+
+- A nonempty `REDIS_URL` takes precedence. Otherwise `REDIS_HOST` enables TLS (`rediss`), with `REDIS_PORT=6379`, `REDIS_USERNAME=default`, and optional `REDIS_PASSWORD`. The username is used when a password is supplied. For non-TLS Redis use an explicit `redis://` URL. With neither URL nor host set, Redis is unconfigured.
+- `AUTH_TRUST_PROXY` is off unless exactly `true`. `AUTH_TRUST_PROXY_HOPS` defaults to `1` and must be an integer from 1 through 16. Addresses are counted from the right of `X-Forwarded-For`; missing, too-short, or invalid chains disable address limiting, not identity limiting. Enable trust only behind an enforced append/overwrite proxy chain with no direct or intermediate bypass. HTTPS alone does not establish that trust.
+- Bundled CDK ALB mode sets trust to `true`, hops `1`. CloudFront mode sets trust to `false`, hops `2`: VPC traffic can bypass CloudFront at the private origin. Do not enable two-hop trust until that bypass is closed.
+
+### Failure boundaries
+
+No Redis configuration means process-local counters and a warning. When configured Redis is connecting, unavailable, or rejects commands (including READONLY/OOM), the limiter uses per-process in-memory insurance counters, not shared counters. Commands time out after 500 ms; a socket with pending commands and no reply is recycled after 2,000 ms. Unfulfilled commands are not replayed on reconnect. The 500 ms bound is per command, not a whole-request response-time guarantee.
+
+Watch `auth-throttle` logs for degradation and restoration. Insurance warnings are limited to once per 60 seconds, with a 5-second first-connection grace period. Memory counters share a 10,000-key capacity with least-recently-used eviction: they are best-effort, reset on restart, and are not merged back into Redis on recovery. An unexpected limiter backend error outside normal insurance handling is logged and permits that check (fail-open). A Redis outage does not deliberately block all sign-ins.
+
+Account validation is fail-closed and remains separate: disabled/deleted local users, an incompatible workspace mode, or a stale session version cannot authorize a local session. Failure to read account state does not grant access. Insurance also cannot restore cross-instance SSE; local events may continue while cross-instance updates are unavailable. Restore Redis and check both authentication counters and live updates before declaring recovery.

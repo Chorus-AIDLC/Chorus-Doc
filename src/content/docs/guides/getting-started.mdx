@@ -19,7 +19,7 @@ npm install --global \
   @chorus-aidlc/chorus
 ```
 
-Set your administrator account and start Chorus:
+Set your single-user Default Auth account and start Chorus:
 
 ```sh
 DEFAULT_USER=you@example.com \
@@ -32,11 +32,9 @@ application. Keep this terminal open while you use Chorus.
 
 ## Sign in
 
-Open `http://localhost:8637` and sign in with the email and password you set above. Keep
-those values out of shell history on shared machines. The built-in database is intended
-for local, single-user use. For a shared installation, use an external PostgreSQL
-database or the supported Docker deployment and manage credentials through the
-deployment environment.
+Open `http://localhost:8637`, enter the email above, and select **Continue**. Select the default password identity if Chorus offers several choices, then enter its password. This environment-defined account is not a Super Admin or a managed local Workspace Admin. Keep those values out of shell history on shared machines.
+
+The built-in database is intended for local, single-user use. For a shared installation, use an external PostgreSQL database or the supported Docker deployment. Configure [Super Admin and authentication](/guides/authentication-setup/) to create either an OIDC workspace or a local-account workspace with an invited initial Workspace Admin. Do not share the Default Auth password as a substitute for individual accounts. Local users accept a private invitation, set their password, and sign in with username or email; see [Account and workspace](/guides/account-and-workspace/).
 
 ## Connect an agent
 

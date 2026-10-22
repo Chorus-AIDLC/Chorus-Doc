@@ -1,6 +1,6 @@
 ---
 title: Prepare agent access
-description: Create a least-privilege agent credential and give an operator the details needed to connect.
+description: Manage local workspace users, create least-privilege agent credentials, and hand access to an operator.
 docsLocale: en
 route: /guides/administrator-setup/
 sidebar:
@@ -38,6 +38,31 @@ Treat the `cho_` value as a password. Store it in a secret manager or another ap
 credential store. If it is exposed, revoke the key in **Settings → Agents** and create a
 replacement.
 :::
+
+## Manage local workspace users
+
+For a local-auth workspace, open **Workspace users** in the sidebar (below **Settings**) while signed in as an active local **Workspace Admin** who has set a password. Regular users, OIDC users, Default Auth users, and agents cannot use this management surface. An agent's admin permission preset is not the Workspace Admin role. The Super Admin creates the workspace and its initial administrator, but does not use this page for day-to-day user management.
+
+1. Select **Invite user**. Enter a username and email; a display name is optional. Grant Workspace Admin only when needed.
+2. Use a username of 3–64 ASCII letters, numbers, dots, underscores, or hyphens, beginning with a letter or number and without `@`. Usernames and emails are trimmed, lowercased, and unique within this workspace, not across the deployment.
+3. Copy the invitation link from the result and share it through a private channel. It is shown only at issuance, expires after 24 hours, and works once. No invitation email is sent automatically.
+4. The invited user sets their own password and then signs in separately. You cannot activate a passwordless invitation by changing its status.
+
+The user list distinguishes **Invited**, **Active**, and **Disabled** accounts. Its actions let you edit username/email/name, grant or revoke Workspace Admin, disable or re-enable, remove, reissue an invitation, or issue a password-reset link for an active user. Re-enabling an account that never set a password restores its invited state and returns a fresh invitation.
+
+Account edits invalidate that user's existing sessions and old invitation/reset links; issuing a replacement invitation or reset link also invalidates sessions and older links. Share any fresh link returned for an invited account. The user must sign in again after completing a reset. Password reset retains the user's agent keys, but disabling or removing the owner blocks those keys from authenticating.
+
+Chorus prevents removing, disabling, or demoting the last effective Workspace Admin; an unaccepted invitation is not an active replacement admin. Removal keeps historical attribution and ownership on the removed identity. Reusing its username or email creates a new identity and does not inherit old work, privileges, sessions, or agent keys.
+
+Workspace creation and initial-admin recovery are covered in [authentication setup](/guides/authentication-setup/). Users edit their own display name and avatar in [account settings](/guides/account-and-workspace/).
+
+<Screenshot
+  src="/images/workspace/workspace-users.webp"
+  alt="Workspace users table showing an active demo user and account-management actions"
+  width={1440}
+  height={1000}
+  caption="An active local Workspace Admin manages invitations, account status, and administrator roles here."
+/>
 
 ## Give the operator what they need
 
