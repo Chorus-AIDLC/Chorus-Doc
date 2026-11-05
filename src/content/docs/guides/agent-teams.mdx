@@ -169,9 +169,10 @@ sessions, and work in progress are preserved. If anything changed since the prev
 preview expired, Chorus reassigns nothing and asks for a fresh preview; select **Refresh
 preview** and confirm again.
 
-Handing off requires **Editor** access to the project. With Viewer access you can still
-pick or unbind a template, but you cannot add members to a role, and **Hand off…** is
-unavailable.
+Handing off requires **Editor** access to the project. With Viewer access you can remove
+members, empty a role, or unbind the template, but you cannot add members. Saving fails if
+the change would add any member, including by applying a template that has members.
+**Hand off…** is also unavailable.
 
 If the lead you last handed off to is later removed from the Lead role, loses eligibility, or
 is deleted, the Team tab shows a warning naming it. Chorus does not reassign anything on its
