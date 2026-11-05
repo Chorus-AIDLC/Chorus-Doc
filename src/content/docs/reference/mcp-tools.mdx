@@ -74,7 +74,7 @@ scoping headers on the MCP connection:
 
 </div>
 
-Only `chorus_get_my_assignments` honors the scoping headers. With neither header, it spans accessible projects; when both are set, `X-Chorus-Project-Group` wins. `chorus_checkin` returns an unfiltered `activeProjects` distribution, not a recent-idea list. Other tools use their own explicit scope arguments; these headers are not a general project-access filter.
+`chorus_get_my_assignments` filters its results by the scoping headers. With neither header, it spans accessible projects; when both are set, `X-Chorus-Project-Group` wins. `chorus_checkin` does not filter by them: its `activeProjects` distribution stays unfiltered (it is not a recent-idea list), and the selected projects are only added to its `projectTeams`. Other tools use their own explicit scope arguments; these headers are not a general project-access filter.
 
 ```json
 {
@@ -188,7 +188,8 @@ Returns identity, owner, effective permissions, persona, and `activeProjects`: p
 
 `projectTeams` maps each project UUID to the owner's [Agent Team](/guides/agent-teams/) for that
 project, or `null` when there is none. It covers the `activeProjects` keys plus any projects
-named by the scoping headers, and is `{}` for an agent without an owner. Use
+selected by the scoping headers. It is `{}` for an agent without an owner or without
+`project:read`. Use
 `chorus_get_project_team` for any other project.
 
 ```text

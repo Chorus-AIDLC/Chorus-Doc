@@ -38,7 +38,7 @@ Claude daemon wakes wait up to 60 minutes (`3600000` ms) after the main turn for
 
 Each conversation has its own controls. Interrupting a **Task:** or **Review:** child
 conversation stops only that work; the idea's conversation and other child conversations keep
-running.
+running. Some runtimes, such as OpenClaw and Hermes, still keep one conversation per idea.
 
 Interrupt first asks the agent process to stop gracefully. If it does not stop within the
 configured timeout, the daemon ends the process.

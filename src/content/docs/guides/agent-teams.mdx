@@ -35,7 +35,8 @@ agents without them cannot be added to that role.
 - **One agent can hold several roles.** A single capable agent can be your product, review,
   and lead member at once.
 - **Every role is optional.** A role with no members keeps that kind of work on the usual
-  manual workflow. A Team with every role empty is valid.
+  manual workflow. Review is the exception: with no Review members, the orchestrator runs its
+  own reviewer sub-agent. A Team with every role empty is valid.
 - **On a project, members also need project access.** Agents act with their owner's access,
   so you need at least **Editor** access to the project for your agents to be eligible there
   (see [Control who can see a project](/guides/project-access/)). Review members need it too,
@@ -115,7 +116,8 @@ Each role row shows a badge:
   to a role overrides that whole role for this project.
 - Open the role's **…** menu for two more actions:
   - **Empty role** — keep the role deliberately empty on this project, even if the template
-    has members for it. That work then stays manual.
+    has members for it. That work then stays manual, except for an empty Review role, where
+    the orchestrator runs its own reviewer sub-agent.
   - **Reset inheritance** — drop your override and use the template's members again. It is
     not available while the Team is a frozen snapshot.
 
@@ -201,8 +203,8 @@ Lead role. It routes each step to your Team:
   who built it when possible. When candidates tie, the orchestrator decides.
 - **Review.** See [How reviews are routed](#how-reviews-are-routed) below.
 
-When a role is empty or has no eligible member, that step falls back to the usual manual
-workflow. If the orchestrator itself loses its required permissions or project access, Team
+When a role other than Review is empty or has no eligible member, that step falls back to the
+usual manual workflow. An empty Review role works differently, as described below. If the orchestrator itself loses its required permissions or project access, Team
 routing pauses for that Idea until you fix it or reassign the Idea.
 
 ## How reviews are routed
@@ -216,8 +218,8 @@ is notified and routes the review:
   agent that built the work can be picked as its reviewer.
 - If the Review role is empty, or no eligible member is online, the orchestrator runs its own
   independent reviewer sub-agent instead, so a review never stalls.
-- When the last task of the proposal is submitted, the orchestrator also starts a review of
-  the whole Idea's change. It runs alongside the task reviews, and its pass gates the
+- Once every task across all of the Idea's proposals is submitted for verification, done, or
+  closed, the orchestrator also starts a review of the whole Idea's change. It runs alongside the task reviews, and its pass gates the
   completion report.
 
 ### Review requests

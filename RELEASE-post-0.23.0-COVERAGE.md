@@ -10,8 +10,10 @@
   `git log 3d636687..origin/develop` were both empty: local and remote `develop` still pointed
   at `3d636687`. No user-visible commit landed after the starting baseline, so no screen
   needed recapturing and no extra page was added.
-- Delivery: one commit on the branch `docs/post-0-23-0-agent-teams` and a pull request
-  for human review. The pull request is not merged and the site is not deployed. No Chorus
+- Delivery: commits on the branch `docs/post-0-23-0-agent-teams` and a pull request for
+  human review: `0197a9b` (the coverage itself), `91ea777` (Viewer scope on the project Team
+  tab), and a follow-up commit that fixes the post-delivery review notes (see
+  [Post-delivery reviews](#post-delivery-reviews)). The pull request is not merged and the site is not deployed. No Chorus
   product code, version bump, tag or release is part of this change.
 - All page stems below apply to English (`src/content/docs/`) and its `zh/`, `ja/`, `ko/`
   counterparts. One route is new (`guides/agent-teams`, added to the "Use the workspace"
@@ -24,7 +26,7 @@
 | `4c02c4a8` #641 private Agent Teams | Personal Team templates in Settings, the four roles (product, development, review, lead), applying a template to a project, eligibility, template deletion leaving a frozen snapshot, lead handoff | `guides/agent-teams` (new), `guides/manage-agents`, `guides/project-access`, `reference/glossary`, `reference/mcp-tools` (`chorus_get_project_team`, check-in `projectTeams`) |
 | `ea222006` #644 Team-managed Ideas | An Idea assigned to one of your agents on a Team project is orchestrated by that assignee; Team state (active, paused, unmanaged); product delegation; a Team grants no permissions | `guides/agent-teams`, `guides/plugin-automation`, `reference/glossary`, `reference/mcp-tools` (`chorus_get_idea_team_context`, `chorus_recommend_team_agent`, `chorus_delegate_team_product`) |
 | `981995a1` #645 Team review routing | Proposal and task reviews go to the Team's Review role, fall back to the orchestrator's own reviewer, and the verdict is advice; approval and verification follow the normal workflow unless the Idea was started with Yolo | `guides/agent-teams`, `guides/review-a-proposal`, `guides/verify-and-complete`, `guides/plugin-automation`, `reference/mcp-tools` |
-| `cf748b0c` #646 wake-purpose sessions and structured review requests | One conversation per Idea with Task and Review child conversations grouped under it; a structured review request wakes only the named reviewer | `guides/agent-teams`, `guides/online-agents-overview`, `guides/remote-control`, `guides/session-recovery`, `guides/plugin-automation`, `reference/mcp-tools` (`chorus_request_review`) |
+| `cf748b0c` #646 wake-purpose sessions and structured review requests | One main conversation per agent per Idea, with Task and Review child conversations grouped under it; a structured review request wakes only the named reviewer | `guides/agent-teams`, `guides/online-agents-overview`, `guides/remote-control`, `guides/session-recovery`, `guides/plugin-automation`, `reference/mcp-tools` (`chorus_request_review`) |
 | `597fcc6a` #647 Team configuration UI | Project settings → Team tab, compact role rows with Inherited / Overridden badges, clear and reset per role, Save / discard, Unbind confirmation, Hand off… dialog with preview; Settings → Agent teams cards and editor | `guides/agent-teams`, `guides/project-access` (Project settings now has a Team tab); screenshots below |
 | `3d636687` #651 Quick Task ↔ Idea link | Pick, change or clear the Idea of a Quick Task; theme Ideas cannot take a direct task; linked tasks appear on the Idea panel, in the task view scope and in the resource graph; Idea progress is derived from approved-proposal tasks plus linked Quick Tasks; MCP task tools accept `ideaUuid` | `guides/create-and-edit-entities`, `guides/run-tasks`, `guides/verify-and-complete`, `guides/capture-an-idea`, `guides/plugin-commands`, `reference/lifecycle`, `reference/resource-graph`, `reference/mcp-tools` |
 
@@ -60,6 +62,9 @@ server running `3d636687` against a throwaway database with fictional data. The 
 no later UI commit, so none needed recapturing.
 
 ## Verification
+
+The author gate below was run for the original delivery (`0197a9b`). It is kept separate from
+the later reviews in [Post-delivery reviews](#post-delivery-reviews).
 
 Completed 2026-11-05 for 68 MDX pages (64 edited, four new), five new or replaced captures
 and two test route additions.
@@ -104,6 +109,23 @@ intermittent Node.js connection failures. `pnpm check:preview` ran with the same
 
 Local evidence logs: `/tmp/docspost023-check.log`, `/tmp/docspost023-preview.log`,
 `/tmp/docspost023-axe.log`, `/tmp/docspost023-links15s.log`. These are local verification artifacts, not published content.
+
+## Post-delivery reviews
+
+Team round-3 reviews of the delivered branch: Leo reviewed EN and ZH, and Tom reviewed JA and
+KO, the screenshots and these records. Both verdicts were PASS WITH NOTES. Their seven
+non-blocking notes (Korean reopen wording, this delivery record, the #646 conversation scope,
+the empty Review role fallback, check-in `projectTeams` and the scoping headers, the OpenClaw
+and Hermes conversation model, and the whole-Idea review trigger) were fixed in all four
+locales in the follow-up review-fix commit. For that commit, `pnpm content:check`, `pnpm build`
+(with the environment settings below; 229 pages, emphasis rendering verified) and
+`git diff --check` passed, and a scan of the changed Chinese prose outside code fences found no
+em dashes.
+
+Leo's browser-stage history, recorded as it happened: his first full `pnpm check` failed once
+in the browser stage on the unchanged `/guides/openspec-mode/` with "invalid landmarks,
+headings, or image alternatives". A re-run of `pnpm check:browser` passed. The cause was not
+established.
 
 ## Publication boundary
 

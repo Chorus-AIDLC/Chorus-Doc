@@ -71,7 +71,7 @@ MCP トランスポートのセッションは、Chorus の**エージェント�
 
 </div>
 
-範囲指定ヘッダーに従うのは `chorus_get_my_assignments` だけです。未指定ならアクセス可能なプロジェクト全体を対象とし、両方あれば `X-Chorus-Project-Group` が優先します。`chorus_checkin` は絞り込まれない `activeProjects` の分布を返し、最近の着想一覧ではありません。他のツールはそれぞれの明示的な範囲引数を使います。これらのヘッダーは一般的なアクセスフィルターではありません。
+`chorus_get_my_assignments` は範囲指定ヘッダーで結果を絞り込みます。未指定ならアクセス可能なプロジェクト全体を対象とし、両方あれば `X-Chorus-Project-Group` が優先します。`chorus_checkin` はこれらのヘッダーで絞り込みません。`activeProjects` の分布は絞り込まれず（最近の着想一覧でもありません）、ヘッダーで選んだプロジェクトは `projectTeams` に追加されるだけです。他のツールはそれぞれの明示的な範囲引数を使います。これらのヘッダーは一般的なアクセスフィルターではありません。
 
 ```json
 {
@@ -178,7 +178,7 @@ MCP トランスポートのセッションは、Chorus の**エージェント�
 識別情報、所有者、有効権限、ペルソナと `activeProjects` を返します。プロジェクト UUID ごとに名前と `activeIdeaCount` があり、進行中の着想総数は切り詰められません。個別の着想や課題は含みません。最近の未読通知を最大五件返し、自動で既読にします。`notifications.unread` は既読化後の残りの未読数です。範囲指定ヘッダーでは絞られません。
 
 `projectTeams` は、各プロジェクト UUID を、そのプロジェクトでの所有者の[エージェントチーム](/ja/guides/agent-teams/)に対応付けます。チームがなければ `null` です。
-対象は `activeProjects` のプロジェクトと、範囲指定ヘッダーで指定したプロジェクトで、所有者のいないエージェントには `{}` が返ります。ほかのプロジェクトには `chorus_get_project_team` を使います。
+対象は `activeProjects` のプロジェクトと、範囲指定ヘッダーで選んだプロジェクトです。所有者のいないエージェントや `project:read` を持たないエージェントには `{}` が返ります。ほかのプロジェクトには `chorus_get_project_team` を使います。
 
 ```text
 { checkinTime, agent: { uuid, name, permissions, persona, systemPrompt, owner },

@@ -68,7 +68,7 @@ MCP 传输会话与 Chorus 的**智能体会话**无关。智能体会话用于�
 
 </div>
 
-只有 `chorus_get_my_assignments` 遵循范围请求头。不带请求头时覆盖可访问项目，同时设置时 `X-Chorus-Project-Group` 优先。`chorus_checkin` 返回不受请求头过滤的 `activeProjects` 分布，不是近期想法列表。其他工具使用各自显式的范围参数，这些请求头不是通用项目访问过滤器。
+`chorus_get_my_assignments` 按范围请求头过滤结果。不带请求头时覆盖可访问项目，同时设置时 `X-Chorus-Project-Group` 优先。`chorus_checkin` 不按这些请求头过滤：它的 `activeProjects` 分布不受过滤（也不是近期想法列表），请求头选中的项目只会额外加入它的 `projectTeams`。其他工具使用各自显式的范围参数，这些请求头不是通用项目访问过滤器。
 
 ```json
 {
@@ -169,7 +169,7 @@ MCP 传输会话与 Chorus 的**智能体会话**无关。智能体会话用于�
 返回身份、所有者、有效权限、角色设定及 `activeProjects`：项目 UUID 对应名称和 `activeIdeaCount`。计数是未截断的活跃想法总数，不包含逐条想法或任务。最多返回五条近期未读通知并自动标为已读，`notifications.unread` 是标记后的剩余未读数。范围请求头不会缩小该分布。
 
 `projectTeams` 把每个项目 UUID 映射到所有者在该项目上的[智能体团队](/zh/guides/agent-teams/)，没有团队时为 `null`。
-它覆盖 `activeProjects` 中的项目，以及范围请求头指定的项目；没有所有者的智能体得到 `{}`。其他项目请使用 `chorus_get_project_team`。
+它覆盖 `activeProjects` 中的项目，以及范围请求头选中的项目；没有所有者或没有 `project:read` 权限的智能体得到 `{}`。其他项目请使用 `chorus_get_project_team`。
 
 ```text
 { checkinTime, agent: { uuid, name, permissions, persona, systemPrompt, owner },

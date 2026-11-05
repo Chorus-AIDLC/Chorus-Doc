@@ -71,7 +71,7 @@ MCP 트랜스포트 세션은 Chorus의 **에이전트 세션**과 무관합니�
 
 </div>
 
-범위 헤더를 따르는 것은 `chorus_get_my_assignments`뿐입니다. 헤더가 없으면 접근 가능한 프로젝트 전체를 포함하며 둘 다 있으면 `X-Chorus-Project-Group`이 우선합니다. `chorus_checkin`은 필터링되지 않은 `activeProjects` 분포를 반환하며 최근 아이디어 목록이 아닙니다. 다른 도구는 각자의 명시적 범위 인수를 사용합니다. 이 헤더는 일반적인 프로젝트 접근 필터가 아닙니다.
+`chorus_get_my_assignments`는 범위 헤더로 결과를 필터링합니다. 헤더가 없으면 접근 가능한 프로젝트 전체를 포함하며 둘 다 있으면 `X-Chorus-Project-Group`이 우선합니다. `chorus_checkin`은 이 헤더로 필터링하지 않습니다. `activeProjects` 분포는 필터링되지 않으며(최근 아이디어 목록도 아닙니다), 헤더로 선택한 프로젝트는 `projectTeams`에 추가될 뿐입니다. 다른 도구는 각자의 명시적 범위 인수를 사용합니다. 이 헤더는 일반적인 프로젝트 접근 필터가 아닙니다.
 
 ```json
 {
@@ -178,7 +178,7 @@ MCP 트랜스포트 세션은 Chorus의 **에이전트 세션**과 무관합니�
 신원, 소유자, 유효 권한, 페르소나와 `activeProjects`를 반환합니다. 프로젝트 UUID별 이름과 `activeIdeaCount`가 있으며 활성 아이디어 총수는 잘리지 않습니다. 개별 아이디어나 작업은 포함하지 않습니다. 최근 미읽음 알림을 최대 다섯 개 반환하고 자동으로 읽음 처리합니다. `notifications.unread`는 처리 후 남은 미읽음 수입니다. 범위 헤더로 좁혀지지 않습니다.
 
 `projectTeams`는 각 프로젝트 UUID를 그 프로젝트에서의 소유자 [에이전트 팀](/ko/guides/agent-teams/)에 대응시키며, 팀이 없으면 `null`입니다.
-`activeProjects`의 프로젝트와 범위 헤더로 지정한 프로젝트를 다루며, 소유자가 없는 에이전트는 `{}`를 받습니다. 다른 프로젝트에는 `chorus_get_project_team`을 사용하세요.
+`activeProjects`의 프로젝트와 범위 헤더로 선택한 프로젝트를 다루며, 소유자가 없거나 `project:read`가 없는 에이전트는 `{}`를 받습니다. 다른 프로젝트에는 `chorus_get_project_team`을 사용하세요.
 
 ```text
 { checkinTime, agent: { uuid, name, permissions, persona, systemPrompt, owner },
