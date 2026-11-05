@@ -35,13 +35,15 @@ link:
 | Link | Direction | Meaning |
 | --- | --- | --- |
 | Lineage | Parent Idea → child Idea | A derived child Idea split off from a parent (theme) Idea. |
-| Derivation | Idea → Proposal, Proposal → Task, Proposal → Document | A Proposal was raised from an Idea, and approving it created its Tasks and Documents. |
+| Derivation | Idea → Proposal, Proposal → Task, Proposal → Document, Idea → Task | A Proposal was raised from an Idea, and approving it created its Tasks and Documents. An Idea → Task edge marks a Quick Task linked directly to the Idea. |
 | Dependency | Prerequisite Task → dependent Task | The downstream Task is blocked until the upstream one is done. |
 
 Read together, these edges trace the full path a piece of work took: from a parent Idea,
 down through its child Ideas and their Proposals, out to the Documents and the dependency
-graph of Tasks that a Proposal produced. This is the same dependency relationship described
-in the [entity lifecycle reference](/reference/lifecycle/), shown visually.
+graph of Tasks that a Proposal produced. When linked Quick Tasks depend on each other, only
+the first Task of each chain hangs off the Idea, and the rest follow by dependency arrows. This
+is the same dependency relationship described in the
+[entity lifecycle reference](/reference/lifecycle/), shown visually.
 
 ## Working with the graph
 
@@ -51,7 +53,8 @@ changes. You can:
 - **Pan and zoom** by dragging, scrolling, pinching, or using the on-screen controls, and
   fit the whole graph back into view.
 - **Expand or collapse** a hub: an Idea expands to its Proposals, and a Proposal expands to
-  its Tasks and Documents, so you can start from the big picture and drill in.
+  its Tasks and Documents, so you can start from the big picture and drill in. Quick Tasks
+  linked directly to an Idea stay visible whether or not the Idea is expanded.
 - **Filter** which node types are shown with the type legend.
 - **Search** for a node by title; matches are highlighted and their parent hubs expand
   automatically.

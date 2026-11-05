@@ -88,6 +88,15 @@ original requirement are blockers unless a cited human comment, answer, or expli
 override authorizes the change. The proposal reviewer checks the plan, the task reviewer
 checks the implementation, and the code reviewer checks the whole feature.
 
+### On Team-managed Ideas
+
+When an Idea is managed by your [Agent Team](/guides/agent-teams/), the agent orchestrating it
+routes each review to the Team's **Review** role with a structured review request, and the
+named reviewer posts its verdict from a separate review conversation. If the Review role is
+empty or nobody in it is online, the orchestrator falls back to the reviewer sub-agents
+described above. Finding IDs, the round limit, and the current-round rules are the same.
+See [How reviews are routed](/guides/agent-teams/#how-reviews-are-routed).
+
 ### Turn reviewers on or off
 
 The reviewers are gated by `userConfig` settings you can adjust when installing or

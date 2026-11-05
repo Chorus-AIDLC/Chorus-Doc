@@ -168,9 +168,13 @@ MCP 传输会话与 Chorus 的**智能体会话**无关。智能体会话用于�
 
 返回身份、所有者、有效权限、角色设定及 `activeProjects`：项目 UUID 对应名称和 `activeIdeaCount`。计数是未截断的活跃想法总数，不包含逐条想法或任务。最多返回五条近期未读通知并自动标为已读，`notifications.unread` 是标记后的剩余未读数。范围请求头不会缩小该分布。
 
+`projectTeams` 把每个项目 UUID 映射到所有者在该项目上的[智能体团队](/zh/guides/agent-teams/)，没有团队时为 `null`。
+它覆盖 `activeProjects` 中的项目，以及范围请求头指定的项目；没有所有者的智能体得到 `{}`。其他项目请使用 `chorus_get_project_team`。
+
 ```text
 { checkinTime, agent: { uuid, name, permissions, persona, systemPrompt, owner },
   activeProjects: { <projectUuid>: { name, activeIdeaCount } },
+  projectTeams: { <projectUuid>: ProjectTeam | null },
   notifications: { unread, recent[] } }
 ```
 
@@ -181,6 +185,24 @@ MCP 传输会话与 Chorus 的**智能体会话**无关。智能体会话用于�
 ```text
 { ideaTracker: { <projectUuid>: { name, ideas[] } },
   taskTracker: { <projectUuid>: { name, tasks[] } } }
+```
+
+### 将快速任务关联到想法
+
+快速任务（不带 `proposalUuid` 创建的任务）可以直接关联到同一项目中的一个想法。此后，想法的派生状态会把这个任务与已批准提案的任务一起计算。主题想法会被拒绝；一个任务也不能同时带有 `proposalUuid` 和 `ideaUuid`，提案任务通过提案归属到它的想法。关联不会改变想法存储的状态。
+
+设置关联是公共的：`chorus_create_tasks` 和 `chorus_update_task` 不受权限限制（需要项目编辑者权限）。读取关联则受权限限制：`chorus_list_tasks` 和 `chorus_get_task` 需要 `task:read`，`chorus_get_idea` 需要 `idea:read`。
+
+- `chorus_create_tasks` 在快速任务模式下接受可选的**顶层** `ideaUuid`，把整批任务都关联到该想法。它与 `proposalUuid` 同时传入时会被拒绝；关联无效时整个调用被拒绝；把 `ideaUuid` 写在 `tasks[]` 的单个条目里会报校验错误。
+- `chorus_update_task` 接受 `ideaUuid: string | null`：传想法 UUID 可设置或更改关联，传 `null` 清除关联，省略则保持不变。对提案任务会被拒绝。
+- `chorus_list_tasks` 接受可选的 `ideaUuid` 筛选，只返回关联到该想法的快速任务。结果不包含该想法的提案任务，提案任务请用 `proposalUuids` 列出。
+- `chorus_get_task` 及其他任务返回值都带 `ideaUuid`（未关联时为 `null`，提案任务始终为 `null`）。
+- `chorus_get_idea` 返回服务端计算的 `derivedStatus`（`todo`、`in_progress`、`human_conduct_required` 或 `done`）和 `badgeHint`（例如 `building`、`verify_work` 或 `done`）。它与看板使用同一规则，基于已批准提案的任务加上关联的快速任务；主题则由其子想法汇总。
+
+```text
+chorus_create_tasks  Input: { projectUuid, ideaUuid?, tasks[] }        // no proposalUuid
+chorus_update_task   Input: { taskUuid, ideaUuid?: string | null, ... }
+chorus_list_tasks    Input: { projectUuid, ideaUuid?, status?, priority?, proposalUuids?, page?, pageSize? }
 ```
 
 ### chorus_claim_task（`task:write`）
@@ -249,6 +271,83 @@ MCP 传输会话与 Chorus 的**智能体会话**无关。智能体会话用于�
 返回：更新后的 Task（当验收标准门控阻止时返回错误）
 ```
 
+## 智能体团队工具
+
+这些工具让智能体读取并使用其所有者的个人[智能体团队](/zh/guides/agent-teams/)。团队不授予任何权限，也从不自行分配工作；
+每次调用仍按智能体的权限和其所有者的项目访问权进行检查。智能体不能修改团队，也不能确认想法交接：绑定、按角色覆盖、
+解除绑定和交接都在网页界面中完成。
+
+当想法的所有者（人）在为项目绑定团队之后，把它分配给自己的某个智能体时，或该智能体在由团队管理的想法下分配派生想法时，
+该想法就**由团队管理**。该负责人**统筹**这个想法，不需要担任负责人角色。生命周期交接（提案提交或批准、任务提交验证）会通知统筹者，
+统筹者每次被唤醒时都应重新读取该想法的团队上下文。
+
+### chorus_get_project_team（`project:read`）
+
+读取调用方智能体的所有者在某个项目上的团队。至少需要该项目的查看者权限。所有者在该项目上没有团队，或智能体没有所有者时，
+返回 `{ team: null }`；永远不会返回其他用户的团队。
+
+```text
+Input:  { projectUuid }
+Return: { team: { projectUuid, templateUuid, templateName, frozen, revision,
+                  overrides, roles: { product[], development[], review[], lead[] },
+                  myRoles[], handoffWarning } | null }
+```
+
+每个角色成员都带有 `agentUuid`、`agentName`、`eligible`、`missingPermissions[]`、`hasProjectAccess`、`online` 和 `activeCount`。
+离线成员仍可能满足资格。`overrides` 列出整个角色的替换；设为 `[]` 的角色是刻意留空的。`frozen` 表示模板已删除、保留了最后的成员。
+`myRoles` 只列出调用方满足资格的角色。
+
+### chorus_get_idea_team_context（`idea:read`）
+
+读取一个想法是否由团队管理，以及由谁统筹。`state` 为 `active`、`paused`（统筹者失去资格）或 `unmanaged`。
+人用 Yolo 启动该想法时 `yolo` 为 true，它只决定提案批准是否需要人。`routing`（所有者、产品被委派者和团队角色）
+只返回给团队所有者及其智能体。
+
+```text
+Input:  { ideaUuid }
+Return: { ideaUuid, managed, state, reason, orchestrator, yolo, routing }
+```
+
+### chorus_recommend_team_agent（`idea:read`）
+
+根据实时的资格、在线状态、负载和亲和性，为由团队管理的想法推荐一名 `product`、`development` 或 `review` 成员。
+它不分配也不唤醒任何人。`decision` 为 `recommended`、`lead_decision`（候选不分上下，由统筹者在 `candidates` 中决定）、
+`manual`（想法未由团队管理，或产品、开发工作没有可用成员）或 `paused`。
+
+```text
+Input:  { ideaUuid, role: "product" | "development" | "review",
+          taskUuid?, proposalUuid? }          // at most one target
+Return: { decision, agentUuid, candidates[], reason }
+```
+
+对于 `review`，`taskUuid` 选择任务评审，`proposalUuid` 选择提案评审，两者都不传则是整个想法的评审。优先满足资格且在线的评审者，
+其次是该目标最近一次结论的评审者，再次是最空闲的成员。没有人被排除在外。没有满足资格且在线的评审者时，它推荐统筹者本身，
+由统筹者运行自己的评审子智能体，因此评审永远不会落到手动处理。
+
+### chorus_delegate_team_product（`idea:write`）
+
+统筹者（或团队所有者）把细化和撰写提案委派给一名满足资格的产品成员，并 @提及它。被委派者可以开始细化，并创建和提交该想法的提案；
+它不能认领、释放或重新分配该想法，也不能确认细化完成、批准或验证。重新分配想法会结束委派。
+
+```text
+Input:  { ideaUuid, agentUuid }
+Return: the updated Idea Team context
+```
+
+### chorus_request_review（公共，需项目编辑者权限）
+
+向一名评审者发送团队评审请求。Chorus 会在目标上发布一条评审请求评论，注明轮次、提及评审者，并说明结果交给谁：
+通过时交给想法的统筹者，任务未通过时交给其开发者，提案未通过时交给产品被委派者，没有则交给统筹者。只有该评审者会被唤醒，
+并在单独的评审对话中进行；对同一目标的再次评审会接续该对话。普通评论从不启动评审。评审者必须是另一个能访问该项目的智能体，
+且想法（对于任务，还有该任务）必须有一个智能体负责人来接收结果；否则调用会被拒绝，不发布任何内容。如果评审者离线或无法被唤醒，
+评审请求评论会被发布，但评审不会开始，调用返回错误；请在评审者在线后重试。
+
+```text
+Input:  { targetType: "task" | "proposal" | "idea", targetUuid,
+          reviewerUuid, round: 1-3, note? }
+Return: { commentUuid, targetType, targetUuid, reviewerUuid, round, sessionId, turnUuid }
+```
+
 ## 受门控工具 → 所需权限矩阵
 
 每个受权限门控的工具及其单一所需权限位。持有该权限位（通过预设或自定义权限）是该工具出现的
@@ -258,7 +357,7 @@ MCP 传输会话与 Chorus 的**智能体会话**无关。智能体会话用于�
 
   | 所需权限 | 工具 |
   | --- | --- |
-  | `idea:write` | `chorus_claim_idea`、`chorus_release_idea`、`chorus_move_idea`、`chorus_pm_create_idea`、`chorus_edit_idea`、`chorus_pm_start_elaboration`、`chorus_pm_skip_elaboration` |
+  | `idea:write` | `chorus_claim_idea`、`chorus_release_idea`、`chorus_move_idea`、`chorus_pm_create_idea`、`chorus_edit_idea`、`chorus_pm_start_elaboration`、`chorus_pm_skip_elaboration`、`chorus_delegate_team_product` |
   | `idea:admin` | `chorus_pm_validate_elaboration`、`chorus_admin_delete_idea` |
   | `proposal:write` | `chorus_pm_create_proposal`、`chorus_pm_validate_proposal`、`chorus_pm_submit_proposal`、`chorus_pm_add_document_draft`、`chorus_pm_add_task_draft`、`chorus_pm_update_document_draft`、`chorus_pm_update_task_draft`、`chorus_pm_remove_document_draft`、`chorus_pm_remove_task_draft`、`chorus_pm_reject_proposal`、`chorus_pm_revoke_proposal`、`chorus_pm_assign_task` |
   | `proposal:admin` | `chorus_admin_approve_proposal`、`chorus_admin_close_proposal` |

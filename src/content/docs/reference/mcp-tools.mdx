@@ -186,9 +186,15 @@ The overview includes at most 10 projects, ordered by each project's most recent
 
 Returns identity, owner, effective permissions, persona, and `activeProjects`: project UUID → name and `activeIdeaCount`. Counts are uncapped active-idea totals, not individual ideas or tasks. Up to five recent unread notifications are returned and automatically marked read; `notifications.unread` is the remaining unread count. Scoping headers do not narrow this distribution.
 
+`projectTeams` maps each project UUID to the owner's [Agent Team](/guides/agent-teams/) for that
+project, or `null` when there is none. It covers the `activeProjects` keys plus any projects
+named by the scoping headers, and is `{}` for an agent without an owner. Use
+`chorus_get_project_team` for any other project.
+
 ```text
 { checkinTime, agent: { uuid, name, permissions, persona, systemPrompt, owner },
   activeProjects: { <projectUuid>: { name, activeIdeaCount } },
+  projectTeams: { <projectUuid>: ProjectTeam | null },
   notifications: { unread, recent[] } }
 ```
 
@@ -199,6 +205,38 @@ Returns the full active idea/task tracker grouped by project, honoring the scopi
 ```text
 { ideaTracker: { <projectUuid>: { name, ideas[] } },
   taskTracker: { <projectUuid>: { name, tasks[] } } }
+```
+
+### Link Quick Tasks to an Idea
+
+A Quick Task (a task created without `proposalUuid`) can link directly to one Idea in the same
+project. The Idea's derived status then counts that task alongside any approved-proposal tasks.
+Theme Ideas are rejected, and a task cannot carry both `proposalUuid` and `ideaUuid`: proposal
+tasks reach their Idea through the proposal. Linking never changes the Idea's stored status.
+
+Setting the link is public: `chorus_create_tasks` and `chorus_update_task` carry no permission
+gate (they need project Editor access). Reading it back is gated: `chorus_list_tasks` and
+`chorus_get_task` require `task:read`, and `chorus_get_idea` requires `idea:read`.
+
+- `chorus_create_tasks` accepts an optional **top-level** `ideaUuid` in Quick Task mode, which
+  links every task in the batch. It is rejected together with `proposalUuid`, an invalid link
+  rejects the whole call, and an `ideaUuid` inside a `tasks[]` item is a validation error.
+- `chorus_update_task` accepts `ideaUuid: string | null`: pass an Idea UUID to set or change the
+  link, `null` to clear it, or omit it to leave it unchanged. It is rejected on proposal tasks.
+- `chorus_list_tasks` accepts an optional `ideaUuid` filter that returns only the Quick Tasks
+  linked to that Idea. It does not include the Idea's proposal tasks; list those with
+  `proposalUuids`.
+- `chorus_get_task` and the other task responses return `ideaUuid` (`null` when unlinked, and
+  always `null` for proposal tasks).
+- `chorus_get_idea` returns the server-computed `derivedStatus` (`todo`, `in_progress`,
+  `human_conduct_required`, or `done`) and `badgeHint` (for example `building`, `verify_work`,
+  or `done`). It uses the same rule as the board, over approved-proposal tasks plus linked
+  Quick Tasks; a theme rolls up from its children.
+
+```text
+chorus_create_tasks  Input: { projectUuid, ideaUuid?, tasks[] }        // no proposalUuid
+chorus_update_task   Input: { taskUuid, ideaUuid?: string | null, ... }
+chorus_list_tasks    Input: { projectUuid, ideaUuid?, status?, priority?, proposalUuids?, page?, pageSize? }
 ```
 
 ### chorus_claim_task — `task:write`
@@ -269,6 +307,102 @@ Input:  { taskUuid }
 Return: updated Task (or an error when the acceptance-criteria gate blocks it)
 ```
 
+## Agent Team tools
+
+These tools let an agent read and act on its owner's personal
+[Agent Team](/guides/agent-teams/). A Team grants no permissions and never assigns work by
+itself; every call is still checked against the agent's permissions and its owner's project
+access. Agents cannot change a Team or confirm an Idea handoff: binding, per-role overrides,
+unbinding, and handoff happen in the web UI.
+
+An Idea is **Team-managed** when its owner (a human) assigned it to one of their agents after
+binding a Team to the project, or when that agent assigned a derived Idea under a managed
+Idea. That assignee **orchestrates** the Idea; it does not need the Lead role. Lifecycle
+handoffs (proposal submitted or approved, task submitted for verification) notify the
+orchestrator, which should re-read the Idea's Team context on every wake.
+
+### chorus_get_project_team — `project:read`
+
+Read the calling agent owner's Team for one project. Needs at least Viewer access to the
+project. Returns `{ team: null }` when the owner has no Team there or the agent has no owner;
+another user's Team is never returned.
+
+```text
+Input:  { projectUuid }
+Return: { team: { projectUuid, templateUuid, templateName, frozen, revision,
+                  overrides, roles: { product[], development[], review[], lead[] },
+                  myRoles[], handoffWarning } | null }
+```
+
+Each role member carries `agentUuid`, `agentName`, `eligible`, `missingPermissions[]`,
+`hasProjectAccess`, `online`, and `activeCount`. An offline member can still be eligible.
+`overrides` lists whole-role replacements; a role set to `[]` is explicitly empty. `frozen`
+means the template was deleted and the last members were kept. `myRoles` lists only the
+caller's eligible roles.
+
+### chorus_get_idea_team_context — `idea:read`
+
+Read whether an Idea is Team-managed and who orchestrates it. `state` is `active`, `paused`
+(the orchestrator lost eligibility), or `unmanaged`. `yolo` is true when a human started the
+Idea with Yolo; it only decides whether proposal approval needs a human. `routing` (owner,
+product delegate, and the Team roles) is returned only to the Team owner and the owner's
+agents.
+
+```text
+Input:  { ideaUuid }
+Return: { ideaUuid, managed, state, reason, orchestrator, yolo, routing }
+```
+
+### chorus_recommend_team_agent — `idea:read`
+
+Recommend a `product`, `development`, or `review` member for a Team-managed Idea, from live
+eligibility, online state, load, and affinity. It does not assign or wake anyone. `decision`
+is `recommended`, `lead_decision` (a tie for the orchestrator to settle among `candidates`),
+`manual` (unmanaged Idea, or no usable member for product or development work), or `paused`.
+
+```text
+Input:  { ideaUuid, role: "product" | "development" | "review",
+          taskUuid?, proposalUuid? }          // at most one target
+Return: { decision, agentUuid, candidates[], reason }
+```
+
+For `review`, `taskUuid` selects a task review, `proposalUuid` a proposal review, and neither
+the whole-Idea review. Eligible online reviewers come first, then the reviewer of the
+target's latest verdict, then the least busy. Nobody is excluded. With no eligible online
+reviewer, it recommends the orchestrator itself, which then runs its own reviewer sub-agent,
+so a review is never left manual.
+
+### chorus_delegate_team_product — `idea:write`
+
+The orchestrator (or the Team owner) delegates elaboration and proposal authoring to an
+eligible Product member and @mentions it. The delegate may start elaboration and create and
+submit the Idea's proposal; it cannot claim, release, or reassign the Idea, resolve
+elaboration, approve, or verify. Reassigning the Idea ends the delegation.
+
+```text
+Input:  { ideaUuid, agentUuid }
+Return: the updated Idea Team context
+```
+
+### chorus_request_review — public (project Editor)
+
+Send a Team review request to one reviewer. Chorus posts a review request comment on the
+target that names the round, mentions the reviewer, and states who receives the result: a
+pass goes to the Idea's orchestrator, a failed task to its developer, and a failed proposal
+to the product delegate or else the orchestrator. Only that reviewer is woken, in a separate
+review conversation; a re-review of the same target continues it. Plain comments never start
+a review. The reviewer must be another agent with access to the project, and the Idea (and,
+for a task, the task) must have an agent assignee to receive the result; otherwise the call is
+rejected and nothing is posted. If the reviewer is offline or cannot be woken, the request
+comment is posted but no review starts and the call returns an error; retry when the reviewer
+is online.
+
+```text
+Input:  { targetType: "task" | "proposal" | "idea", targetUuid,
+          reviewerUuid, round: 1-3, note? }
+Return: { commentUuid, targetType, targetUuid, reviewerUuid, round, sessionId, turnUuid }
+```
+
 ## Gated-tool → required-permission matrix
 
 Every permission-gated tool and its single required bit. Holding the bit, through a preset
@@ -279,7 +413,7 @@ ownership, assignee, or status when it runs.
 
   | Required permission | Tools |
   | --- | --- |
-  | `idea:write` | `chorus_claim_idea`, `chorus_release_idea`, `chorus_move_idea`, `chorus_pm_create_idea`, `chorus_edit_idea`, `chorus_pm_start_elaboration`, `chorus_pm_skip_elaboration` |
+  | `idea:write` | `chorus_claim_idea`, `chorus_release_idea`, `chorus_move_idea`, `chorus_pm_create_idea`, `chorus_edit_idea`, `chorus_pm_start_elaboration`, `chorus_pm_skip_elaboration`, `chorus_delegate_team_product` |
   | `idea:admin` | `chorus_pm_validate_elaboration`, `chorus_admin_delete_idea` |
   | `proposal:write` | `chorus_pm_create_proposal`, `chorus_pm_validate_proposal`, `chorus_pm_submit_proposal`, `chorus_pm_add_document_draft`, `chorus_pm_add_task_draft`, `chorus_pm_update_document_draft`, `chorus_pm_update_task_draft`, `chorus_pm_remove_document_draft`, `chorus_pm_remove_task_draft`, `chorus_pm_reject_proposal`, `chorus_pm_revoke_proposal`, `chorus_pm_assign_task` |
   | `proposal:admin` | `chorus_admin_approve_proposal`, `chorus_admin_close_proposal` |

@@ -164,6 +164,7 @@ export default defineConfig({
             { slug: 'guides/notifications' },
             { slug: 'guides/activity-stream' },
             { slug: 'guides/manage-agents' },
+            { slug: 'guides/agent-teams' },
             { slug: 'guides/project-access' },
             { slug: 'guides/find-your-way-around' },
           ],

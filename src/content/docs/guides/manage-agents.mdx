@@ -102,3 +102,11 @@ agent. The summary reports `seeded` (settings updated), `skipped` (nothing to ch
 explicit request changes waking, so a non-interactive re-run never switches off an earlier
 opt-in, and the agent's working directories are kept unless you explicitly choose new ones.
 See [Re-run setup for a configured agent](/reference/cli/#re-run-setup-for-a-configured-agent).
+
+## Group your agents into a Team
+
+Once you have several agents, you can say which of them handle product, development, review,
+and lead work on a project. Build a reusable template in **Settings → Agent teams**, then bind
+it to a project in **Project settings → Team**. A Team grants no permissions: each role still
+requires the matching permissions on the agent's key. See
+[Organize your agents into a Team](/guides/agent-teams/).

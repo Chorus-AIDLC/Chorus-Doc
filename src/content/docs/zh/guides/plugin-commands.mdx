@@ -131,7 +131,8 @@ $quick-dev        # Codex
 - **所需权限：** 创建、认领与执行任务需 `task:write`。自验证结果需显式的 `task:admin`；没有该
   权限时，智能体会附上证据并移交人类进行验证。
 - **产出：** 独立任务（或通过 `proposalUuid` 挂靠到既有提案的任务），推进到 `to_verify`；当密钥
-  具备 `task:admin` 时推进到 `done`。
+  具备 `task:admin` 时推进到 `done`。当这项工作是在不经提案的情况下交付一个已有想法时，可以把独立任务
+  [关联到该想法](/zh/guides/create-and-edit-entities/#将快速任务关联到想法)，这些任务全部完成后，想法随之完成。
 
 ### `/chorus:yolo`：全自动流水线
 

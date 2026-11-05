@@ -36,6 +36,10 @@ Claude daemon wakes wait up to 60 minutes (`3600000` ms) after the main turn for
   caption="A running conversation shows its active turn, elapsed time, and Interrupt control."
 />
 
+Each conversation has its own controls. Interrupting a **Task:** or **Review:** child
+conversation stops only that work; the idea's conversation and other child conversations keep
+running.
+
 Interrupt first asks the agent process to stop gracefully. If it does not stop within the
 configured timeout, the daemon ends the process.
 
@@ -88,7 +92,10 @@ When the conversation is interrupted or recoverable after a crash:
 3. Add any correction or missing context.
 4. Select **Resume**.
 
-Resume uses the original agent connection and working directory. It does not migrate the
+Resume continues the same conversation, whether it is the idea's conversation or a task or
+review child conversation. A child conversation has no reply box, so select **Resume** there
+directly and send any correction from the idea's conversation. Resume uses the original agent
+connection and working directory. It does not migrate the
 session to another machine or directory. If the original runtime cannot return, start a
 new session deliberately and include the relevant context from the previous attempt.
 
@@ -115,7 +122,9 @@ See your platform's reference page for the exact command:
 [Claude Code](/reference/agents/claude-code/), [Codex](/reference/agents/codex/), and
 [Kiro](/reference/agents/kiro/).
 
-Chorus keeps one session per idea. If you start work on the idea from a different working
-directory, Chorus moves that single session there instead of starting a new one — so
-there is always exactly one conversation to take over, wherever it last ran. See the
+Chorus keeps one main conversation per agent per idea. If you start work on the idea from a different
+working directory, Chorus moves that conversation there instead of starting a new one — so
+each agent always has exactly one idea conversation to take over, wherever it last ran. Task and
+review child conversations have their own session IDs: copy the ID from the child
+conversation you want to continue, not from the idea's conversation. See the
 [Online agents overview](/guides/online-agents-overview/) for the full model.

@@ -56,6 +56,9 @@ hold, and **Confirm move** stays disabled until you reassign or release those it
 those assignees Editor access on the target), then try the move again. Assignees that no longer exist, such as a deleted agent, are skipped and
 never block the move; their items move unchanged.
 
+Quick Tasks linked to a moving idea travel with it, like the tasks of its proposals. Deleting
+an idea keeps its linked Quick Tasks; they simply become unlinked.
+
 The panel also manages **lineage** — how ideas relate as parents and children:
 
 - **Set parent** / **Change parent** — attach this idea under another, or move it to a
@@ -78,6 +81,24 @@ effort estimate, **Acceptance Criteria** (the checklist a reviewer verifies agai
 hand-created task starts open and unassigned, ready to be claimed or assigned like one created
 from a proposal.
 
+### Link a Quick Task to an idea
+
+When the work delivers an existing idea but does not need a proposal, choose that idea in the
+**Idea (optional)** field of the New Task form. A Quick Task links to at most one idea, and
+the list offers only ideas in the same project. Theme ideas are not offered, because a theme
+is delivered through its child ideas. The idea can be at any stage (open, elaborating, or
+elaborated), and linking never changes its own status.
+
+A linked Quick Task counts toward the idea's progress exactly like a task from an approved
+proposal: the idea shows **Building** while any of its tasks is unfinished, **Verify work**
+when a task awaits verification, and **Done** once every task is done or closed. Linked tasks appear on the
+idea's panel (its **Tasks** tab and overview timeline) and in the
+[resource graph](/reference/resource-graph/). See
+[derived progress](/reference/lifecycle/#derived-progress) for the full rule.
+
+Tasks created from a proposal already belong to that proposal's idea, so they never show
+this field.
+
 :::note[What the agent does]
 A Quick Task is a normal task once created — assign it to an agent and, when its dependencies
 are met, the agent claims it, works on it, and submits it for your verification. See
@@ -89,6 +110,18 @@ are met, the agent claims it, works on it, and submits it for your verification.
 Open a task to reach the same panel, now titled **Edit Task**. Change any field and **Save
 Changes**, or **Delete Task** to remove it. The panel also drives the status path with **Start
 Work**, **Submit for Review**, **Mark as Verified**, and **Assign**.
+
+A Quick Task linked to an idea shows it under **Idea** in the task panel; select it to open
+the idea. To change the link, edit the task and pick another idea in **Idea (optional)**, or
+choose **No linked idea** to clear it, then **Save Changes**.
+
+<Screenshot
+  src="/images/workflow/quick-task-linked-idea.webp"
+  alt="Task panel of an open Quick Task showing its linked idea, Offline sync for mobile notes, in the Idea section above Dependencies and Acceptance Criteria"
+  width={1440}
+  height={900}
+  caption="A Quick Task linked to an idea shows it under Idea; select it to open the idea."
+/>
 
 Dependencies read in two directions: **Depends on** lists the upstream tasks this one waits on,
 and **Blocked by this** lists the downstream tasks waiting on it. A task can only start once
