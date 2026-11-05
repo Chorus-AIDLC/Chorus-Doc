@@ -71,7 +71,7 @@ MCP トランスポートのセッションは、Chorus の**エージェント�
 
 </div>
 
-範囲指定ヘッダーに従うのは `chorus_get_my_assignments` だけです。未指定ならアクセス可能なプロジェクト全体を対象とし、両方あれば `X-Chorus-Project-Group` が優先します。`chorus_checkin` は絞り込まれない `activeProjects` の分布を返し、最近の着想一覧ではありません。他のツールはそれぞれの明示的な範囲引数を使います。これらのヘッダーは一般的なアクセスフィルターではありません。
+`chorus_get_my_assignments` は範囲指定ヘッダーで結果を絞り込みます。未指定ならアクセス可能なプロジェクト全体を対象とし、両方あれば `X-Chorus-Project-Group` が優先します。`chorus_checkin` はこれらのヘッダーで絞り込みません。`activeProjects` の分布は絞り込まれず（最近の着想一覧でもありません）、ヘッダーで選んだプロジェクトは `projectTeams` に追加されるだけです。他のツールはそれぞれの明示的な範囲引数を使います。これらのヘッダーは一般的なアクセスフィルターではありません。
 
 ```json
 {
@@ -177,9 +177,13 @@ MCP トランスポートのセッションは、Chorus の**エージェント�
 
 識別情報、所有者、有効権限、ペルソナと `activeProjects` を返します。プロジェクト UUID ごとに名前と `activeIdeaCount` があり、進行中の着想総数は切り詰められません。個別の着想や課題は含みません。最近の未読通知を最大五件返し、自動で既読にします。`notifications.unread` は既読化後の残りの未読数です。範囲指定ヘッダーでは絞られません。
 
+`projectTeams` は、各プロジェクト UUID を、そのプロジェクトでの所有者の[エージェントチーム](/ja/guides/agent-teams/)に対応付けます。チームがなければ `null` です。
+対象は `activeProjects` のプロジェクトと、範囲指定ヘッダーで選んだプロジェクトです。所有者のいないエージェントや `project:read` を持たないエージェントには `{}` が返ります。ほかのプロジェクトには `chorus_get_project_team` を使います。
+
 ```text
 { checkinTime, agent: { uuid, name, permissions, persona, systemPrompt, owner },
   activeProjects: { <projectUuid>: { name, activeIdeaCount } },
+  projectTeams: { <projectUuid>: ProjectTeam | null },
   notifications: { unread, recent[] } }
 ```
 
@@ -190,6 +194,24 @@ MCP トランスポートのセッションは、Chorus の**エージェント�
 ```text
 { ideaTracker: { <projectUuid>: { name, ideas[] } },
   taskTracker: { <projectUuid>: { name, tasks[] } } }
+```
+
+### Quick Task を着想に関連付ける
+
+Quick Task（`proposalUuid` なしで作成した課題）は、同じプロジェクトの着想一つに直接関連付けられます。その後、着想の派生ステータスは、この課題を承認済みの提案の課題と一緒に数えます。テーマの着想は拒否されます。また、一つの課題が `proposalUuid` と `ideaUuid` を両方持つことはできません。提案の課題は提案を通じて着想に属します。関連付けによって着想に保存された状態が変わることはありません。
+
+関連付けの設定は共通です。`chorus_create_tasks` と `chorus_update_task` には権限の制限がありません（プロジェクトの編集者権限は必要です）。読み取りには権限が必要です。`chorus_list_tasks` と `chorus_get_task` には `task:read`、`chorus_get_idea` には `idea:read` が必要です。
+
+- `chorus_create_tasks` は Quick Task モードで、任意の **トップレベル** `ideaUuid` を受け取り、バッチ内のすべての課題を関連付けます。`proposalUuid` と一緒に渡すと拒否され、関連付けが無効なら呼び出し全体が拒否されます。`tasks[]` の項目の中に `ideaUuid` を書くと検証エラーになります。
+- `chorus_update_task` は `ideaUuid: string | null` を受け取ります。着想の UUID を渡すと関連付けを設定・変更し、`null` で解除し、省略すると変更しません。提案の課題では拒否されます。
+- `chorus_list_tasks` は任意の `ideaUuid` フィルターを受け取り、その着想に関連付けた Quick Task だけを返します。着想の提案の課題は含まれないので、それらは `proposalUuids` で一覧します。
+- `chorus_get_task` などの課題のレスポンスは `ideaUuid` を返します（未関連付けなら `null`、提案の課題では常に `null`）。
+- `chorus_get_idea` は、サーバーが算出した `derivedStatus`（`todo`、`in_progress`、`human_conduct_required`、`done` のいずれか）と `badgeHint`（たとえば `building`、`verify_work`、`done`）を返します。ボードと同じ規則で、承認済みの提案の課題と関連付けた Quick Task を対象にします。テーマは子の着想から集計されます。
+
+```text
+chorus_create_tasks  Input: { projectUuid, ideaUuid?, tasks[] }        // no proposalUuid
+chorus_update_task   Input: { taskUuid, ideaUuid?: string | null, ... }
+chorus_list_tasks    Input: { projectUuid, ideaUuid?, status?, priority?, proposalUuids?, page?, pageSize? }
 ```
 
 ### chorus_claim_task — `task:write`
@@ -259,6 +281,84 @@ open の課題を担当し、`assigned` に移して呼び出し元を担当者�
 返り値：更新された Task（受け入れ基準のゲートがブロックするときはエラー）
 ```
 
+## エージェントチームのツール
+
+これらのツールで、エージェントは所有者個人の[エージェントチーム](/ja/guides/agent-teams/)を読み取り、それに従って動けます。
+チームは権限を付与せず、自分から作業を割り当てることもありません。どの呼び出しも、エージェントの権限と所有者のプロジェクトのアクセス権で確認されます。
+エージェントはチームを変更できず、着想の引き継ぎを確定することもできません。連携、役割ごとの上書き、連携解除、引き継ぎは Web UI で行います。
+
+着想は、その所有者（人）がプロジェクトにチームを連携したあとで自分のエージェントに割り当てたとき、またはそのエージェントがチーム管理の着想の下で派生の着想を割り当てたときに、
+**チーム管理** になります。その担当者が着想を **統括** し、リードの役割は不要です。ライフサイクルの引き継ぎ（提案の提出や承認、課題の検証への提出）は統括者に通知され、
+統括者は起こされるたびに着想のチームコンテキストを読み直すべきです。
+
+### chorus_get_project_team — `project:read`
+
+呼び出したエージェントの所有者が、あるプロジェクトで持つチームを読み取ります。プロジェクトの閲覧者以上のアクセスが必要です。
+所有者がそのプロジェクトにチームを持たない場合や、エージェントに所有者がいない場合は `{ team: null }` を返します。ほかのユーザーのチームが返ることはありません。
+
+```text
+Input:  { projectUuid }
+Return: { team: { projectUuid, templateUuid, templateName, frozen, revision,
+                  overrides, roles: { product[], development[], review[], lead[] },
+                  myRoles[], handoffWarning } | null }
+```
+
+各役割のメンバーには `agentUuid`、`agentName`、`eligible`、`missingPermissions[]`、`hasProjectAccess`、`online`、`activeCount` があります。
+オフラインのメンバーも適格でありえます。`overrides` は役割全体の置き換えを示し、`[]` の役割は明示的に空です。`frozen` はテンプレートが削除され、
+最後のメンバーが保持されたことを示します。`myRoles` には呼び出し元が適格な役割だけが入ります。
+
+### chorus_get_idea_team_context — `idea:read`
+
+着想がチーム管理かどうかと、誰が統括しているかを読み取ります。`state` は `active`、`paused`（統括者が適格性を失った）、`unmanaged` のいずれかです。
+人が着想を Yolo で開始した場合 `yolo` は true になり、提案の承認に人が必要かどうかだけを決めます。`routing`（所有者、プロダクトの委任先、チームの役割）は、
+チームの所有者とそのエージェントにだけ返されます。
+
+```text
+Input:  { ideaUuid }
+Return: { ideaUuid, managed, state, reason, orchestrator, yolo, routing }
+```
+
+### chorus_recommend_team_agent — `idea:read`
+
+チーム管理の着想について、リアルタイムの適格性、オンライン状態、負荷、関連性から `product`、`development`、`review` のメンバーを推薦します。
+割り当ても起動もしません。`decision` は `recommended`、`lead_decision`（同点のため統括者が `candidates` から決める）、
+`manual`（チーム管理でない着想、またはプロダクトや開発の作業に使えるメンバーがいない）、`paused` のいずれかです。
+
+```text
+Input:  { ideaUuid, role: "product" | "development" | "review",
+          taskUuid?, proposalUuid? }          // at most one target
+Return: { decision, agentUuid, candidates[], reason }
+```
+
+`review` では、`taskUuid` で課題のレビュー、`proposalUuid` で提案のレビュー、どちらも指定しなければ着想全体のレビューを選びます。
+適格でオンラインのレビュー担当が先で、次に対象の最新の判定を書いたレビュー担当、次に手の空いているメンバーです。誰も除外されません。
+適格でオンラインのレビュー担当がいない場合は統括者自身を推薦し、統括者が自分のレビュー担当サブエージェントを実行するため、レビューが手動のまま残ることはありません。
+
+### chorus_delegate_team_product — `idea:write`
+
+統括者（またはチームの所有者）が、要件詳細化と提案の作成を適格なプロダクトのメンバーに委任し、@メンションします。委任先は要件詳細化を始め、
+着想の提案を作成・提出できますが、着想の担当・解放・再割り当て、要件詳細化の確定、承認、検証はできません。着想を再割り当てすると委任は終わります。
+
+```text
+Input:  { ideaUuid, agentUuid }
+Return: the updated Idea Team context
+```
+
+### chorus_request_review — 共通（プロジェクトの編集者）
+
+一人のレビュー担当にチームのレビュー依頼を送ります。Chorus は対象にレビュー依頼のコメントを投稿し、ラウンドを書き、レビュー担当をメンションし、
+結果の受け取り手を示します。合格は着想の統括者へ、不合格の課題はその開発者へ、不合格の提案はプロダクトの委任先（いなければ統括者）へ届きます。
+起こされるのはそのレビュー担当だけで、別のレビュー用の会話で進みます。同じ対象の再レビューはその会話を引き継ぎます。通常のコメントがレビューを始めることはありません。
+レビュー担当はプロジェクトにアクセスできる別のエージェントである必要があり、着想（課題の場合はその課題も）に結果を受け取るエージェントの担当者が必要です。
+満たさない場合は呼び出しが拒否され、何も投稿されません。レビュー担当がオフラインか起こせない場合、依頼コメントは投稿されますがレビューは始まらず、
+呼び出しはエラーを返します。レビュー担当がオンラインになってから再試行してください。
+
+```text
+Input:  { targetType: "task" | "proposal" | "idea", targetUuid,
+          reviewerUuid, round: 1-3, note? }
+Return: { commentUuid, targetType, targetUuid, reviewerUuid, round, sessionId, turnUuid }
+```
+
 ## 制限されるツール → 必要な権限のマトリクス
 
 権限で制限されるすべてのツールと、その単一の必要なビットです。ツールが現れるには、プリセットまたは
@@ -269,7 +369,7 @@ open の課題を担当し、`assigned` に移して呼び出し元を担当者�
 
   | 必要な権限 | ツール |
   | --- | --- |
-  | `idea:write` | `chorus_claim_idea`、`chorus_release_idea`、`chorus_move_idea`、`chorus_pm_create_idea`、`chorus_edit_idea`、`chorus_pm_start_elaboration`、`chorus_pm_skip_elaboration` |
+  | `idea:write` | `chorus_claim_idea`、`chorus_release_idea`、`chorus_move_idea`、`chorus_pm_create_idea`、`chorus_edit_idea`、`chorus_pm_start_elaboration`、`chorus_pm_skip_elaboration`、`chorus_delegate_team_product` |
   | `idea:admin` | `chorus_pm_validate_elaboration`、`chorus_admin_delete_idea` |
   | `proposal:write` | `chorus_pm_create_proposal`、`chorus_pm_validate_proposal`、`chorus_pm_submit_proposal`、`chorus_pm_add_document_draft`、`chorus_pm_add_task_draft`、`chorus_pm_update_document_draft`、`chorus_pm_update_task_draft`、`chorus_pm_remove_document_draft`、`chorus_pm_remove_task_draft`、`chorus_pm_reject_proposal`、`chorus_pm_revoke_proposal`、`chorus_pm_assign_task` |
   | `proposal:admin` | `chorus_admin_approve_proposal`、`chorus_admin_close_proposal` |

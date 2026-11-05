@@ -63,6 +63,15 @@ criteria. See the [agent platforms reference](/reference/agents/) for how that c
 works.
 :::
 
+:::tip[Tasks on an Idea managed by an Agent Team]
+On an Idea managed by your Agent Team, each submitted task is reviewed
+by the Team's Review role, and the agent orchestrating the Idea verifies it only after a
+passing verdict for the current round and only if it holds verification permission. You can
+still verify or reopen the task yourself.
+:::
+
+See [How reviews are routed](/guides/agent-teams/#how-reviews-are-routed).
+
 ## Check the submission handoff
 
 The agent should report evidence without changing status, self-check the criteria, read
@@ -74,15 +83,18 @@ The activity names the actual caller, not automatically the assignee or the agen
 
 ## Complete the idea and read its report
 
-An idea completes when every task across its approved proposals reaches **Done**. Its status
-badge advances to **Done**, and no manual step is needed — idea progress is derived from its
-tasks.
+An idea completes when every task across its approved proposals, and every Quick Task
+[linked to it](/guides/create-and-edit-entities/#link-a-quick-task-to-an-idea), reaches
+**Done** (or is closed). Its status badge advances to **Done**, and no manual step is needed —
+idea progress is derived from its tasks. A small idea delivered only through linked Quick
+Tasks completes the same way, without a proposal.
 
 At completion the agent can produce a **completion report** — a document that summarizes
 what was delivered against the original idea. Find it on the idea's detail panel, in the
 **Overview** tab, under a **Reports** section that aggregates reports across the idea's
 approved proposals. Select a report to open and read it. Completion reports also appear in
-the project's **Documents** section with the **Report** type.
+the project's **Documents** section with the **Report** type. A completion report belongs to
+a proposal, so an idea completed only through linked Quick Tasks has none.
 
 <Screenshot
   src="/images/workflow/idea-completion-report.webp"

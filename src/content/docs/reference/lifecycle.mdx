@@ -19,7 +19,8 @@ For the higher-level view of how the whole delivery flow hands off between stage
 An Idea only tracks the **elaboration** phase in its own stored status. Once elaboration
 is complete the Idea is considered finished; all later progress you see on the board —
 planning, building, verifying, done — is **derived** from the linked Proposal and Tasks,
-not stored on the Idea itself.
+not stored on the Idea itself. The Tasks can come from an approved Proposal, from Quick Tasks
+linked directly to the Idea, or both.
 
 | State | Meaning | What moves it forward |
 | --- | --- | --- |
@@ -29,18 +30,25 @@ not stored on the Idea itself.
 
 ### Derived progress
 
-After an Idea reaches `elaborated`, Chorus computes a display status for the board from
+After an Idea reaches `elaborated` (or earlier, once Quick Tasks are linked to it), Chorus computes a display status for the board from
 the states of its linked Proposal and Tasks. There is no stored `completed` or `closed`
 status on an Idea, and no direct way to set an Idea's status — it only changes as a side
 effect of elaboration and of downstream work.
 
 | Derived label | When it applies |
 | --- | --- |
-| Planning | Elaborated, but no submitted Proposal yet (no Proposal, or a draft). |
+| Planning | Elaborated, but no submitted Proposal yet (no Proposal, or a draft) and no linked Quick Tasks. |
 | Review proposal | A Proposal has been submitted and is waiting for your review. |
-| Building | The Proposal is approved and its Tasks are being worked on. |
+| Building | The Proposal is approved, or Quick Tasks are linked to the Idea, and at least one of those Tasks is unfinished. |
 | Verify work | At least one Task has been submitted for verification. |
-| Done | The Proposal is approved and every Task has reached `done` (or `closed`). |
+| Done | Every Task, from the approved Proposal and from linked Quick Tasks, has reached `done` (or `closed`). |
+
+When Quick Tasks are linked to an Idea, the derived label follows the union of those Tasks and
+the approved Proposal's Tasks, whatever the Idea's stored state. A pending elaboration round
+still shows **Answer questions** first, and a submitted Proposal still shows **Review
+proposal** before the Tasks are considered. Linking or unlinking a Quick Task never changes the
+Idea's stored state. Theme Ideas cannot take linked Quick Tasks; a theme's progress rolls up
+from its child Ideas.
 
 ## Proposal
 

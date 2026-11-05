@@ -70,6 +70,7 @@ try {
         `${locale}/guides/authentication-setup/`,
         `${locale}/guides/deploy-production/`,
         `${locale}/guides/review-a-proposal/`,
+        `${locale}/guides/agent-teams/`,
         `${locale}/reference/mcp-tools/`,
         `${locale}/reference/agents/pi/`,
       ]),

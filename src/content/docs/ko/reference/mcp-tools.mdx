@@ -71,7 +71,7 @@ MCP 트랜스포트 세션은 Chorus의 **에이전트 세션**과 무관합니�
 
 </div>
 
-범위 헤더를 따르는 것은 `chorus_get_my_assignments`뿐입니다. 헤더가 없으면 접근 가능한 프로젝트 전체를 포함하며 둘 다 있으면 `X-Chorus-Project-Group`이 우선합니다. `chorus_checkin`은 필터링되지 않은 `activeProjects` 분포를 반환하며 최근 아이디어 목록이 아닙니다. 다른 도구는 각자의 명시적 범위 인수를 사용합니다. 이 헤더는 일반적인 프로젝트 접근 필터가 아닙니다.
+`chorus_get_my_assignments`는 범위 헤더로 결과를 필터링합니다. 헤더가 없으면 접근 가능한 프로젝트 전체를 포함하며 둘 다 있으면 `X-Chorus-Project-Group`이 우선합니다. `chorus_checkin`은 이 헤더로 필터링하지 않습니다. `activeProjects` 분포는 필터링되지 않으며(최근 아이디어 목록도 아닙니다), 헤더로 선택한 프로젝트는 `projectTeams`에 추가될 뿐입니다. 다른 도구는 각자의 명시적 범위 인수를 사용합니다. 이 헤더는 일반적인 프로젝트 접근 필터가 아닙니다.
 
 ```json
 {
@@ -177,9 +177,13 @@ MCP 트랜스포트 세션은 Chorus의 **에이전트 세션**과 무관합니�
 
 신원, 소유자, 유효 권한, 페르소나와 `activeProjects`를 반환합니다. 프로젝트 UUID별 이름과 `activeIdeaCount`가 있으며 활성 아이디어 총수는 잘리지 않습니다. 개별 아이디어나 작업은 포함하지 않습니다. 최근 미읽음 알림을 최대 다섯 개 반환하고 자동으로 읽음 처리합니다. `notifications.unread`는 처리 후 남은 미읽음 수입니다. 범위 헤더로 좁혀지지 않습니다.
 
+`projectTeams`는 각 프로젝트 UUID를 그 프로젝트에서의 소유자 [에이전트 팀](/ko/guides/agent-teams/)에 대응시키며, 팀이 없으면 `null`입니다.
+`activeProjects`의 프로젝트와 범위 헤더로 선택한 프로젝트를 다루며, 소유자가 없거나 `project:read`가 없는 에이전트는 `{}`를 받습니다. 다른 프로젝트에는 `chorus_get_project_team`을 사용하세요.
+
 ```text
 { checkinTime, agent: { uuid, name, permissions, persona, systemPrompt, owner },
   activeProjects: { <projectUuid>: { name, activeIdeaCount } },
+  projectTeams: { <projectUuid>: ProjectTeam | null },
   notifications: { unread, recent[] } }
 ```
 
@@ -190,6 +194,24 @@ MCP 트랜스포트 세션은 Chorus의 **에이전트 세션**과 무관합니�
 ```text
 { ideaTracker: { <projectUuid>: { name, ideas[] } },
   taskTracker: { <projectUuid>: { name, tasks[] } } }
+```
+
+### Quick Task를 아이디어에 연결하기
+
+Quick Task(`proposalUuid` 없이 만든 작업)는 같은 프로젝트의 아이디어 하나에 직접 연결할 수 있습니다. 그러면 아이디어의 파생 상태가 이 작업을 승인된 제안의 작업과 함께 계산합니다. 테마 아이디어는 거부되며, 한 작업이 `proposalUuid`와 `ideaUuid`를 함께 가질 수 없습니다. 제안 작업은 제안을 통해 아이디어에 속합니다. 연결해도 아이디어에 저장된 상태는 바뀌지 않습니다.
+
+연결 설정은 공용입니다. `chorus_create_tasks`와 `chorus_update_task`에는 권한 제한이 없습니다(프로젝트 편집자 권한은 필요합니다). 읽기에는 권한이 필요합니다. `chorus_list_tasks`와 `chorus_get_task`에는 `task:read`, `chorus_get_idea`에는 `idea:read`가 필요합니다.
+
+- `chorus_create_tasks`는 Quick Task 모드에서 선택적인 **최상위** `ideaUuid`를 받아 배치의 모든 작업을 연결합니다. `proposalUuid`와 함께 보내면 거부되고, 연결이 유효하지 않으면 호출 전체가 거부되며, `tasks[]` 항목 안에 `ideaUuid`를 넣으면 검증 오류가 납니다.
+- `chorus_update_task`는 `ideaUuid: string | null`을 받습니다. 아이디어 UUID를 보내면 연결을 설정하거나 바꾸고, `null`이면 해제하며, 생략하면 그대로 둡니다. 제안 작업에서는 거부됩니다.
+- `chorus_list_tasks`는 선택적인 `ideaUuid` 필터를 받아 그 아이디어에 연결된 Quick Task만 반환합니다. 아이디어의 제안 작업은 포함되지 않으므로 `proposalUuids`로 조회하세요.
+- `chorus_get_task`와 다른 작업 응답은 `ideaUuid`를 반환합니다(연결되지 않았으면 `null`, 제안 작업은 항상 `null`).
+- `chorus_get_idea`는 서버가 계산한 `derivedStatus`(`todo`, `in_progress`, `human_conduct_required`, `done` 중 하나)와 `badgeHint`(예: `building`, `verify_work`, `done`)를 반환합니다. 보드와 같은 규칙으로 승인된 제안의 작업과 연결된 Quick Task를 대상으로 하며, 테마는 하위 아이디어에서 집계됩니다.
+
+```text
+chorus_create_tasks  Input: { projectUuid, ideaUuid?, tasks[] }        // no proposalUuid
+chorus_update_task   Input: { taskUuid, ideaUuid?: string | null, ... }
+chorus_list_tasks    Input: { projectUuid, ideaUuid?, status?, priority?, proposalUuids?, page?, pageSize? }
 ```
 
 ### chorus_claim_task — `task:write`
@@ -259,6 +281,85 @@ open 작업을 가져가 `assigned`로 옮기고 호출자를 담당자로 설�
 반환:   업데이트된 Task(수락 기준 게이트가 차단하면 오류)
 ```
 
+## 에이전트 팀 도구
+
+이 도구들로 에이전트는 소유자 개인의 [에이전트 팀](/ko/guides/agent-teams/)을 읽고 그에 따라 움직일 수 있습니다. 팀은 권한을 부여하지 않으며
+스스로 일을 배정하지도 않습니다. 모든 호출은 여전히 에이전트의 권한과 소유자의 프로젝트 액세스로 확인됩니다. 에이전트는 팀을 바꾸거나
+아이디어 인계를 확인할 수 없습니다. 연결, 역할별 재정의, 연결 해제, 인계는 웹 UI에서 합니다.
+
+아이디어는 그 소유자(사람)가 프로젝트에 팀을 연결한 뒤 자신의 에이전트에게 배정했을 때, 또는 그 에이전트가 팀이 관리하는 아이디어 아래에서
+파생 아이디어를 배정했을 때 **팀이 관리하는** 아이디어가 됩니다. 그 담당자가 아이디어를 **총괄**하며 리드 역할은 필요 없습니다. 수명 주기 인계
+(제안 제출이나 승인, 작업의 검증 제출)는 총괄자에게 알려지며, 총괄자는 깨어날 때마다 아이디어의 팀 컨텍스트를 다시 읽어야 합니다.
+
+### chorus_get_project_team — `project:read`
+
+호출한 에이전트의 소유자가 한 프로젝트에서 가진 팀을 읽습니다. 프로젝트에 최소 뷰어 액세스가 필요합니다. 소유자가 그 프로젝트에 팀이 없거나
+에이전트에 소유자가 없으면 `{ team: null }`을 반환합니다. 다른 사용자의 팀은 절대 반환되지 않습니다.
+
+```text
+Input:  { projectUuid }
+Return: { team: { projectUuid, templateUuid, templateName, frozen, revision,
+                  overrides, roles: { product[], development[], review[], lead[] },
+                  myRoles[], handoffWarning } | null }
+```
+
+각 역할 멤버에는 `agentUuid`, `agentName`, `eligible`, `missingPermissions[]`, `hasProjectAccess`, `online`, `activeCount`가 있습니다.
+오프라인 멤버도 자격이 있을 수 있습니다. `overrides`는 역할 전체의 대체를 나타내며, `[]`인 역할은 명시적으로 비어 있습니다. `frozen`은 템플릿이
+삭제되어 마지막 멤버가 보존되었음을 뜻합니다. `myRoles`에는 호출자가 자격을 갖춘 역할만 들어 있습니다.
+
+### chorus_get_idea_team_context — `idea:read`
+
+아이디어가 팀이 관리하는 것인지, 누가 총괄하는지 읽습니다. `state`는 `active`, `paused`(총괄자가 자격을 잃음), `unmanaged` 중 하나입니다.
+사람이 아이디어를 Yolo로 시작했으면 `yolo`가 true이며, 제안 승인에 사람이 필요한지만 결정합니다. `routing`(소유자, 제품 위임 대상, 팀 역할)은
+팀 소유자와 그 에이전트에게만 반환됩니다.
+
+```text
+Input:  { ideaUuid }
+Return: { ideaUuid, managed, state, reason, orchestrator, yolo, routing }
+```
+
+### chorus_recommend_team_agent — `idea:read`
+
+팀이 관리하는 아이디어에 대해 실시간 자격, 온라인 상태, 부하, 연관성을 바탕으로 `product`, `development`, `review` 멤버를 추천합니다.
+배정하거나 깨우지 않습니다. `decision`은 `recommended`, `lead_decision`(동률이라 총괄자가 `candidates` 중에서 결정), `manual`(팀이 관리하지 않는
+아이디어이거나 제품·개발 작업에 쓸 멤버가 없음), `paused` 중 하나입니다.
+
+```text
+Input:  { ideaUuid, role: "product" | "development" | "review",
+          taskUuid?, proposalUuid? }          // at most one target
+Return: { decision, agentUuid, candidates[], reason }
+```
+
+`review`에서는 `taskUuid`로 작업 리뷰, `proposalUuid`로 제안 리뷰를 고르며, 둘 다 없으면 아이디어 전체 리뷰입니다. 자격이 있고 온라인인 검토자가
+먼저이고, 다음은 대상의 최근 판정을 쓴 검토자, 그다음은 가장 덜 바쁜 멤버입니다. 아무도 제외되지 않습니다. 자격 있고 온라인인 검토자가 없으면
+총괄자 자신을 추천하고, 총괄자가 자신의 검토자 서브에이전트를 실행하므로 리뷰가 수동으로 남는 일은 없습니다.
+
+### chorus_delegate_team_product — `idea:write`
+
+총괄자(또는 팀 소유자)가 요구사항 구체화와 제안 작성을 자격 있는 제품 멤버에게 위임하고 @멘션합니다. 위임 대상은 구체화를 시작하고 아이디어의
+제안을 만들고 제출할 수 있지만, 아이디어를 가져가거나 놓거나 다시 배정할 수 없고, 구체화 확정, 승인, 검증도 할 수 없습니다. 아이디어를 다시
+배정하면 위임이 끝납니다.
+
+```text
+Input:  { ideaUuid, agentUuid }
+Return: the updated Idea Team context
+```
+
+### chorus_request_review — 공용(프로젝트 편집자)
+
+검토자 한 명에게 팀 리뷰 요청을 보냅니다. Chorus는 대상에 리뷰 요청 댓글을 게시해 라운드를 적고, 검토자를 멘션하고, 결과를 받을 대상을 밝힙니다.
+통과는 아이디어의 총괄자에게, 실패한 작업은 그 개발자에게, 실패한 제안은 제품 위임 대상(없으면 총괄자)에게 갑니다. 그 검토자만 깨워지며
+별도의 검토 대화에서 진행합니다. 같은 대상의 재리뷰는 그 대화를 이어 갑니다. 일반 댓글은 리뷰를 시작하지 않습니다. 검토자는 프로젝트에 액세스할 수
+있는 다른 에이전트여야 하고, 아이디어(작업이면 그 작업도)에 결과를 받을 에이전트 담당자가 있어야 합니다. 그렇지 않으면 호출이 거부되고 아무것도
+게시되지 않습니다. 검토자가 오프라인이거나 깨울 수 없으면 요청 댓글은 게시되지만 리뷰는 시작되지 않고 호출은 오류를 반환합니다. 검토자가 온라인이 된 뒤
+다시 시도하세요.
+
+```text
+Input:  { targetType: "task" | "proposal" | "idea", targetUuid,
+          reviewerUuid, round: 1-3, note? }
+Return: { commentUuid, targetType, targetUuid, reviewerUuid, round, sessionId, turnUuid }
+```
+
 ## 통제 도구 → 필요한 권한 행렬
 
 권한으로 통제되는 모든 도구와 각 도구에 필요한 단일 비트입니다. 도구가 나타나려면 프리셋이나 사용자 지정
@@ -269,7 +370,7 @@ open 작업을 가져가 `assigned`로 옮기고 호출자를 담당자로 설�
 
   | 필요한 권한 | 도구 |
   | --- | --- |
-  | `idea:write` | `chorus_claim_idea`, `chorus_release_idea`, `chorus_move_idea`, `chorus_pm_create_idea`, `chorus_edit_idea`, `chorus_pm_start_elaboration`, `chorus_pm_skip_elaboration` |
+  | `idea:write` | `chorus_claim_idea`, `chorus_release_idea`, `chorus_move_idea`, `chorus_pm_create_idea`, `chorus_edit_idea`, `chorus_pm_start_elaboration`, `chorus_pm_skip_elaboration`, `chorus_delegate_team_product` |
   | `idea:admin` | `chorus_pm_validate_elaboration`, `chorus_admin_delete_idea` |
   | `proposal:write` | `chorus_pm_create_proposal`, `chorus_pm_validate_proposal`, `chorus_pm_submit_proposal`, `chorus_pm_add_document_draft`, `chorus_pm_add_task_draft`, `chorus_pm_update_document_draft`, `chorus_pm_update_task_draft`, `chorus_pm_remove_document_draft`, `chorus_pm_remove_task_draft`, `chorus_pm_reject_proposal`, `chorus_pm_revoke_proposal`, `chorus_pm_assign_task` |
   | `proposal:admin` | `chorus_admin_approve_proposal`, `chorus_admin_close_proposal` |

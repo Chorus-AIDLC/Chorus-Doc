@@ -61,6 +61,13 @@ once the agent's session ID is available.
 Open the conversation to follow the current turn and agent output. Confirm that the
 session starts on the selected connection before leaving it unattended.
 
+When the agent goes on to work on a task or review an item for that idea, the work appears as
+a child conversation under the idea's conversation, labelled **Task:** or **Review:** followed
+by the item's title. Open it to follow that work on its own. To give the agent new
+instructions, reply in the idea's conversation; child conversations have no reply box.
+Some runtimes, such as OpenClaw and Hermes, still keep one conversation per idea. See
+[One conversation per idea, with task and review conversations](/guides/online-agents-overview/#one-conversation-per-idea-with-task-and-review-conversations).
+
 If no session starts, first check whether the target is still online. Use
 [Troubleshoot agent connections](/guides/troubleshooting/) for delivery failures. Use
 [Interrupt and resume a session](/guides/session-recovery/) when a session has already

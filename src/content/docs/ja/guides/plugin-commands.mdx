@@ -139,7 +139,8 @@ $quick-dev        # Codex
 - **必要な権限:** 課題の作成、担当、実行には `task:write`。結果の自己検証には明示的な `task:admin` が
   必要で、それがなければエージェントは証拠を投稿し、人間に検証を引き渡します。
 - **成果物:** 独立した課題（または `proposalUuid` で既存の提案にひもづく課題）を `to_verify` まで、
-  キーが `task:admin` を持つ場合は `done` まで進めます。
+  キーが `task:admin` を持つ場合は `done` まで進めます。提案を通さずに既存の着想を届ける作業なら、独立した課題を
+  [その着想に関連付け](/ja/guides/create-and-edit-entities/#quick-task-を着想に関連付ける)られ、それらがすべて完了すると着想も完了します。
 
 ### `/chorus:yolo` — 全自動パイプライン
 
