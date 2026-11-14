@@ -139,6 +139,24 @@ chorus agents run --name work --type codex -- resume # 覆盖后端，再把 `re
 - **透传**：`--` 之后的一切都会原样交给智能体，因此智能体自身的全部参数都可使用。智能体继承你的终端，
   `chorus agents run` 以它的退出码退出。
 
+### 在 Chorus 中继续终端里的对话
+
+每次 `chorus agents run` 都会在 Chorus 里登记为该智能体的一段对话。你可以先在终端开始工作，之后在 Chorus 界面里接着聊。
+
+- **实时可见**：你工作时，这段对话会出现在该智能体的对话列表里，用户和助手的消息会实时同步（不包含工具调用和思考过程）。Kiro 会在你退出时一次性上传。
+- **终端运行期间从 Chorus 发消息**：对话会显示 **在终端中运行**，你发送的内容会先排队，不会被输入到你的终端会话里。
+- **退出后由 Chorus 接着处理**：你退出智能体后，运行在 **同一台机器、同一目录** 下的 Chorus 后台服务会续接同一段对话，并回复排队的消息。如果终端是被强制结束而不是正常退出，大约一分钟内也会接手。
+- **该目录下没有运行后台服务**：只会打印一行警告，智能体照常启动。在该目录启动 `chorus daemon` 后，这段对话即可续接；在此之前，Chorus 中的发送按钮会被禁用并给出原因。
+- **挂到某个 Idea 下**：使用 `--idea <uuid>`（否则是一段独立对话）；单次关闭同步请使用 `--no-sync`。
+- **自己传入续接参数**：如果你在 `--` 之后自己传了会话或续接参数（例如 Claude Code 的 `--resume` 或 `--continue`），这段对话仍会显示在 Chorus 中，但无法从 Chorus 续接。OpenCode、OpenClaw 和 DeepSeek Harness 的运行只能查看。
+
+```sh
+chorus agents run --name work --idea <idea-uuid>   # 在某个 Idea 下显示并可续接这次运行
+chorus agents run --name work --no-sync            # 普通启动，不在 Chorus 中登记
+```
+
+同步永远不会阻塞智能体：出现问题时最多打印一行警告，详细信息写入 `~/.chorus/logs/cli-session-sync.log`。
+
 ### 持久化 args/env 与一次性覆盖
 
 选中的 `agents[]` 条目可设置 `args`（字符串数组，默认 `[]`）和 `env`（字符串到字符串的对象，默认 `{}`），后台服务唤醒与前台启动都会使用。`agents[]` 非空时，条目不继承顶层的 `args` / `env`，在顶层设置它们会报错。可复制的模型/思考/env 示例、扁平文件迁移、校验和密钥保护注意事项，参见[后台服务指南](/zh/guides/daemon-operations/)。
