@@ -191,6 +191,36 @@ chorus agents run --name work --type codex -- resume # override the backend, the
 - **Passthrough** — everything after `--` goes to the agent verbatim, so its full flag surface is
   available. The agent inherits your terminal, and `chorus agents run` exits with its exit code.
 
+### Continue a terminal conversation in Chorus
+
+Since Chorus 0.24.1, every `chorus agents run` is also registered as a conversation for that
+agent in Chorus, so you can start work in the terminal and pick it up from the Chorus UI later.
+
+- **See it live.** The conversation appears in the agent's chat list while you work. User and
+  assistant messages show up as you type (tool calls and thinking are not shown). Kiro uploads
+  the conversation once, when you exit.
+- **Send from Chorus while the terminal is open.** The conversation shows **Running in terminal**,
+  and anything you send is queued. Nothing is typed into your terminal session.
+- **Exit, and Chorus continues.** When you quit the agent, the Chorus daemon running on the
+  **same machine and directory** resumes the same conversation and answers the queued messages.
+  If the terminal is killed instead of exiting cleanly, this happens within about a minute.
+- **No daemon running there?** You get a single warning line and the agent still starts. The
+  conversation becomes continuable once you start `chorus daemon` in that directory; until then,
+  Send is disabled in Chorus with an explanation.
+- **Attach it to an Idea** with `--idea <uuid>` (otherwise it is a standalone conversation), or
+  turn sync off for one run with `--no-sync`.
+- **Your own resume flags.** If you pass a session or resume flag yourself after `--` (for
+  example `--resume` or `--continue` for Claude Code), the conversation is still shown in Chorus
+  but cannot be continued from there. OpenCode, OpenClaw and DeepSeek Harness runs are view-only.
+
+```sh
+chorus agents run --name work --idea <idea-uuid>   # show and continue this run under an Idea
+chorus agents run --name work --no-sync            # plain launch, nothing registered in Chorus
+```
+
+Sync never blocks the agent: problems print at most one warning line, with details in
+`~/.chorus/logs/cli-session-sync.log`.
+
 ### Persistent args/env and one-off overrides
 
 Each selected `agents[]` entry can hold `args` (string array, default `[]`) and `env`
